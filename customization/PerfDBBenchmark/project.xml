@@ -1,0 +1,437 @@
+<Customization level="10" description="PerfDBBenchmark by AcuPower LTD (acupowererp.com) for performance analysis" product-version="26.100">
+    <File AppRelativePath="Bin\PerfDBBenchmark.Core.dll" />
+    <File AppRelativePath="Pages\AC\AC301000.aspx" />
+    <File AppRelativePath="Pages\AC\AC301001.aspx" />
+    <File AppRelativePath="FrontendSources\screen\src\development\screens\AC\AC301000\AC301000.html" />
+    <File AppRelativePath="FrontendSources\screen\src\development\screens\AC\AC301000\AC301000.ts" />
+    <File AppRelativePath="FrontendSources\screen\src\development\screens\AC\AC301000\views.ts" />
+    <SiteMapNode>
+        <data-set>
+            <relations format-version="4" relations-version="20240201" main-table="SiteMap">
+                <link from="MUIScreen (NodeID)" to="SiteMap (NodeID)" />
+                <link from="MUIWorkspace (WorkspaceID)" to="MUIScreen (WorkspaceID)" type="FromMaster" linkname="workspaceToScreen" split-location="yes" updateable="True" />
+                <link from="MUISubcategory (SubcategoryID)" to="MUIScreen (SubcategoryID)" type="FromMaster" updateable="True" />
+                <link from="MUITile (ScreenID)" to="SiteMap (ScreenID)" />
+                <link from="MUIWorkspace (WorkspaceID)" to="MUITile (WorkspaceID)" type="FromMaster" linkname="workspaceToTile" split-location="yes" updateable="True" />
+                <link from="MUIArea (AreaID)" to="MUIWorkspace (AreaID)" type="FromMaster" updateable="True" />
+                <link from="MUIPinnedScreen (NodeID, WorkspaceID)" to="MUIScreen (NodeID, WorkspaceID)" type="WeakIfEmpty" isEmpty="Username" />
+                <link from="MUIFavoriteWorkspace (WorkspaceID)" to="MUIWorkspace (WorkspaceID)" type="WeakIfEmpty" isEmpty="Username" />
+            </relations>
+            <layout>
+                <table name="SiteMap">
+                    <table name="MUIScreen" uplink="(NodeID) = (NodeID)">
+                        <table name="MUIPinnedScreen" uplink="(NodeID, WorkspaceID) = (NodeID, WorkspaceID)" />
+                    </table>
+                    <table name="MUITile" uplink="(ScreenID) = (ScreenID)" />
+                </table>
+                <table name="MUIWorkspace">
+                    <table name="MUIFavoriteWorkspace" uplink="(WorkspaceID) = (WorkspaceID)" />
+                </table>
+                <table name="MUISubcategory" />
+                <table name="MUIArea" />
+            </layout>
+            <data>
+                <SiteMap>
+                    <row Title="Perf DB Benchmark" Url="~/Scripts/Screens/AC301000.html" ScreenID="AC301000" NodeID="0e8a89be-ef59-4f57-afc0-fc6c9f8410e1" ParentID="00000000-0000-0000-0000-000000000000" SelectedUI="T">
+                        <MUIScreen IsPortal="0" WorkspaceID="c25529f2-1e7e-4c34-ae75-0a524245d166" Order="10" SubcategoryID="f80fbdb2-bfad-4f79-bfce-3d9a5a5dd1b9" />
+                    </row>
+                    <row Title="Perf DB Benchmark Results" Url="~/Pages/AC/AC301001.aspx" ScreenID="AC301001" NodeID="8e7f7303-55f7-4f2f-8df5-efdf13875277" ParentID="00000000-0000-0000-0000-000000000000" SelectedUI="T">
+                        <MUIScreen IsPortal="0" WorkspaceID="c25529f2-1e7e-4c34-ae75-0a524245d166" Order="11" SubcategoryID="f80fbdb2-bfad-4f79-bfce-3d9a5a5dd1b9" />
+                    </row>
+                </SiteMap>
+                <MUIWorkspace>
+                    <row IsPortal="0" WorkspaceID="c25529f2-1e7e-4c34-ae75-0a524245d166" Order="610" Title="AcuPower Tools" Icon="assessment" AreaID="588d2f44-a933-4031-a845-a57255c1250e" ScreenID="WSAP0000" IsSystem="0" />
+                </MUIWorkspace>
+                <MUISubcategory>
+                    <row IsPortal="0" SubcategoryID="f80fbdb2-bfad-4f79-bfce-3d9a5a5dd1b9" Order="100" Name="Performance" Icon="" IsSystem="0" />
+                </MUISubcategory>
+                <MUIArea>
+                    <row IsPortal="0" AreaID="588d2f44-a933-4031-a845-a57255c1250e" Order="30" Name="Configuration" />
+                </MUIArea>
+            </data>
+        </data-set>
+    </SiteMapNode>
+    <EntityEndpoint Description="PerfDB benchmark control, catalog, and results API.">
+        <Endpoint xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="PerfDBBenchmark" version="26.100.001" systemContractVersion="4" xmlns="http://www.acumatica.com/entity/maintenance/5.31">
+            <Detail name="LocalResults">
+                <Fields>
+                    <Field name="ResultID" type="IntValue" />
+                    <Field name="RunID" type="GuidValue" />
+                    <Field name="TestCode" type="StringValue" />
+                    <Field name="DisplayName" type="StringValue" />
+                    <Field name="RequestedAtUtc" type="DateTimeValue" />
+                    <Field name="CapturedAtUtc" type="DateTimeValue" />
+                    <Field name="ElapsedMs" type="IntValue" />
+                    <Field name="RecordsCount" type="IntValue" />
+                    <Field name="Iterations" type="IntValue" />
+                    <Field name="BatchSize" type="IntValue" />
+                    <Field name="MaxThreads" type="IntValue" />
+                    <Field name="Notes" type="StringValue" />
+                </Fields>
+            </Detail>
+            <Detail name="BenchmarkCatalog">
+                <Fields>
+                    <Field name="TestCode" type="StringValue" />
+                    <Field name="DisplayName" type="StringValue" />
+                    <Field name="ActionName" type="StringValue" />
+                    <Field name="Category" type="StringValue" />
+                    <Field name="ExecutionMode" type="StringValue" />
+                    <Field name="ShortDescription" type="StringValue" />
+                    <Field name="SortOrder" type="IntValue" />
+                </Fields>
+            </Detail>
+            <TopLevelEntity name="BenchmarkResult" screen="AC301001">
+                <Fields>
+                    <Field name="ResultID" type="IntValue" />
+                    <Field name="RunID" type="GuidValue" />
+                    <Field name="InstanceName" type="StringValue" />
+                    <Field name="DatabaseType" type="StringValue" />
+                    <Field name="TestCode" type="StringValue" />
+                    <Field name="TestCategory" type="StringValue" />
+                    <Field name="ExecutionMode" type="StringValue" />
+                    <Field name="DisplayName" type="StringValue" />
+                    <Field name="RequestedAtUtc" type="DateTimeValue" />
+                    <Field name="CapturedAtUtc" type="DateTimeValue" />
+                    <Field name="ElapsedMs" type="IntValue" />
+                    <Field name="RecordsCount" type="IntValue" />
+                    <Field name="Iterations" type="IntValue" />
+                    <Field name="BatchSize" type="IntValue" />
+                    <Field name="MaxThreads" type="IntValue" />
+                    <Field name="Notes" type="StringValue" />
+                </Fields>
+                <Mappings>
+                    <Mapping field="ResultID">
+                        <To object="Results" field="ResultID" />
+                    </Mapping>
+                    <Mapping field="RunID">
+                        <To object="Results" field="RunID" />
+                    </Mapping>
+                    <Mapping field="InstanceName">
+                        <To object="Results" field="InstanceName" />
+                    </Mapping>
+                    <Mapping field="DatabaseType">
+                        <To object="Results" field="DatabaseType" />
+                    </Mapping>
+                    <Mapping field="TestCode">
+                        <To object="Results" field="TestCode" />
+                    </Mapping>
+                    <Mapping field="TestCategory">
+                        <To object="Results" field="TestCategory" />
+                    </Mapping>
+                    <Mapping field="ExecutionMode">
+                        <To object="Results" field="ExecutionMode" />
+                    </Mapping>
+                    <Mapping field="DisplayName">
+                        <To object="Results" field="DisplayName" />
+                    </Mapping>
+                    <Mapping field="RequestedAtUtc">
+                        <To object="Results" field="RequestedAtUtc" />
+                    </Mapping>
+                    <Mapping field="CapturedAtUtc">
+                        <To object="Results" field="CapturedAtUtc" />
+                    </Mapping>
+                    <Mapping field="ElapsedMs">
+                        <To object="Results" field="ElapsedMs" />
+                    </Mapping>
+                    <Mapping field="RecordsCount">
+                        <To object="Results" field="RecordsCount" />
+                    </Mapping>
+                    <Mapping field="Iterations">
+                        <To object="Results" field="Iterations" />
+                    </Mapping>
+                    <Mapping field="BatchSize">
+                        <To object="Results" field="BatchSize" />
+                    </Mapping>
+                    <Mapping field="MaxThreads">
+                        <To object="Results" field="MaxThreads" />
+                    </Mapping>
+                    <Mapping field="Notes">
+                        <To object="Results" field="Notes" />
+                    </Mapping>
+                </Mappings>
+            </TopLevelEntity>
+            <TopLevelEntity name="BenchmarkControl" screen="AC301000">
+                <Fields>
+                    <Field name="SetupID" type="IntValue" />
+                    <Field name="NumberOfRecords" type="IntValue" />
+                    <Field name="Iterations" type="IntValue" />
+                    <Field name="ParallelBatchSize" type="IntValue" />
+                    <Field name="ParallelMaxThreads" type="IntValue" />
+                    <Field name="CurrentDatabase" type="StringValue" />
+                    <Field name="CurrentInstance" type="StringValue" />
+                    <Field name="SnapshotStatus" type="StringValue" />
+                    <Field name="PendingAnalysisStatus" type="StringValue" />
+                    <Field name="LastRequestID" type="GuidValue" />
+                    <Field name="LastRequestedTestCode" type="StringValue" />
+                    <Field name="LastRequestedBenchmark" type="StringValue" />
+                    <Field name="LastRequestStatus" type="StringValue" />
+                    <Field name="LastRequestStartedAtUtc" type="DateTimeValue" />
+                    <Field name="LastRequestCompletedAtUtc" type="DateTimeValue" />
+                    <Field name="LastRequestElapsedMs" type="IntValue" />
+                    <Field name="LastRequestMessage" type="StringValue" />
+                    <Field name="LocalResults" type="LocalResults[]" />
+                    <Field name="BenchmarkCatalog" type="BenchmarkCatalog[]" />
+                </Fields>
+                <Mappings>
+                    <Mapping field="SetupID">
+                        <To object="Filter" field="SetupID" />
+                    </Mapping>
+                    <Mapping field="NumberOfRecords">
+                        <To object="Filter" field="NumberOfRecords" />
+                    </Mapping>
+                    <Mapping field="Iterations">
+                        <To object="Filter" field="Iterations" />
+                    </Mapping>
+                    <Mapping field="ParallelBatchSize">
+                        <To object="Filter" field="ParallelBatchSize" />
+                    </Mapping>
+                    <Mapping field="ParallelMaxThreads">
+                        <To object="Filter" field="ParallelMaxThreads" />
+                    </Mapping>
+                    <Mapping field="CurrentDatabase">
+                        <To object="Filter" field="CurrentDatabase" />
+                    </Mapping>
+                    <Mapping field="CurrentInstance">
+                        <To object="Filter" field="CurrentInstance" />
+                    </Mapping>
+                    <Mapping field="SnapshotStatus">
+                        <To object="Filter" field="SnapshotStatus" />
+                    </Mapping>
+                    <Mapping field="PendingAnalysisStatus">
+                        <To object="Filter" field="PendingAnalysisStatus" />
+                    </Mapping>
+                    <Mapping field="LastRequestID">
+                        <To object="Filter" field="LastRequestID" />
+                    </Mapping>
+                    <Mapping field="LastRequestedTestCode">
+                        <To object="Filter" field="LastRequestedTestCode" />
+                    </Mapping>
+                    <Mapping field="LastRequestedBenchmark">
+                        <To object="Filter" field="LastRequestedBenchmark" />
+                    </Mapping>
+                    <Mapping field="LastRequestStatus">
+                        <To object="Filter" field="LastRequestStatus" />
+                    </Mapping>
+                    <Mapping field="LastRequestStartedAtUtc">
+                        <To object="Filter" field="LastRequestStartedAtUtc" />
+                    </Mapping>
+                    <Mapping field="LastRequestCompletedAtUtc">
+                        <To object="Filter" field="LastRequestCompletedAtUtc" />
+                    </Mapping>
+                    <Mapping field="LastRequestElapsedMs">
+                        <To object="Filter" field="LastRequestElapsedMs" />
+                    </Mapping>
+                    <Mapping field="LastRequestMessage">
+                        <To object="Filter" field="LastRequestMessage" />
+                    </Mapping>
+                    <Mapping field="LocalResults">
+                        <Mapping field="ResultID">
+                            <To object="LocalResults" field="ResultID" />
+                        </Mapping>
+                        <Mapping field="RunID">
+                            <To object="LocalResults" field="RunID" />
+                        </Mapping>
+                        <Mapping field="TestCode">
+                            <To object="LocalResults" field="TestCode" />
+                        </Mapping>
+                        <Mapping field="DisplayName">
+                            <To object="LocalResults" field="DisplayName" />
+                        </Mapping>
+                        <Mapping field="RequestedAtUtc">
+                            <To object="LocalResults" field="RequestedAtUtc" />
+                        </Mapping>
+                        <Mapping field="CapturedAtUtc">
+                            <To object="LocalResults" field="CapturedAtUtc" />
+                        </Mapping>
+                        <Mapping field="ElapsedMs">
+                            <To object="LocalResults" field="ElapsedMs" />
+                        </Mapping>
+                        <Mapping field="RecordsCount">
+                            <To object="LocalResults" field="RecordsCount" />
+                        </Mapping>
+                        <Mapping field="Iterations">
+                            <To object="LocalResults" field="Iterations" />
+                        </Mapping>
+                        <Mapping field="BatchSize">
+                            <To object="LocalResults" field="BatchSize" />
+                        </Mapping>
+                        <Mapping field="MaxThreads">
+                            <To object="LocalResults" field="MaxThreads" />
+                        </Mapping>
+                        <Mapping field="Notes">
+                            <To object="LocalResults" field="Notes" />
+                        </Mapping>
+                    </Mapping>
+                    <Mapping field="BenchmarkCatalog">
+                        <Mapping field="TestCode">
+                            <To object="BenchmarkCatalog" field="TestCode" />
+                        </Mapping>
+                        <Mapping field="DisplayName">
+                            <To object="BenchmarkCatalog" field="DisplayName" />
+                        </Mapping>
+                        <Mapping field="ActionName">
+                            <To object="BenchmarkCatalog" field="ActionName" />
+                        </Mapping>
+                        <Mapping field="Category">
+                            <To object="BenchmarkCatalog" field="Category" />
+                        </Mapping>
+                        <Mapping field="ExecutionMode">
+                            <To object="BenchmarkCatalog" field="ExecutionMode" />
+                        </Mapping>
+                        <Mapping field="ShortDescription">
+                            <To object="BenchmarkCatalog" field="ShortDescription" />
+                        </Mapping>
+                        <Mapping field="SortOrder">
+                            <To object="BenchmarkCatalog" field="SortOrder" />
+                        </Mapping>
+                    </Mapping>
+                </Mappings>
+                <Actions>
+                    <Action name="RefreshStatus" mappedTo="RefreshStatus" />
+                    <Action name="ApplyRecommendedSettings" mappedTo="ApplyRecommendedSettings" />
+                    <Action name="ClearTestData" mappedTo="ClearTestData" />
+                    <Action name="RunSequentialRead" mappedTo="RunSequentialRead" />
+                    <Action name="RunSequentialWrite" mappedTo="RunSequentialWrite" />
+                    <Action name="RunSequentialDelete" mappedTo="RunSequentialDelete" />
+                    <Action name="RunSequentialComplexJoin" mappedTo="RunSequentialComplexJoin" />
+                    <Action name="RunSequentialProjection" mappedTo="RunSequentialProjection" />
+                    <Action name="RunParallelRead" mappedTo="RunParallelRead" />
+                    <Action name="RunParallelWrite" mappedTo="RunParallelWrite" />
+                    <Action name="RunParallelDelete" mappedTo="RunParallelDelete" />
+                    <Action name="RunParallelComplexJoin" mappedTo="RunParallelComplexJoin" />
+                    <Action name="RunParallelProjection" mappedTo="RunParallelProjection" />
+                </Actions>
+            </TopLevelEntity>
+        </Endpoint>
+    </EntityEndpoint>
+    <Sql TableName="PerfBenchmarkFilter" TableSchemaXml="#CDATA">
+        <CDATA name="TableSchemaXml"><![CDATA[<table name="PerfBenchmarkFilter">
+  <col name="CompanyID" type="Int" default="Zero" />
+  <col name="SetupID" type="Int" />
+  <col name="NumberOfRecords" type="Int" nullable="true" />
+  <col name="Iterations" type="Int" nullable="true" />
+  <col name="ParallelBatchSize" type="Int" nullable="true" />
+  <col name="ParallelMaxThreads" type="Int" nullable="true" />
+  <col name="CurrentDatabase" type="NVarChar(60)" nullable="true" />
+  <col name="CurrentInstance" type="NVarChar(60)" nullable="true" />
+  <col name="DetectedCpuCores" type="Int" nullable="true" />
+  <col name="DetectedMemoryGb" type="Decimal(19,6)" nullable="true" />
+  <col name="RecommendedRecords" type="Int" nullable="true" />
+  <col name="RecommendedIterations" type="Int" nullable="true" />
+  <col name="RecommendedBatchSize" type="Int" nullable="true" />
+  <col name="RecommendedMaxThreads" type="Int" nullable="true" />
+  <col name="HardwareRecommendationSummary" type="NVarChar(512)" nullable="true" />
+  <col name="SnapshotStatus" type="NVarChar(512)" nullable="true" />
+  <col name="PendingAnalysisStatus" type="NVarChar(2048)" nullable="true" />
+  <col name="LastRequestID" type="UniqueIdentifier" nullable="true" />
+  <col name="LastRequestedTestCode" type="NVarChar(64)" nullable="true" />
+  <col name="LastRequestedBenchmark" type="NVarChar(128)" nullable="true" />
+  <col name="LastRequestStatus" type="NVarChar(32)" nullable="true" />
+  <col name="LastRequestStartedAtUtc" type="DateTime" nullable="true" />
+  <col name="LastRequestCompletedAtUtc" type="DateTime" nullable="true" />
+  <col name="LastRequestElapsedMs" type="Int" nullable="true" />
+  <col name="LastRequestMessage" type="NVarChar(1024)" nullable="true" />
+  <col name="BLOB" type="VarBinary(MAX)" nullable="true" />
+  <col name="FileURL" type="NVarChar(255)" nullable="true" />
+  <col name="NoteID" type="UniqueIdentifier" />
+  <col name="tstamp" type="Timestamp" />
+  <col name="CreatedByID" type="UniqueIdentifier" />
+  <col name="CreatedByScreenID" type="Char(8)" />
+  <col name="CreatedDateTime" type="DateTime" />
+  <col name="LastModifiedByID" type="UniqueIdentifier" />
+  <col name="LastModifiedByScreenID" type="Char(8)" />
+  <col name="LastModifiedDateTime" type="DateTime" />
+  <index name="PerfBenchmarkFilter_NoteID" unique="true">
+    <col name="NoteID" />
+    <col name="CompanyID" />
+  </index>
+  <index name="PerfBenchmarkFilter_PK" clustered="true" primary="true" unique="true">
+    <col name="CompanyID" />
+    <col name="SetupID" />
+  </index>
+</table>]]></CDATA>
+    </Sql>
+    <Sql TableName="PerfTestRecord" TableSchemaXml="#CDATA">
+        <CDATA name="TableSchemaXml"><![CDATA[<table name="PerfTestRecord">
+  <col name="CompanyID" type="Int" default="Zero" />
+  <col name="RecordID" type="Int" identity="true" />
+  <col name="BatchID" type="NVarChar(64)" />
+  <col name="OperationType" type="NVarChar(32)" />
+  <col name="Iteration" type="Int" default="Zero" />
+  <col name="Sequence" type="Int" default="Zero" />
+  <col name="PayloadText" type="NVarChar(255)" nullable="true" />
+  <col name="PayloadValue" type="Int" default="Zero" />
+  <col name="BLOB" type="VarBinary(MAX)" nullable="true" />
+  <col name="FileURL" type="NVarChar(255)" nullable="true" />
+  <col name="NoteID" type="UniqueIdentifier" />
+  <col name="tstamp" type="Timestamp" />
+  <col name="CreatedByID" type="UniqueIdentifier" />
+  <col name="CreatedByScreenID" type="Char(8)" />
+  <col name="CreatedDateTime" type="DateTime" />
+  <col name="LastModifiedByID" type="UniqueIdentifier" />
+  <col name="LastModifiedByScreenID" type="Char(8)" />
+  <col name="LastModifiedDateTime" type="DateTime" />
+  <index name="PerfTestRecord_NoteID" unique="true">
+    <col name="NoteID" />
+    <col name="CompanyID" />
+  </index>
+  <index name="PerfTestRecord_BatchID_Sequence">
+    <col name="CompanyID" />
+    <col name="BatchID" />
+    <col name="Sequence" />
+  </index>
+  <index name="PerfTestRecord_PK" clustered="true" primary="true" unique="true">
+    <col name="CompanyID" />
+    <col name="RecordID" />
+  </index>
+</table>]]></CDATA>
+    </Sql>
+    <Sql TableName="PerfTestResult" TableSchemaXml="#CDATA">
+        <CDATA name="TableSchemaXml"><![CDATA[<table name="PerfTestResult">
+  <col name="CompanyID" type="Int" default="Zero" />
+  <col name="ResultID" type="Int" identity="true" />
+  <col name="InstanceName" type="NVarChar(64)" />
+  <col name="DatabaseType" type="NVarChar(64)" />
+  <col name="TestCode" type="NVarChar(64)" />
+  <col name="TestCategory" type="NVarChar(64)" />
+  <col name="ExecutionMode" type="NVarChar(24)" />
+  <col name="DisplayName" type="NVarChar(128)" />
+  <col name="RunID" type="UniqueIdentifier" nullable="true" />
+  <col name="RequestedAtUtc" type="DateTime" nullable="true" />
+  <col name="RecordsCount" type="Int" nullable="true" />
+  <col name="Iterations" type="Int" nullable="true" />
+  <col name="BatchSize" type="Int" nullable="true" />
+  <col name="MaxThreads" type="Int" nullable="true" />
+  <col name="ElapsedMs" type="Int" nullable="true" />
+  <col name="Notes" type="NVarChar(1024)" nullable="true" />
+  <col name="CapturedAtUtc" type="DateTime" nullable="true" />
+  <col name="BLOB" type="VarBinary(MAX)" nullable="true" />
+  <col name="FileURL" type="NVarChar(255)" nullable="true" />
+  <col name="NoteID" type="UniqueIdentifier" />
+  <col name="tstamp" type="Timestamp" />
+  <col name="CreatedByID" type="UniqueIdentifier" />
+  <col name="CreatedByScreenID" type="Char(8)" />
+  <col name="CreatedDateTime" type="DateTime" />
+  <col name="LastModifiedByID" type="UniqueIdentifier" />
+  <col name="LastModifiedByScreenID" type="Char(8)" />
+  <col name="LastModifiedDateTime" type="DateTime" />
+  <index name="PerfTestResult_NoteID" unique="true">
+    <col name="NoteID" />
+    <col name="CompanyID" />
+  </index>
+  <index name="PerfTestResult_TestCode_CapturedAtUtc">
+    <col name="CompanyID" />
+    <col name="TestCode" />
+    <col name="CapturedAtUtc" />
+  </index>
+  <index name="PerfTestResult_RunID">
+    <col name="CompanyID" />
+    <col name="RunID" />
+  </index>
+  <index name="PerfTestResult_PK" clustered="true" primary="true" unique="true">
+    <col name="CompanyID" />
+    <col name="ResultID" />
+  </index>
+</table>]]></CDATA>
+    </Sql>
+</Customization>

@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>PerfDBBenchmark.Core</AssemblyName>
+    <RootNamespace>PerfDBBenchmark.Core</RootNamespace>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="PX.Common">
+      <HintPath>$(AcumaticaBinFolder)PX.Common.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="PX.Common.Std">
+      <HintPath>$(AcumaticaBinFolder)PX.Common.Std.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="PX.Data">
+      <HintPath>$(AcumaticaBinFolder)PX.Data.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="PX.Data.BQL.Fluent">
+      <HintPath>$(AcumaticaBinFolder)PX.Data.BQL.Fluent.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="PX.Objects">
+      <HintPath>$(AcumaticaBinFolder)PX.Objects.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="PX.Web.UI">
+      <HintPath>$(AcumaticaBinFolder)PX.Web.UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+  </ItemGroup>
+</Project>

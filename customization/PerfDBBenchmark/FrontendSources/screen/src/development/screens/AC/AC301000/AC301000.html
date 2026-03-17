@@ -1,0 +1,127 @@
+<template>
+	<qp-tabbar id="BenchmarkTab" active-tab-id="OverviewTab" wg-container>
+		<qp-tab id="OverviewTab" caption="Overview">
+			<qp-template id="OverviewTemplate" name="1-1">
+				<div slot="A">
+					<qp-fieldset id="Environment" view.bind="Filter" caption="Current Environment" class="label-size-m">
+						<field name="SetupID"></field>
+						<field name="CurrentDatabase"></field>
+						<field name="CurrentInstance"></field>
+						<field name="DetectedCpuCores"></field>
+						<field name="DetectedMemoryGb"></field>
+						<field name="HardwareRecommendationSummary"></field>
+						<field name="SnapshotStatus"></field>
+						<field name="PendingAnalysisStatus"></field>
+						<field name="LastRequestID"></field>
+						<field name="LastRequestedTestCode"></field>
+						<field name="LastRequestedBenchmark"></field>
+						<field name="LastRequestStatus"></field>
+						<field name="LastRequestStartedAtUtc"></field>
+						<field name="LastRequestCompletedAtUtc"></field>
+						<field name="LastRequestElapsedMs"></field>
+						<field name="LastRequestMessage"></field>
+					</qp-fieldset>
+
+					<qp-fieldset id="Parameters" view.bind="Filter" caption="Benchmark Parameters" class="label-size-m">
+						<field name="NumberOfRecords"></field>
+						<field name="Iterations"></field>
+						<field name="ParallelBatchSize"></field>
+						<field name="ParallelMaxThreads"></field>
+						<field name="RecommendedRecords"></field>
+						<field name="RecommendedIterations"></field>
+						<field name="RecommendedBatchSize"></field>
+						<field name="RecommendedMaxThreads"></field>
+					</qp-fieldset>
+				</div>
+				<div slot="B">
+					<div class="benchmark-summary" style="margin-bottom: 16px;">
+						<h3 style="margin: 0 0 8px 0;">PerfDBBenchmark</h3>
+						<p style="margin: 0 0 6px 0;">
+							Run the same benchmark actions on PerfPG, PerfMySQL, and PerfSQL to compare the three database engines.
+						</p>
+						<p style="margin: 0;">
+							This Modern UI form exposes the same graph actions and comparison data so users can experiment without leaving the new interface.
+						</p>
+					</div>
+
+					<div class="benchmark-actions" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+						<qp-button id="btnApplyRecommended" state.bind="ApplyRecommendedSettings" class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnRefreshStatus" state.bind="RefreshStatus" title="Reloads snapshot and pending-analysis status so you can validate current benchmark coverage." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnSeqRead" state.bind="RunSequentialRead" title="Reads the seeded benchmark records through Acumatica BQL in a single-threaded loop." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnSeqWrite" state.bind="RunSequentialWrite" title="Inserts benchmark records through the Acumatica cache one batch at a time." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnSeqDelete" state.bind="RunSequentialDelete" title="Deletes prepared benchmark records sequentially to measure cleanup throughput." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnSeqComplex" state.bind="RunSequentialComplexJoin" title="Runs a realistic multi-table inventory BQL join sequentially for analytical workload comparison." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnSeqProjection" state.bind="RunSequentialProjection" title="Queries the benchmark PXProjection sequentially to measure analytical projection performance." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnParRead" state.bind="RunParallelRead" title="Splits seeded record reads across Acumatica processing workers." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnParWrite" state.bind="RunParallelWrite" title="Splits record inserts across Acumatica processing workers." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnParDelete" state.bind="RunParallelDelete" title="Splits delete work across Acumatica processing workers after seeding delete batches." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnParComplex" state.bind="RunParallelComplexJoin" title="Runs the multi-table analytical BQL join in parallel windows." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnParProjection" state.bind="RunParallelProjection" title="Runs the PXProjection analytical workload in parallel windows." class="major-button" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnExportExcel" state.bind="ExportToExcel" style="width: 100%; min-height: 40px;"></qp-button>
+						<qp-button id="btnClearData" state.bind="ClearTestData" style="width: 100%; min-height: 40px;"></qp-button>
+					</div>
+				</div>
+			</qp-template>
+		</qp-tab>
+
+		<qp-tab id="BenchmarkCatalogTab" caption="Benchmark Catalog">
+			<qp-grid id="gridBenchmarkCatalog" view.bind="BenchmarkCatalog"></qp-grid>
+		</qp-tab>
+
+		<qp-tab id="LocalResultsTab" caption="Local Results">
+			<qp-grid id="gridLocalResults" view.bind="LocalResults"></qp-grid>
+		</qp-tab>
+
+		<qp-tab id="ResultsTab" caption="Comparison Results">
+			<qp-grid id="gridResults" view.bind="ComparisonResults"></qp-grid>
+		</qp-tab>
+
+		<qp-tab id="VisualizationTab" caption="Visualization">
+			<div class="benchmark-summary" style="margin-bottom: 16px;">
+				<p style="margin: 0 0 6px 0;">
+					Green winners and comparison timings are rendered from the same comparison dataset as the classic screen.
+				</p>
+				<p style="margin: 0;">
+					${VisualizationStatus}
+				</p>
+			</div>
+
+			<div if.bind="hasVisualizationData">
+				<div repeat.for="chart of VisualizationCharts" style="margin-bottom: 22px;">
+					<div style="font-weight: 600; margin: 0 0 10px 0;">${chart.title}</div>
+					<div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px;">
+						<div repeat.for="legendItem of chart.legend" style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #475569;">
+							<span style.bind="'display:inline-block;width:12px;height:12px;border-radius:999px;background:' + legendItem.color"></span>
+							<span>${legendItem.name}</span>
+						</div>
+					</div>
+					<div style="overflow-x: auto; border: 1px solid #dbe3ee; border-radius: 6px; background: #ffffff; padding: 8px;">
+						<svg width.bind="chart.width" height.bind="chart.height" style="display: block; width: 100%; min-width: 980px;">
+							<g repeat.for="tick of chart.yTicks">
+								<line x1.bind="chart.plotLeft" y1.bind="tick.y" x2.bind="chart.plotEndX" y2.bind="tick.y" stroke="#e5e7eb" stroke-width="1"></line>
+								<text x.bind="chart.plotLeft - 8" y.bind="tick.y + 4" text-anchor="end" font-size="11" fill="#64748b">${tick.label}</text>
+							</g>
+
+							<line x1.bind="chart.plotLeft" y1.bind="chart.axisBottom" x2.bind="chart.plotEndX" y2.bind="chart.axisBottom" stroke="#94a3b8" stroke-width="1"></line>
+							<line x1.bind="chart.plotLeft" y1.bind="chart.plotTop" x2.bind="chart.plotLeft" y2.bind="chart.axisBottom" stroke="#94a3b8" stroke-width="1"></line>
+
+							<g repeat.for="category of chart.categories">
+								<line x1.bind="category.x" y1.bind="chart.plotTop" x2.bind="category.x" y2.bind="chart.axisBottom" stroke="#f8fafc" stroke-width="1"></line>
+								<text x.bind="category.x" y.bind="chart.axisBottom + 20" transform.bind="category.transform" text-anchor="end" font-size="11" fill="#475569">${category.label}</text>
+							</g>
+
+							<g repeat.for="series of chart.series">
+								<path d.bind="series.path" fill="none" stroke.bind="series.color" stroke-width="2.5"></path>
+								<circle repeat.for="point of series.points" cx.bind="point.x" cy.bind="point.y" r="3.5" fill.bind="series.color">
+									<title>${point.tooltip}</title>
+								</circle>
+							</g>
+						</svg>
+					</div>
+				</div>
+
+				<qp-grid id="gridVisualizationResults" view.bind="ComparisonResults"></qp-grid>
+			</div>
+		</qp-tab>
+	</qp-tabbar>
+</template>
