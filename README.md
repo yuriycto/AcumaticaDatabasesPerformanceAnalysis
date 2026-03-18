@@ -10,25 +10,25 @@ Created by AcuPower LTD for performance analysis. Company website: [acupowererp.
 
 ![All Operations](docs/images/benchmark-all-operations.png)
 
-Elapsed time (ms) across all 10 benchmark categories for all three databases. The two prominent peaks correspond to Delete operations, which are consistently the most expensive across every engine. SQL Server (blue) tends to sit below MySQL and PostgreSQL on Delete-heavy workloads, while Read and Projection operations cluster tightly for all three engines.
+The Y-axis shows elapsed time in milliseconds (ms) -- **lower is better**, meaning the database completed the workload faster. The scale values represent thousands of milliseconds: 25k = 25,000 ms (25 seconds), 50k = 50,000 ms (50 seconds), 75k = 75,000 ms (1 min 15 sec), 100k = 100,000 ms (1 min 40 sec). The chart covers all 10 benchmark categories for all three databases. The two prominent peaks correspond to Delete operations, which are consistently the most expensive across every engine. SQL Server (blue) tends to sit below MySQL and PostgreSQL on Delete-heavy workloads, while Read and Projection operations cluster tightly for all three engines.
 
 ### Read / Write / Delete
 
 ![Read Write Delete](docs/images/benchmark-read-write-delete.png)
 
-A focused view of the six CRUD benchmarks (sequential and parallel Read, Write, Delete). Read operations are nearly identical across engines. Write operations show moderate separation, with SQL Server completing slightly faster. Delete operations reveal the largest gap: MySQL and PostgreSQL reach 80-85k ms while SQL Server stays around 50-60k ms for the same record count and iteration settings.
+A focused view of the six CRUD benchmarks (sequential and parallel Read, Write, Delete). Lower values mean faster execution. Read operations are nearly identical across engines. Write operations show moderate separation, with SQL Server completing slightly faster. Delete operations reveal the largest gap: MySQL and PostgreSQL reach ~85,000 ms (~1 min 25 sec) while SQL Server stays around ~58,000 ms (~58 seconds) for the same record count and iteration settings.
 
 ### Analytical Workloads (Complex BQL Join and PXProjection)
 
 ![Analytical Workloads](docs/images/benchmark-analytical-workloads.png)
 
-Zoomed into the analytical benchmark categories: Sequential Join, Sequential Projection, Parallel Join, and Parallel Projection. SQL Server (blue) shows higher elapsed time on the Join benchmarks, while PostgreSQL (red) is consistently the fastest on Projection queries. Sequential Projection times are very close across all three engines, suggesting the database optimizer produces similar plans for the flattened projection view.
+Zoomed into the analytical benchmark categories: Sequential Join, Sequential Projection, Parallel Join, and Parallel Projection. Lower values mean faster execution. The Y-axis scale here tops out at 20k (20,000 ms = 20 seconds), reflecting that analytical queries are substantially lighter than Delete workloads. SQL Server (blue) shows higher elapsed time on the Join benchmarks (~19,000 ms / ~19 sec), while PostgreSQL (red) is consistently the fastest on Projection queries. Sequential Projection times are very close across all three engines (~1,000-2,000 ms / 1-2 seconds), suggesting the database optimizer produces similar plans for the flattened projection view.
 
 ### Spider Chart (Normalized Comparison)
 
 ![Spider Chart](docs/images/benchmark-spider-chart.png)
 
-A radar chart normalizing every benchmark category to a 0-100 scale so the overall performance "shape" of each database is visible at a glance. A larger footprint means more time consumed. SQL Server (red) extends outward on Write and Delete axes, while PostgreSQL (green) and MySQL (blue) trade advantages depending on the operation type.
+A radar chart normalizing every benchmark category to a 0-100 scale so the overall performance "shape" of each database is visible at a glance. Here, **smaller is better** -- a larger footprint means more time consumed (worse performance). SQL Server (red) extends outward on Write and Delete axes, while PostgreSQL (green) and MySQL (blue) trade advantages depending on the operation type.
 
 ## What It Includes
 
