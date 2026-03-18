@@ -17,11 +17,13 @@ public static class PerfBenchmarkTestCodes
 {
     public const string SequentialRead = "SEQ_READ";
     public const string SequentialWrite = "SEQ_WRITE";
+    public const string SequentialUpdate = "SEQ_UPDATE";
     public const string SequentialDelete = "SEQ_DELETE";
     public const string SequentialComplexJoin = "SEQ_COMPLEX";
     public const string SequentialProjection = "SEQ_PROJECTION";
     public const string ParallelRead = "PAR_READ";
     public const string ParallelWrite = "PAR_WRITE";
+    public const string ParallelUpdate = "PAR_UPDATE";
     public const string ParallelDelete = "PAR_DELETE";
     public const string ParallelComplexJoin = "PAR_COMPLEX";
     public const string ParallelProjection = "PAR_PROJECTION";
@@ -32,11 +34,13 @@ public static class PerfBenchmarkActionNames
     public const string RefreshStatus = "RefreshStatus";
     public const string RunSequentialRead = "RunSequentialRead";
     public const string RunSequentialWrite = "RunSequentialWrite";
+    public const string RunSequentialUpdate = "RunSequentialUpdate";
     public const string RunSequentialDelete = "RunSequentialDelete";
     public const string RunSequentialComplexJoin = "RunSequentialComplexJoin";
     public const string RunSequentialProjection = "RunSequentialProjection";
     public const string RunParallelRead = "RunParallelRead";
     public const string RunParallelWrite = "RunParallelWrite";
+    public const string RunParallelUpdate = "RunParallelUpdate";
     public const string RunParallelDelete = "RunParallelDelete";
     public const string RunParallelComplexJoin = "RunParallelComplexJoin";
     public const string RunParallelProjection = "RunParallelProjection";
@@ -46,11 +50,13 @@ public static class PerfBenchmarkDescriptions
 {
     public const string SequentialRead = "Reads the seeded benchmark records through Acumatica BQL in a single-threaded loop.";
     public const string SequentialWrite = "Inserts benchmark records through the Acumatica cache one batch at a time.";
+    public const string SequentialUpdate = "Updates seeded benchmark records sequentially to measure single-threaded update throughput.";
     public const string SequentialDelete = "Deletes prepared benchmark records sequentially to measure cleanup throughput.";
     public const string SequentialComplexJoin = "Runs a realistic multi-table inventory BQL join sequentially for analytical workload comparison.";
     public const string SequentialProjection = "Queries the benchmark PXProjection sequentially to measure analytical projection performance.";
     public const string ParallelRead = "Splits seeded record reads across Acumatica processing workers.";
     public const string ParallelWrite = "Splits record inserts across Acumatica processing workers.";
+    public const string ParallelUpdate = "Splits record updates across Acumatica processing workers.";
     public const string ParallelDelete = "Splits delete work across Acumatica processing workers after seeding delete batches.";
     public const string ParallelComplexJoin = "Runs the multi-table analytical BQL join in parallel windows.";
     public const string ParallelProjection = "Runs the PXProjection analytical workload in parallel windows.";
@@ -82,11 +88,13 @@ public static class PerfBenchmarkCatalog
     {
         [PerfBenchmarkTestCodes.SequentialRead] = new() { TestCode = PerfBenchmarkTestCodes.SequentialRead, Category = "Read", ExecutionMode = "Sequential", DisplayName = "Sequential Read", ActionName = PerfBenchmarkActionNames.RunSequentialRead, ShortDescription = PerfBenchmarkDescriptions.SequentialRead, SortOrder = 10 },
         [PerfBenchmarkTestCodes.SequentialWrite] = new() { TestCode = PerfBenchmarkTestCodes.SequentialWrite, Category = "Write", ExecutionMode = "Sequential", DisplayName = "Sequential Write", ActionName = PerfBenchmarkActionNames.RunSequentialWrite, ShortDescription = PerfBenchmarkDescriptions.SequentialWrite, SortOrder = 20 },
+        [PerfBenchmarkTestCodes.SequentialUpdate] = new() { TestCode = PerfBenchmarkTestCodes.SequentialUpdate, Category = "Update", ExecutionMode = "Sequential", DisplayName = "Sequential Update", ActionName = PerfBenchmarkActionNames.RunSequentialUpdate, ShortDescription = PerfBenchmarkDescriptions.SequentialUpdate, SortOrder = 25 },
         [PerfBenchmarkTestCodes.SequentialDelete] = new() { TestCode = PerfBenchmarkTestCodes.SequentialDelete, Category = "Delete", ExecutionMode = "Sequential", DisplayName = "Sequential Delete", ActionName = PerfBenchmarkActionNames.RunSequentialDelete, ShortDescription = PerfBenchmarkDescriptions.SequentialDelete, SortOrder = 30 },
         [PerfBenchmarkTestCodes.SequentialComplexJoin] = new() { TestCode = PerfBenchmarkTestCodes.SequentialComplexJoin, Category = "Complex BQL Join", ExecutionMode = "Sequential", DisplayName = "Complex BQL Join (Sequential)", ActionName = PerfBenchmarkActionNames.RunSequentialComplexJoin, ShortDescription = PerfBenchmarkDescriptions.SequentialComplexJoin, SortOrder = 40 },
         [PerfBenchmarkTestCodes.SequentialProjection] = new() { TestCode = PerfBenchmarkTestCodes.SequentialProjection, Category = "PXProjection", ExecutionMode = "Sequential", DisplayName = "PXProjection Analysis (Sequential)", ActionName = PerfBenchmarkActionNames.RunSequentialProjection, ShortDescription = PerfBenchmarkDescriptions.SequentialProjection, SortOrder = 50 },
         [PerfBenchmarkTestCodes.ParallelRead] = new() { TestCode = PerfBenchmarkTestCodes.ParallelRead, Category = "Read", ExecutionMode = "Parallel", DisplayName = "Parallel Read", ActionName = PerfBenchmarkActionNames.RunParallelRead, ShortDescription = PerfBenchmarkDescriptions.ParallelRead, SortOrder = 60 },
         [PerfBenchmarkTestCodes.ParallelWrite] = new() { TestCode = PerfBenchmarkTestCodes.ParallelWrite, Category = "Write", ExecutionMode = "Parallel", DisplayName = "Parallel Write", ActionName = PerfBenchmarkActionNames.RunParallelWrite, ShortDescription = PerfBenchmarkDescriptions.ParallelWrite, SortOrder = 70 },
+        [PerfBenchmarkTestCodes.ParallelUpdate] = new() { TestCode = PerfBenchmarkTestCodes.ParallelUpdate, Category = "Update", ExecutionMode = "Parallel", DisplayName = "Parallel Update", ActionName = PerfBenchmarkActionNames.RunParallelUpdate, ShortDescription = PerfBenchmarkDescriptions.ParallelUpdate, SortOrder = 75 },
         [PerfBenchmarkTestCodes.ParallelDelete] = new() { TestCode = PerfBenchmarkTestCodes.ParallelDelete, Category = "Delete", ExecutionMode = "Parallel", DisplayName = "Parallel Delete", ActionName = PerfBenchmarkActionNames.RunParallelDelete, ShortDescription = PerfBenchmarkDescriptions.ParallelDelete, SortOrder = 80 },
         [PerfBenchmarkTestCodes.ParallelComplexJoin] = new() { TestCode = PerfBenchmarkTestCodes.ParallelComplexJoin, Category = "Complex BQL Join", ExecutionMode = "Parallel", DisplayName = "Complex BQL Join (Parallel)", ActionName = PerfBenchmarkActionNames.RunParallelComplexJoin, ShortDescription = PerfBenchmarkDescriptions.ParallelComplexJoin, SortOrder = 90 },
         [PerfBenchmarkTestCodes.ParallelProjection] = new() { TestCode = PerfBenchmarkTestCodes.ParallelProjection, Category = "PXProjection", ExecutionMode = "Parallel", DisplayName = "PXProjection Analysis (Parallel)", ActionName = PerfBenchmarkActionNames.RunParallelProjection, ShortDescription = PerfBenchmarkDescriptions.ParallelProjection, SortOrder = 100 }
@@ -610,5 +618,15 @@ public static class PerfChartBuilder
     }
 
     public static IReadOnlyList<string> GetOrderedDatabases(IEnumerable<PerfComparisonResult> rows) =>
-        rows.Select(x => x.DatabaseType).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x).ToArray();
+        rows.Select(x => x.DatabaseType).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => GetDatabaseColorIndex(x)).ToArray();
+
+    public static int GetDatabaseColorIndex(string databaseType)
+    {
+        if (string.IsNullOrWhiteSpace(databaseType)) return 3;
+        var name = databaseType.ToUpperInvariant();
+        if (name.Contains("SQL SERVER") || name.Contains("MSSQL")) return 0;
+        if (name.Contains("MYSQL")) return 1;
+        if (name.Contains("POSTGRE") || name.Contains("PGSQL")) return 2;
+        return 3;
+    }
 }

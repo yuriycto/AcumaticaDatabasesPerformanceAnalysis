@@ -198,11 +198,13 @@
                     <div class="perf-button-grid">
                         <div class="perf-button-cell"><px:PXButton ID="btnSeqRead" runat="server" Text="Sequential Read" CommandName="RunSequentialRead" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnSeqWrite" runat="server" Text="Sequential Write" CommandName="RunSequentialWrite" CommandSourceID="ds" Width="100%" Height="40px" /></div>
+                        <div class="perf-button-cell"><px:PXButton ID="btnSeqUpdate" runat="server" Text="Sequential Update" CommandName="RunSequentialUpdate" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnSeqDelete" runat="server" Text="Sequential Delete" CommandName="RunSequentialDelete" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnSeqComplex" runat="server" Text="Complex Join (Sequential)" CommandName="RunSequentialComplexJoin" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnSeqProjection" runat="server" Text="PXProjection (Sequential)" CommandName="RunSequentialProjection" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnParRead" runat="server" Text="Parallel Read" CommandName="RunParallelRead" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnParWrite" runat="server" Text="Parallel Write" CommandName="RunParallelWrite" CommandSourceID="ds" Width="100%" Height="40px" /></div>
+                        <div class="perf-button-cell"><px:PXButton ID="btnParUpdate" runat="server" Text="Parallel Update" CommandName="RunParallelUpdate" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnParDelete" runat="server" Text="Parallel Delete" CommandName="RunParallelDelete" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnParComplex" runat="server" Text="Complex Join (Parallel)" CommandName="RunParallelComplexJoin" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnParProjection" runat="server" Text="PXProjection (Parallel)" CommandName="RunParallelProjection" CommandSourceID="ds" Width="100%" Height="40px" /></div>

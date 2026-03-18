@@ -69,6 +69,7 @@ public class AC301000 : PXPage
         BindChart((PXSerialChart)sender, row =>
             string.Equals(row.TestCategory, "Read", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(row.TestCategory, "Write", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(row.TestCategory, "Update", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(row.TestCategory, "Delete", StringComparison.OrdinalIgnoreCase));
 
     private void BindChart(PXSerialChart chart, Func<PerfComparisonResult, bool> predicate)
@@ -147,11 +148,13 @@ public class AC301000 : PXPage
     {
         SetBenchmarkButtonTooltip("btnSeqRead", PerfBenchmarkTestCodes.SequentialRead);
         SetBenchmarkButtonTooltip("btnSeqWrite", PerfBenchmarkTestCodes.SequentialWrite);
+        SetBenchmarkButtonTooltip("btnSeqUpdate", PerfBenchmarkTestCodes.SequentialUpdate);
         SetBenchmarkButtonTooltip("btnSeqDelete", PerfBenchmarkTestCodes.SequentialDelete);
         SetBenchmarkButtonTooltip("btnSeqComplex", PerfBenchmarkTestCodes.SequentialComplexJoin);
         SetBenchmarkButtonTooltip("btnSeqProjection", PerfBenchmarkTestCodes.SequentialProjection);
         SetBenchmarkButtonTooltip("btnParRead", PerfBenchmarkTestCodes.ParallelRead);
         SetBenchmarkButtonTooltip("btnParWrite", PerfBenchmarkTestCodes.ParallelWrite);
+        SetBenchmarkButtonTooltip("btnParUpdate", PerfBenchmarkTestCodes.ParallelUpdate);
         SetBenchmarkButtonTooltip("btnParDelete", PerfBenchmarkTestCodes.ParallelDelete);
         SetBenchmarkButtonTooltip("btnParComplex", PerfBenchmarkTestCodes.ParallelComplexJoin);
         SetBenchmarkButtonTooltip("btnParProjection", PerfBenchmarkTestCodes.ParallelProjection);

@@ -700,6 +700,15 @@ function Get-DefaultBenchmarkCatalog {
             SortOrder = 20
         },
         [pscustomobject]@{
+            TestCode = "SEQ_UPDATE"
+            DisplayName = "Sequential Update"
+            ActionName = "RunSequentialUpdate"
+            Category = "Update"
+            ExecutionMode = "Sequential"
+            ShortDescription = "Updates seeded benchmark records sequentially to measure single-threaded update throughput."
+            SortOrder = 25
+        },
+        [pscustomobject]@{
             TestCode = "SEQ_DELETE"
             DisplayName = "Sequential Delete"
             ActionName = "RunSequentialDelete"
@@ -743,6 +752,15 @@ function Get-DefaultBenchmarkCatalog {
             ExecutionMode = "Parallel"
             ShortDescription = "Splits record inserts across Acumatica processing workers."
             SortOrder = 70
+        },
+        [pscustomobject]@{
+            TestCode = "PAR_UPDATE"
+            DisplayName = "Parallel Update"
+            ActionName = "RunParallelUpdate"
+            Category = "Update"
+            ExecutionMode = "Parallel"
+            ShortDescription = "Splits record updates across Acumatica processing workers."
+            SortOrder = 75
         },
         [pscustomobject]@{
             TestCode = "PAR_DELETE"
@@ -951,11 +969,13 @@ function Get-BenchmarkChartLabel {
     switch ($BenchmarkCode.ToUpperInvariant()) {
         "SEQ_READ" { return "Seq Read" }
         "SEQ_WRITE" { return "Seq Write" }
+        "SEQ_UPDATE" { return "Seq Update" }
         "SEQ_DELETE" { return "Seq Delete" }
         "SEQ_COMPLEX" { return "Seq Join" }
         "SEQ_PROJECTION" { return "Seq Proj" }
         "PAR_READ" { return "Par Read" }
         "PAR_WRITE" { return "Par Write" }
+        "PAR_UPDATE" { return "Par Update" }
         "PAR_DELETE" { return "Par Delete" }
         "PAR_COMPLEX" { return "Par Join" }
         "PAR_PROJECTION" { return "Par Proj" }
@@ -1087,8 +1107,17 @@ function Get-RadarChartPayload {
     )
 
     $datasets = New-Object System.Collections.Generic.List[object]
-    $paletteIndex = 0
     foreach ($summary in @($InstanceSummaries | Sort-Object DisplayName)) {
+        $displayUpper = ([string]$summary.DisplayName).ToUpperInvariant()
+        if ($displayUpper -match "SQL" -and $displayUpper -notmatch "MYSQL" -and $displayUpper -notmatch "PG" -and $displayUpper -notmatch "POSTGRE") {
+            $paletteIndex = 0
+        } elseif ($displayUpper -match "MYSQL") {
+            $paletteIndex = 1
+        } elseif ($displayUpper -match "PG" -or $displayUpper -match "POSTGRE") {
+            $paletteIndex = 2
+        } else {
+            $paletteIndex = 3
+        }
         $scores = New-Object System.Collections.Generic.List[double]
         foreach ($benchmark in $Benchmarks) {
             $bestDuration = $null
@@ -1118,7 +1147,6 @@ function Get-RadarChartPayload {
         }
 
         $paletteEntry = $palette[$paletteIndex % $palette.Count]
-        $paletteIndex++
         $datasets.Add([pscustomobject]@{
             Label = $summary.DisplayName
             DatabaseType = $summary.DatabaseType

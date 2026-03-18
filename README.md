@@ -33,7 +33,7 @@ A radar chart normalizing every benchmark category to a 0-100 scale so the overa
 ## What It Includes
 
 - Screen `AC301000` with responsive tabs, charts, result highlighting, hardware-based recommendations, and current database detection.
-- Benchmarks for sequential read, sequential write, sequential delete, parallel read, parallel write, parallel delete, complex FBQL joins, and `PXProjection` analysis.
+- Benchmarks for sequential and parallel Read, Write, Update, Delete, complex FBQL joins, and `PXProjection` analysis.
 - Cross-instance comparison snapshots written to `App_Data\PerfDBBenchmark`.
 - A precompiled `.NET Framework 4.8` DLL that uses modern C# features so the customization is intended to be deployed as a compiled assembly, not runtime-compiled inside Acumatica.
 - A built-in access-rights bootstrap for `AC301000` that copies `RolesInGraph` entries from a stock Acumatica screen at runtime, so the screen permissions are delivered by the customization DLL itself instead of a separate SQL script.
@@ -47,7 +47,7 @@ All benchmarks use Acumatica Fluent BQL (FBQL) through `SelectFrom<>` syntax. Th
 | DAC | Underlying Table | Purpose |
 |-----|-------------------|---------|
 | `PerfBenchmarkFilter` | `PerfBenchmarkFilter` | Single-row control record that stores benchmark parameters (record count, iterations, batch size, max threads), detected hardware info, recommended settings, and the status of the last benchmark request. |
-| `PerfTestRecord` | `PerfTestRecord` | Rows inserted, read, and deleted during Read/Write/Delete benchmarks. Each record carries a `BatchID`, `Sequence` index, `PayloadText`, and `PayloadValue` to simulate realistic ERP row sizes. |
+| `PerfTestRecord` | `PerfTestRecord` | Rows inserted, read, updated, and deleted during Read/Write/Update/Delete benchmarks. Each record carries a `BatchID`, `Sequence` index, `PayloadText`, and `PayloadValue` to simulate realistic ERP row sizes. |
 | `PerfTestResult` | `PerfTestResult` | Persisted benchmark results with elapsed time, parameters, database type, instance name, and capture timestamp. |
 
 ### Stock Acumatica Tables Used by Analytical Benchmarks
@@ -76,6 +76,18 @@ SelectFrom<PerfTestRecord>
 ```
 
 **Write** -- inserts records into `PerfTestRecord` through the Acumatica cache in batches of 200, flushing with `Save.Press()` between batches.
+
+**Update** -- seeds data (like Read), then selects rows by batch and sequence range, modifies `PayloadText` and `PayloadValue`, and writes them back through `cache.Update(row)` in batches of 200:
+```csharp
+SelectFrom<PerfTestRecord>
+    .Where<PerfTestRecord.batchID.IsEqual<@P.AsString>
+        .And<PerfTestRecord.sequence.IsGreaterEqual<@P.AsInt>>
+        .And<PerfTestRecord.sequence.IsLessEqual<@P.AsInt>>>
+    .OrderBy<PerfTestRecord.sequence.Asc>
+    .View
+    .Select(this, batchId, startIndex, endIndex)
+// each row is modified and passed to Records.Cache.Update(row)
+```
 
 **Delete** -- first seeds rows for each iteration, then selects and deletes them through the cache:
 ```csharp
@@ -141,9 +153,9 @@ SelectFrom<PerfBenchmarkProjection>
 ## How Testing Works
 
 1. **Parameter Setup** -- the user configures Number of Records, Iterations, Batch Size, and Max Threads on screen `AC301000`, or applies hardware-detected recommended settings with a single button.
-2. **Benchmark Execution** -- each benchmark action runs inside `PXLongOperation` so the UI remains responsive. Sequential benchmarks run in a single-threaded loop. Parallel benchmarks split work into `PerfBenchmarkTask` items and execute them through `PXProcessing.ProcessItemsParallel`, which uses Acumatica's built-in parallel processing infrastructure.
+2. **Benchmark Execution** -- each benchmark action runs inside `PXLongOperation` so the UI remains responsive. Sequential benchmarks run in a single-threaded loop. Parallel benchmarks split work into `PerfBenchmarkTask` items and execute them through `PXProcessing.ProcessItemsParallel`, which uses Acumatica's built-in parallel processing infrastructure. The full suite covers 12 benchmarks: sequential and parallel variants of Read, Write, Update, Delete, Complex BQL Join, and PXProjection.
 3. **Timing** -- a `Stopwatch` wraps the entire benchmark body. The elapsed time in milliseconds is persisted to `PerfTestResult`.
-4. **Checksums** -- Read, Join, and Projection benchmarks compute an analytical checksum from field values (e.g., `QtyOnHand + QtyAvail + InventoryCD.Length`) to force the database to actually read and transmit row data, preventing the optimizer from short-circuiting the query.
+4. **Checksums** -- Read, Update, Join, and Projection benchmarks compute an analytical checksum from field values (e.g., `QtyOnHand + QtyAvail + InventoryCD.Length`) to force the database to actually read and transmit row data, preventing the optimizer from short-circuiting the query.
 5. **Snapshot & Comparison** -- after each benchmark completes, the latest results are written as a JSON snapshot to `App_Data\PerfDBBenchmark\<InstanceName>.json`. When multiple instance snapshots exist, the Comparison Results tab and Visualization tab merge them for side-by-side analysis.
 
 ## Hardcoded Instance Names

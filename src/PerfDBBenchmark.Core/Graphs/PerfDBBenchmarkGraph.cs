@@ -105,6 +105,11 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
     [PXUIField(DisplayName = "Sequential Write", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
     protected virtual IEnumerable runSequentialWrite(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.SequentialWrite);
 
+    public PXAction<PerfBenchmarkFilter> RunSequentialUpdate;
+    [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.SequentialUpdate)]
+    [PXUIField(DisplayName = "Sequential Update", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
+    protected virtual IEnumerable runSequentialUpdate(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.SequentialUpdate);
+
     public PXAction<PerfBenchmarkFilter> RunSequentialDelete;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.SequentialDelete)]
     [PXUIField(DisplayName = "Sequential Delete", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
@@ -129,6 +134,11 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.ParallelWrite)]
     [PXUIField(DisplayName = "Parallel Write", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
     protected virtual IEnumerable runParallelWrite(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.ParallelWrite);
+
+    public PXAction<PerfBenchmarkFilter> RunParallelUpdate;
+    [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.ParallelUpdate)]
+    [PXUIField(DisplayName = "Parallel Update", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
+    protected virtual IEnumerable runParallelUpdate(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.ParallelUpdate);
 
     public PXAction<PerfBenchmarkFilter> RunParallelDelete;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.ParallelDelete)]
@@ -246,6 +256,9 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
                 case PerfBenchmarkTestCodes.SequentialWrite:
                     notes = RunSequentialWriteBenchmark(request);
                     break;
+                case PerfBenchmarkTestCodes.SequentialUpdate:
+                    notes = RunSequentialUpdateBenchmark(request);
+                    break;
                 case PerfBenchmarkTestCodes.SequentialDelete:
                     notes = RunSequentialDeleteBenchmark(request);
                     break;
@@ -260,6 +273,9 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
                     break;
                 case PerfBenchmarkTestCodes.ParallelWrite:
                     notes = RunParallelWriteBenchmark(request);
+                    break;
+                case PerfBenchmarkTestCodes.ParallelUpdate:
+                    notes = RunParallelUpdateBenchmark(request);
                     break;
                 case PerfBenchmarkTestCodes.ParallelDelete:
                     notes = RunParallelDeleteBenchmark(request);
@@ -351,6 +367,19 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
         return $"Sequential Acumatica cache inserts completed for {request.Iterations} batch(es).";
     }
 
+    private string RunSequentialUpdateBenchmark(PerfBenchmarkRunRequest request)
+    {
+        EnsureSeedData(request.NumberOfRecords);
+        var checksum = 0;
+
+        for (var iteration = 1; iteration <= request.Iterations; iteration++)
+        {
+            checksum += UpdateRecordRange(ReadSeedBatch, 1, request.NumberOfRecords, iteration);
+        }
+
+        return $"Sequential update benchmark completed with checksum {checksum}.";
+    }
+
     private string RunSequentialDeleteBenchmark(PerfBenchmarkRunRequest request)
     {
         var batches = PrepareDeleteBatches(request, "SEQ_DELETE_PREP");
@@ -411,6 +440,14 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
         return $"Parallel write benchmark completed with {tasks.Count} Acumatica processing task(s).";
     }
 
+    private string RunParallelUpdateBenchmark(PerfBenchmarkRunRequest request)
+    {
+        EnsureSeedData(request.NumberOfRecords);
+        var tasks = BuildRecordTasks(request, ReadSeedBatch);
+        ExecuteParallelTasks(request, tasks);
+        return $"Parallel update benchmark completed with {tasks.Count} Acumatica processing task(s).";
+    }
+
     private string RunParallelDeleteBenchmark(PerfBenchmarkRunRequest request)
     {
         var deleteBatches = PrepareDeleteBatches(request, "PAR_DELETE_PREP");
@@ -468,6 +505,9 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
                 break;
             case PerfBenchmarkTestCodes.ParallelWrite:
                 InsertRecords(task.BatchID, "PAR_WRITE", task.Iteration ?? 0, task.StartIndex ?? 0, task.EndIndex ?? 0);
+                break;
+            case PerfBenchmarkTestCodes.ParallelUpdate:
+                UpdateRecordRange(task.BatchID, task.StartIndex ?? 0, task.EndIndex ?? 0, task.Iteration ?? 0);
                 break;
             case PerfBenchmarkTestCodes.ParallelDelete:
                 DeleteRecordRange(task.BatchID, task.StartIndex ?? 0, task.EndIndex ?? 0);
@@ -613,6 +653,39 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
             checksum += row.PayloadValue ?? 0;
         }
 
+        return checksum;
+    }
+
+    private int UpdateRecordRange(string batchId, int startIndex, int endIndex, int iteration)
+    {
+        var checksum = 0;
+        var updated = 0;
+
+        foreach (PerfTestRecord row in SelectFrom<PerfTestRecord>
+                     .Where<PerfTestRecord.batchID.IsEqual<@P.AsString>
+                         .And<PerfTestRecord.sequence.IsGreaterEqual<@P.AsInt>>
+                         .And<PerfTestRecord.sequence.IsLessEqual<@P.AsInt>>>
+                     .OrderBy<PerfTestRecord.sequence.Asc>
+                     .View
+                     .Select(this, batchId, startIndex, endIndex))
+        {
+            row.PayloadText = $"Updated iteration {iteration} seq {row.Sequence}";
+            row.PayloadValue = (row.PayloadValue ?? 0) + iteration;
+            Records.Cache.Update(row);
+            checksum += row.PayloadValue ?? 0;
+
+            updated++;
+            if (updated % 200 == 0)
+            {
+                Save.Press();
+                Records.Cache.Clear();
+                Records.Cache.ClearQueryCache();
+            }
+        }
+
+        Save.Press();
+        Records.Cache.Clear();
+        Records.Cache.ClearQueryCache();
         return checksum;
     }
 
