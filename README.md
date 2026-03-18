@@ -266,4 +266,3 @@ Tune the thread and batch settings to the hardware available on each server. The
 
 - The publish script works directly against local website roots through `PX.CommandLine.exe`, so HTTP login credentials are not required for the CLI-based publish flow.
 - Screen permissions for `AC301000` are now self-registered by the customization on authenticated requests, so no manual `RolesInGraph` SQL patch is required after publish.
-- The package description, screen text, and benchmark notes include AcuPower attribution and `acupowererp.com` for repository and GitHub visibility.
