@@ -6,29 +6,49 @@ Created by AcuPower LTD for performance analysis. Company website: [acupowererp.
 
 ## Benchmark Results
 
+Test parameters: **15,000 records**, **5 iterations**, **batch size 250**, **12 parallel threads**.
+
 ### All Operations Overview
 
 ![All Operations](docs/images/benchmark-all-operations.png)
 
-The Y-axis shows elapsed time in milliseconds (ms) -- **lower is better**, meaning the database completed the workload faster. The scale values represent thousands of milliseconds: 25k = 25,000 ms (25 seconds), 50k = 50,000 ms (50 seconds), 75k = 75,000 ms (1 min 15 sec), 100k = 100,000 ms (1 min 40 sec). The chart covers all 10 benchmark categories for all three databases. The two prominent peaks correspond to Delete operations, which are consistently the most expensive across every engine. SQL Server (blue) tends to sit below MySQL and PostgreSQL on Delete-heavy workloads, while Read and Projection operations cluster tightly for all three engines.
+This line chart plots elapsed time in milliseconds for all 12 benchmark categories across the three database engines. The Y-axis shows time in milliseconds -- **lower is better**. The scale values represent thousands of milliseconds: 125k = 125,000 ms (2 min 5 sec), 250k = 250,000 ms (4 min 10 sec), 375k = 375,000 ms (6 min 15 sec), 500k = 500,000 ms (8 min 20 sec).
 
-### Read / Write / Delete
-
-![Read Write Delete](docs/images/benchmark-read-write-delete.png)
-
-A focused view of the six CRUD benchmarks (sequential and parallel Read, Write, Delete). Lower values mean faster execution. Read operations are nearly identical across engines. Write operations show moderate separation, with SQL Server completing slightly faster. Delete operations reveal the largest gap: MySQL and PostgreSQL reach ~85,000 ms (~1 min 25 sec) while SQL Server stays around ~58,000 ms (~58 seconds) for the same record count and iteration settings.
-
-### Analytical Workloads (Complex BQL Join and PXProjection)
-
-![Analytical Workloads](docs/images/benchmark-analytical-workloads.png)
-
-Zoomed into the analytical benchmark categories: Sequential Join, Sequential Projection, Parallel Join, and Parallel Projection. Lower values mean faster execution. The Y-axis scale here tops out at 20k (20,000 ms = 20 seconds), reflecting that analytical queries are substantially lighter than Delete workloads. SQL Server (blue) shows higher elapsed time on the Join benchmarks (~19,000 ms / ~19 sec), while PostgreSQL (red) is consistently the fastest on Projection queries. Sequential Projection times are very close across all three engines (~1,000-2,000 ms / 1-2 seconds), suggesting the database optimizer produces similar plans for the flattened projection view.
+The two prominent peaks correspond to **Delete** operations (both sequential and parallel), which are consistently the most expensive across every engine. SQL Server (blue) sits below MySQL and PostgreSQL on Delete-heavy workloads. Read and Projection operations cluster tightly near the baseline for all three engines, indicating minimal difference on lightweight queries.
 
 ### Spider Chart (Normalized Comparison)
 
 ![Spider Chart](docs/images/benchmark-spider-chart.png)
 
-A radar chart normalizing every benchmark category to a 0-100 scale so the overall performance "shape" of each database is visible at a glance. Here, **smaller is better** -- a larger footprint means more time consumed (worse performance). SQL Server (red) extends outward on Write and Delete axes, while PostgreSQL (green) and MySQL (blue) trade advantages depending on the operation type.
+A radar chart normalizing every benchmark category to a 0-100 **speed score**. Each axis shows a normalized speed score for one benchmark. **100 = fastest database for that benchmark**. Compare databases per axis: the further from the center, the faster.
+
+**How to read it:**
+- **Blue** = Microsoft SQL Server, **Red** = PostgreSQL, **Green** = MySQL 8.0
+- SQL Server (blue) reaches the outer edge on most CRUD axes (Read, Write, Update, Delete), confirming it is the fastest for transactional operations
+- SQL Server collapses toward the center on **Parallel Read** (score ~23), where PostgreSQL and MySQL are dramatically faster (~1.2s vs 5.35s)
+- PostgreSQL (red) and MySQL (green) reach 100 on **Complex BQL Join** axes, meaning they outperform SQL Server on multi-table analytical joins
+- On **PXProjection** axes, all three engines cluster near the outer edge, meaning projection performance is similar across all databases
+
+### Benchmark Matrix
+
+Full results from the latest benchmark run (15,000 records, 5 iterations, 12 threads):
+
+| Benchmark | MySQL 8.0 | PostgreSQL | SQL Server | Winner |
+|---|---|---|---|---|
+| Sequential Read | 11.29s | 11.75s | **9.76s** | SQL Server |
+| Sequential Write | 56.65s | 57.50s | **48.09s** | SQL Server |
+| Sequential Update | 1:28 (88s) | 1:17 (77s) | **57.77s** | SQL Server |
+| Sequential Delete | 5:47 (347s) | 5:31 (331s) | **4:04 (244s)** | SQL Server |
+| Complex BQL Join (Sequential) | 26.87s | **26.46s** | 35.08s | PostgreSQL |
+| PXProjection Analysis (Sequential) | 3.03s | **2.28s** | 2.33s | PostgreSQL |
+| Parallel Read | 1.45s | **1.23s** | 5.35s | PostgreSQL |
+| Parallel Write | 49.97s | 50.66s | **41.99s** | SQL Server |
+| Parallel Update | 49.75s | 47.20s | **36.71s** | SQL Server |
+| Parallel Delete | 5:15 (315s) | 4:55 (295s) | **3:48 (228s)** | SQL Server |
+| Complex BQL Join (Parallel) | 21.45s | **21.24s** | 26.65s | PostgreSQL |
+| PXProjection Analysis (Parallel) | 2.57s | 1.93s | **1.58s** | SQL Server |
+
+**Summary:** SQL Server wins 8 of 12 benchmarks (all CRUD operations plus Parallel PXProjection). PostgreSQL wins 4 (both Complex BQL Joins, Sequential PXProjection, and Parallel Read). MySQL 8.0 tracks PostgreSQL closely on every benchmark but does not take first place in any category.
 
 ## What It Includes
 
@@ -60,11 +80,10 @@ All benchmarks use Acumatica Fluent BQL (FBQL) through `SelectFrom<>` syntax. Th
 | `INSite` | Left-joined via `SiteID` to retrieve warehouse code. |
 | `Branch` (GL) | Left-joined via `BranchID` to retrieve the branch associated with each warehouse. |
 
-### Read / Write / Delete Queries
+### Read Queries
 
-These benchmarks operate on the `PerfTestRecord` table using parameterized FBQL:
+Selects records by `BatchID` and `Sequence` range, ordered ascending:
 
-**Read** -- selects records by `BatchID` and `Sequence` range, ordered ascending:
 ```csharp
 SelectFrom<PerfTestRecord>
     .Where<PerfTestRecord.batchID.IsEqual<@P.AsString>
@@ -75,21 +94,35 @@ SelectFrom<PerfTestRecord>
     .Select(this, batchId, startIndex, endIndex)
 ```
 
-**Write** -- inserts records into `PerfTestRecord` through the Acumatica cache in batches of 200, flushing with `Save.Press()` between batches.
+### Write Queries
 
-**Update** -- seeds data (like Read), then selects rows by batch and sequence range, modifies `PayloadText` and `PayloadValue`, and writes them back through `cache.Update(row)` in batches of 200:
+Inserts records into `PerfTestRecord` through the Acumatica cache in batches of 200, flushing with `Save.Press()` between batches.
+
+### Update Queries
+
+The Update benchmark was added to answer the question: *"Does the Write benchmark include UPDATE and DELETE statements?"* Write only measures INSERT throughput. Update is a separate benchmark that seeds data first, then selects rows by batch and sequence range, modifies `PayloadText` and `PayloadValue` on each row, and writes changes back through `Records.Cache.Update(row)` in batches of 200:
+
 ```csharp
-SelectFrom<PerfTestRecord>
+foreach (PerfTestRecord row in SelectFrom<PerfTestRecord>
     .Where<PerfTestRecord.batchID.IsEqual<@P.AsString>
         .And<PerfTestRecord.sequence.IsGreaterEqual<@P.AsInt>>
         .And<PerfTestRecord.sequence.IsLessEqual<@P.AsInt>>>
     .OrderBy<PerfTestRecord.sequence.Asc>
     .View
-    .Select(this, batchId, startIndex, endIndex)
-// each row is modified and passed to Records.Cache.Update(row)
+    .Select(this, batchId, startIndex, endIndex))
+{
+    row.PayloadText = $"Updated iteration {iteration} seq {row.Sequence}";
+    row.PayloadValue = (row.PayloadValue ?? 0) + iteration;
+    Records.Cache.Update(row);
+}
 ```
 
-**Delete** -- first seeds rows for each iteration, then selects and deletes them through the cache:
+Each row's `PayloadText` is overwritten with an iteration-stamped string and `PayloadValue` is incremented. Rows are flushed to the database in batches of 200 via `Save.Press()`, and the cache is cleared between flushes to prevent memory accumulation. A running checksum of `PayloadValue` is computed to verify data integrity. The parallel variant splits the update work across Acumatica processing workers using `PXProcessing.ProcessItemsParallel`.
+
+### Delete Queries
+
+First seeds rows for each iteration, then selects and deletes them through the cache:
+
 ```csharp
 SelectFrom<PerfTestRecord>
     .Where<PerfTestRecord.batchID.IsEqual<@P.AsString>
@@ -158,6 +191,23 @@ SelectFrom<PerfBenchmarkProjection>
 4. **Checksums** -- Read, Update, Join, and Projection benchmarks compute an analytical checksum from field values (e.g., `QtyOnHand + QtyAvail + InventoryCD.Length`) to force the database to actually read and transmit row data, preventing the optimizer from short-circuiting the query.
 5. **Snapshot & Comparison** -- after each benchmark completes, the latest results are written as a JSON snapshot to `App_Data\PerfDBBenchmark\<InstanceName>.json`. When multiple instance snapshots exist, the Comparison Results tab and Visualization tab merge them for side-by-side analysis.
 
+## Benchmark Types Explained
+
+| Benchmark | Category | What It Measures |
+|---|---|---|
+| Sequential Read | Read | Single-threaded BQL select of seeded records by batch/sequence range |
+| Parallel Read | Read | Same reads split across Acumatica processing workers |
+| Sequential Write | Write | Single-threaded INSERT of new records through the Acumatica cache in batches of 200 |
+| Parallel Write | Write | Same inserts split across processing workers |
+| Sequential Update | Update | Single-threaded SELECT + UPDATE of existing records, modifying `PayloadText` and `PayloadValue` |
+| Parallel Update | Update | Same updates split across processing workers |
+| Sequential Delete | Delete | Single-threaded SELECT + DELETE of seeded records through the cache |
+| Parallel Delete | Delete | Same deletes split across processing workers |
+| Complex BQL Join (Sequential) | Complex BQL Join | Five-table analytical join over stock Acumatica Inventory tables, single-threaded |
+| Complex BQL Join (Parallel) | Complex BQL Join | Same join executed in parallel windows |
+| PXProjection Analysis (Sequential) | PXProjection | Read-only projected view flattening the same five-table join, single-threaded |
+| PXProjection Analysis (Parallel) | PXProjection | Same projection query executed in parallel windows |
+
 ## Hardcoded Instance Names
 
 The scripts default to three local Acumatica instances, each backed by a different database engine:
@@ -183,6 +233,7 @@ The scripts also accept a `PerfrMySQL` / `PerfrSQL` alternate spelling as a cand
 - `customization/PerfDBBenchmark`: Acumatica customization source folder containing the ASPX page and generated `project.xml`.
 - `scripts/`: PowerShell automation scripts (see below).
 - `docs/images/`: benchmark result screenshots.
+- `artifacts/benchmark-reports/`: generated HTML and JSON benchmark reports.
 
 ## PowerShell Scripts
 

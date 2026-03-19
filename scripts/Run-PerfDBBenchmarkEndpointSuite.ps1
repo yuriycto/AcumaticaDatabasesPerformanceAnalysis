@@ -370,7 +370,7 @@ function Get-RecordFieldValue {
         return $value
     }
 
-    if ($value.PSObject.Properties.Name -contains "value") {
+    if ($null -ne $value.PSObject.Properties["value"]) {
         return $value.value
     }
 
@@ -582,7 +582,7 @@ function Wait-ForBenchmarkDataClear {
         $lastRequestedTestCode = [string](Get-RecordFieldValue -Record $control -FieldName "LastRequestedTestCode")
 
         if ([string]::IsNullOrWhiteSpace([string]$lastRequestId) -and
-            [string]::IsNullOrWhiteSpace($lastRequestStatus) -and
+            ([string]::IsNullOrWhiteSpace($lastRequestStatus) -or $lastRequestStatus -eq "Idle") -and
             [string]::IsNullOrWhiteSpace($lastRequestedTestCode)) {
             return $control
         }
@@ -1159,7 +1159,7 @@ function Get-RadarChartPayload {
     return [pscustomobject]@{
         Labels = $labels.ToArray()
         Datasets = $datasets.ToArray()
-        Note = "Spider chart uses a normalized speed score per benchmark. Outer edge is faster, and the best result for each benchmark scores 100."
+        Note = "Each axis shows a normalized speed score (0-100) for one benchmark. 100 = fastest database for that benchmark. Compare databases per axis: the further from the center, the faster."
     }
 }
 
