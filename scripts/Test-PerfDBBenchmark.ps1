@@ -1,5 +1,5 @@
 param(
-    [string[]]$Instances = @("PerfPG", "PerfrMySQL", "PerfSQL"),
+    [string[]]$Instances = @("PerfPG", "PerfMySQL", "PerfSQL"),
     [string]$Username = "admin",
     [string]$Password = "PerformanceTest",
     [int]$RemoteDebuggingPort = 9245,

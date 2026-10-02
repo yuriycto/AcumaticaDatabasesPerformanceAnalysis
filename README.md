@@ -1,6 +1,6 @@
 # PerfDBBenchmark
 
-`PerfDBBenchmark` is a DLL-based Acumatica 2026 R1 benchmark customization for comparing database behavior across PostgreSQL, MySQL 8.0, and Microsoft SQL Server by running the same Acumatica workloads on each instance.
+`PerfDBBenchmark` is a DLL-based Acumatica 2026 R2 (build 26.200.0334) benchmark customization for comparing database behavior across PostgreSQL, MySQL 8.0, and Microsoft SQL Server by running the same Acumatica workloads on each instance.
 
 Created by AcuPower LTD for performance analysis. Company website: [acupowererp.com](https://acupowererp.com)
 
@@ -218,11 +218,11 @@ The scripts default to three local Acumatica instances, each backed by a differe
 | `PerfMySQL` | MySQL 8.0 | `http://localhost/PerfMySQL` |
 | `PerfSQL` | Microsoft SQL Server | `http://localhost/PerfSQL` |
 
-These names appear as default parameter values in every script. The local instance root defaults to `E:\Instances2\26.100.0168`. All of these can be overridden via script parameters -- for example:
+These names appear as default parameter values in every script. The local instance root defaults to `D:\Instances\26.200.0334`. All of these can be overridden via script parameters -- for example:
 
 ```powershell
 -Instances @("MyPostgres", "MyMySQL", "MySQLServer")
--InstanceRoot "D:\AcumaticaSites\2026R1"
+-InstanceRoot "D:\AcumaticaSites\2026R2"
 ```
 
 The scripts also accept a `PerfrMySQL` / `PerfrSQL` alternate spelling as a candidate folder name for auto-detection, in case the instance was created with a typo.
@@ -242,7 +242,7 @@ The scripts also accept a `PerfrMySQL` / `PerfrSQL` alternate spelling as a cand
 Builds the customization package from source.
 
 - Compiles `PerfDBBenchmark.Core.csproj` with `dotnet build` targeting `.NET Framework 4.8` in Release mode.
-- Locates a reference Acumatica instance under `$InstanceRoot` (default `E:\Instances2\26.100.0168\PerfSQL`) to resolve framework assembly references.
+- Locates a reference Acumatica instance under `$InstanceRoot` (default `D:\Instances\26.200.0334\PerfSQL`) to resolve framework assembly references, passing its `Bin` folder to `dotnet build` as `AcumaticaBinFolder`.
 - Regenerates `customization/PerfDBBenchmark/project.xml` from the current page and DLL content.
 - Copies the compiled DLL into the customization package folder.
 - Produces `artifacts/PerfDBBenchmark.zip` ready for upload.

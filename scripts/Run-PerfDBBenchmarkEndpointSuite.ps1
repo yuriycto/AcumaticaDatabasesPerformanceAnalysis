@@ -1,5 +1,6 @@
 param(
     [string[]]$Instances = @("PerfPG", "PerfMySQL", "PerfSQL"),
+    [string]$InstanceRoot = "D:\Instances\26.200.0334",
     [string]$BaseHost = "http://localhost",
     [string]$Username = "",
     [string]$Password = "",
@@ -1198,22 +1199,12 @@ function Get-InstanceSnapshotPath {
         [string]$InstanceName
     )
 
-    foreach ($drive in @(Get-PSDrive -PSProvider FileSystem)) {
-        $instancesRoot = Join-Path $drive.Root "Instances2"
-        if (-not (Test-Path -LiteralPath $instancesRoot)) {
-            continue
-        }
-
-        $candidate = Get-ChildItem -Path $instancesRoot -Filter "perfdbbenchmark-results.json" -Recurse -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -like ("*\" + $InstanceName + "\App_Data\PerfDBBenchmark\perfdbbenchmark-results.json") } |
-            Select-Object -First 1
-
-        if ($null -ne $candidate) {
-            return $candidate.FullName
-        }
+    $candidate = Join-Path $InstanceRoot "$InstanceName\App_Data\PerfDBBenchmark\perfdbbenchmark-results.json"
+    if (Test-Path -LiteralPath $candidate) {
+        return $candidate
     }
 
-    throw "Could not locate perfdbbenchmark-results.json for instance $InstanceName."
+    throw "Could not locate perfdbbenchmark-results.json for instance $InstanceName under $InstanceRoot."
 }
 
 function Load-InstanceSnapshotEnvelope {

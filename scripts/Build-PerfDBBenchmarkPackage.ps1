@@ -1,8 +1,8 @@
 param(
-    [string]$InstanceRoot = "E:\Instances2\26.100.0168",
+    [string]$InstanceRoot = "D:\Instances\26.200.0334",
     [string]$PreferredBuildInstance = "PerfSQL",
     [string]$Configuration = "Release",
-    [string]$ProductVersion = "26.100",
+    [string]$ProductVersion = "26.200",
     [int]$CustomizationLevel = 10,
     [string]$PackageName = "PerfDBBenchmark",
     [switch]$SkipDotNetBuild
@@ -67,12 +67,16 @@ function Get-PxCommandLinePath {
         return $preferredPath
     }
 
-    $matches = Get-ChildItem -LiteralPath $Root -Recurse -Filter "PX.CommandLine.exe" -File | Sort-Object FullName
+    # Only look in instance folders: the installer root also holds a template Files\Bin\PX.CommandLine.exe.
+    $matches = @(Get-ChildItem -LiteralPath $Root -Directory -Filter "Perf*" |
+        ForEach-Object { Join-Path $_.FullName "Bin\PX.CommandLine.exe" } |
+        Where-Object { Test-Path -LiteralPath $_ } |
+        Sort-Object)
     if ($matches.Count -eq 0) {
         throw "PX.CommandLine.exe was not found under '$Root'."
     }
 
-    return $matches[0].FullName
+    return $matches[0]
 }
 
 function New-PerfProjectXml {
@@ -258,7 +262,8 @@ if (-not (Test-Path -LiteralPath $projectXmlPath)) {
 
 if (-not $SkipDotNetBuild) {
     Write-Host "Building PerfDBBenchmark.Core ($Configuration)..." -ForegroundColor Cyan
-    & dotnet build $coreProjectPath -c $Configuration
+    $acumaticaBinFolder = Join-Path $InstanceRoot "$PreferredBuildInstance\Bin\"
+    & dotnet build $coreProjectPath -c $Configuration "-p:AcumaticaBinFolder=$acumaticaBinFolder"
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet build failed with exit code $LASTEXITCODE."
     }

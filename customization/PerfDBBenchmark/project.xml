@@ -1,4 +1,4 @@
-<Customization level="10" description="PerfDBBenchmark by AcuPower LTD (acupowererp.com) for performance analysis" product-version="26.100">
+<Customization level="10" description="PerfDBBenchmark by AcuPower LTD (acupowererp.com) for performance analysis" product-version="26.200">
     <File AppRelativePath="Bin\PerfDBBenchmark.Core.dll" />
     <File AppRelativePath="Pages\AC\AC301000.aspx" />
     <File AppRelativePath="Pages\AC\AC301001.aspx" />

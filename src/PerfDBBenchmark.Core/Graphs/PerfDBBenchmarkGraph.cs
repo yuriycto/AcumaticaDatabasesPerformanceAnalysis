@@ -9,6 +9,7 @@ using System.Threading;
 using PX.Data;
 using PX.Data.BQL;
 using PX.Data.BQL.Fluent;
+using PX.Data.ReducedMode;
 using PX.Objects.GL;
 using PX.Objects.IN;
 using PerfDBBenchmark.Core.DAC;
@@ -36,6 +37,10 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
     public SelectFrom<PerfComparisonResult>.View ComparisonResults;
 
     public override bool IsDirty => Filter.Cache.IsDirty || Records.Cache.IsDirty || LocalResults.Cache.IsDirty;
+
+    // 26 R2 requires a throttler for ProcessItemsParallel; the platform registers one as a singleton.
+    [InjectDependency]
+    protected IReducedModeThrottler ReducedModeThrottler { get; set; }
 
     public PerfDBBenchmarkGraph()
     {
@@ -486,6 +491,7 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
             (graph, task, token) => graph.ProcessParallelTask(task, token),
             CreateInstance<PerfDBBenchmarkGraph>,
             options,
+            ReducedModeThrottler ?? NoOpReducedModeThrottler.Instance,
             CancellationToken.None);
 
         if (hadErrors)
@@ -1052,5 +1058,18 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
         row.ParallelMaxThreads ??= recommendation.RecommendedMaxThreads;
         row.LastRequestStatus ??= PerfBenchmarkRequestStatuses.Idle;
         row.LastRequestMessage ??= "Ready to run benchmarks.";
+    }
+
+    // ProcessItemsParallel calls Reduce() after every item without a null check, so never pass null.
+    private sealed class NoOpReducedModeThrottler : IReducedModeThrottler
+    {
+        public static readonly NoOpReducedModeThrottler Instance = new();
+
+        public System.Threading.Tasks.Task ReduceAsync(TimeSpan requestDuration, CancellationToken cancellationToken) =>
+            System.Threading.Tasks.Task.CompletedTask;
+
+        public void Reduce(TimeSpan requestDuration, CancellationToken cancellationToken)
+        {
+        }
     }
 }

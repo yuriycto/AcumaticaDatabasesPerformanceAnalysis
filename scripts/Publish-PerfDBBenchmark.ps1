@@ -1,5 +1,5 @@
 param(
-    [string]$InstanceRoot = "E:\Instances2\26.100.0168",
+    [string]$InstanceRoot = "D:\Instances\26.200.0334",
     [string[]]$Targets = @("PerfPG", "PerfMySQL", "PerfSQL"),
     [string]$CustomizationName = "PerfDBBenchmark",
     [string]$PackagePath = "",
@@ -7,7 +7,7 @@ param(
     [bool]$MergePublishedProjects = $true,
     [bool]$SkipPreviouslyExecutedDbScripts = $true,
     [switch]$SkipPackageBuild,
-    [string]$DnSpyPath = "E:\dnSpy\6.5.1\dnSpy.Console.exe"
+    [string]$DnSpyPath = "D:\Tools\dnSpy-net-win64\dnSpy.Console.exe"
 )
 
 Set-StrictMode -Version Latest
