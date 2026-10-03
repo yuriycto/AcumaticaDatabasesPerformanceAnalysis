@@ -44,6 +44,16 @@
             display: flex;
             min-height: 40px;
         }
+        .perf-section-title {
+            font-weight: 600;
+            color: #0f172a;
+            margin: 14px 0 6px 0;
+        }
+        .perf-legacy-note {
+            color: #475569;
+            font-size: 12px;
+            margin: 0 0 6px 0;
+        }
         .perf-visual-section {
             margin-top: 14px;
         }
@@ -70,7 +80,7 @@
             display: block;
             width: 45%;
             height: 100%;
-            background: linear-gradient(90deg, #0ea5e9 0%, #22c55e 100%);
+            background: linear-gradient(90deg, #0072B2 0%, #CC79A7 100%);
             animation: perfPulse 2s infinite ease-in-out;
         }
         .perf-progress-help {
@@ -111,7 +121,7 @@
     <div class="perf-header">
         <h2>PerfDBBenchmark</h2>
         <p>Precompiled Acumatica database benchmark screen created by AcuPower LTD for performance analysis and published by <a href="https://acupowererp.com" target="_blank">acupowererp.com</a>.</p>
-        <p class="perf-note">The most important outcome is the Complex BQL Join and PXProjection comparison across PostgreSQL, MySQL 8.0, and Microsoft SQL Server.</p>
+        <p class="perf-note">The same Acumatica workloads (everyday screens, reports, order entry, many users, invoice release and platform basics) run against SQL Server, MySQL and PostgreSQL. The comparison on this screen is indicative; published verdicts come from the report generator.</p>
     </div>
 
     <px:PXFormView ID="frmEnvironment" runat="server" DataSourceID="ds" DataMember="Filter" Width="100%" Caption="Current Environment">
@@ -122,7 +132,10 @@
             <px:PXTextEdit ID="edCurrentInstance" runat="server" DataField="CurrentInstance" />
             <px:PXNumberEdit ID="edDetectedCpuCores" runat="server" DataField="DetectedCpuCores" />
             <px:PXNumberEdit ID="edDetectedMemoryGb" runat="server" DataField="DetectedMemoryGb" />
+            <px:PXTextEdit ID="edServerMethodologyVersion" runat="server" DataField="ServerMethodologyVersion" />
+            <px:PXTextEdit ID="edServerAppStartUtc" runat="server" DataField="ServerAppStartUtc" />
             <px:PXLayoutRule runat="server" StartColumn="True" LabelsWidth="M" ControlSize="XXL" />
+            <px:PXTextEdit ID="edServerDllSha256" runat="server" DataField="ServerDllSha256" />
             <px:PXTextEdit ID="edHardwareRecommendationSummary" runat="server" DataField="HardwareRecommendationSummary" />
             <px:PXTextEdit ID="edSnapshotStatus" runat="server" DataField="SnapshotStatus" />
             <px:PXTextEdit ID="edPendingAnalysisStatus" runat="server" DataField="PendingAnalysisStatus" />
@@ -146,26 +159,31 @@
                 <Template>
                     <div class="perf-instructions">
                         <h3>How to Run the Benchmark</h3>
-                        <p>1. Publish the same DLL-based customization to all three instances: <span class="perf-highlight">PerfPG</span>, <span class="perf-highlight">PerfMySQL</span>, and <span class="perf-highlight">PerfSQL</span>.</p>
-                        <p>2. Open screen <span class="perf-highlight">AC301000</span> on each instance and apply the recommended settings that were calculated from the detected hardware.</p>
-                        <p>3. Run the same test buttons on all three instances. As snapshots become available, the Results and Visualization tabs will highlight the fastest database in green.</p>
+                        <p>1. Publish the same DLL-based customization to all three instances: <span class="perf-highlight">PerfPG</span>, <span class="perf-highlight">PerfMySQL</span>, and <span class="perf-highlight">PerfSQL</span>. The <b>Server DLL SHA-256</b> field must show the same value on all three.</p>
+                        <p>2. Open the <span class="perf-highlight">Run Tests</span> tab, choose a test in <b>Test to Run</b> and click <b>Run Benchmark</b> (the <span class="perf-highlight">RunBenchmark</span> action). Leave <b>Work Scale</b> at 1 and the pass overrides empty for full-size runs.</p>
+                        <p>3. <b>Run Budget (s)</b> (<span class="perf-highlight">RunBudgetSec</span>) limits one run; 0 or empty means 15 minutes. A run that reaches the budget stops after its current operation, cleans up, and is stored as <b>Capped</b>, which is a valid result ranked last.</p>
+                        <p>4. <b>Abort Benchmark</b> (<span class="perf-highlight">AbortBenchmark</span>) asks the run in progress on this instance to stop after its current operation. The run is stored as Invalid (Aborted). With nothing running it answers "Nothing to abort". Only one run per instance can be in progress.</p>
+                        <p>5. <b>Clear Test Records</b> deletes benchmark work records other than the READ-SEED and UPDATE-SEED batches and removes documents left by interrupted runs; results are kept. <b>Clear Test Data</b> also deletes every stored result.</p>
+                        <p>6. Run the same test with the same parameters on all three instances. The Results Grid and Visualization tabs show an indicative comparison only when the parameters hash and the DLL match. The published verdicts (six repetitions, warm-up, rotation and the tie rule) come from <code>scripts\New-PerfDBBenchmarkReport.ps1</code>.</p>
 
-                        <h3>Parallel Processing Requirement</h3>
-                        <p>Parallel benchmarks use Acumatica's processing infrastructure and require the instance <code>Web.config</code> to enable parallel processing.</p>
+                        <h3>Parallel Processing and Thread Pool Requirements</h3>
+                        <p>Multi-worker tests use Acumatica's processing infrastructure and require parallel processing to be enabled in the instance <code>Web.config</code>.</p>
                         <pre>&lt;add key="EnableAutoNumberingInSeparateConnection" value="true"/&gt;
-&lt;add key="ParallelProcessingDisabled" value="false"/&gt;
-&lt;add key="ParallelProcessingMaxThreads" value="6"/&gt;
-&lt;add key="ParallelProcessingBatchSize" value="10"/&gt;
-&lt;add key="IsParallelProcessingSkipBatchExceptions" value="True" /&gt;</pre>
+&lt;add key="ParallelProcessingDisabled" value="false"/&gt;</pre>
+                        <p>Tests with <b>16 workers</b> (16 clerks working non-stop) need a larger Acumatica thread pool. Add this element inside <code>&lt;px.core&gt;</code> in web.config (each worker uses one pool thread, plus one for the run itself):</p>
+                        <pre>&lt;px.core&gt;
+  &lt;ThreadPoolSize&gt;32&lt;/ThreadPoolSize&gt;
+&lt;/px.core&gt;</pre>
+                        <p>Without it, a 16-worker run is stored as Invalid (WorkersNotStarted) instead of being started with fewer workers.</p>
 
-                        <h3>What Matters Most</h3>
-                        <p>The <span class="perf-highlight">Complex BQL Join</span> and <span class="perf-highlight">PXProjection</span> benchmarks simulate realistic Acumatica analytical workloads with multi-table inventory and warehouse joins. These results are the most useful indicator for business reporting and inquiry performance.</p>
+                        <h3>What the Tests Cover</h3>
+                        <p>Everyday screens, reports and month-end, order entry, many simultaneous users, invoice release to GL, and the platform basics (the 12 original record, list and projection tests, re-baselined). The <b>Benchmark Catalog</b> tab lists each test with the question it answers, what it simulates and why it matters.</p>
 
-                        <h3>Delete Workload Coverage</h3>
-                        <p>This customization also measures sequential and parallel delete behavior so you can evaluate cleanup-heavy scenarios, not only inserts and reads.</p>
+                        <h3>Legacy Buttons</h3>
+                        <p>The 12 original buttons still work. Each one starts the matching platform-basics test (for example Sequential Read starts CORE_READ_1U).</p>
 
-                                <h3>Publisher</h3>
-                                <p>This benchmark package was produced by AcuPower LTD for GitHub publishing and performance-analysis reporting. Company website: <a href="https://acupowererp.com" target="_blank">acupowererp.com</a>.</p>
+                        <h3>Publisher</h3>
+                        <p>This benchmark package was produced by AcuPower LTD for GitHub publishing and performance-analysis reporting. Company website: <a href="https://acupowererp.com" target="_blank">acupowererp.com</a>.</p>
                     </div>
                 </Template>
             </px:PXTabItem>
@@ -174,7 +192,7 @@
                 <Template>
                     <px:PXFormView ID="frmParameters" runat="server" DataSourceID="ds" DataMember="Filter" Width="100%" Caption="Benchmark Parameters">
                         <Template>
-                            <px:PXLayoutRule runat="server" StartColumn="True" GroupCaption="Active Parameters" LabelsWidth="M" ControlSize="M" />
+                            <px:PXLayoutRule runat="server" StartColumn="True" GroupCaption="Platform Basics Parameters" LabelsWidth="M" ControlSize="M" />
                             <px:PXNumberEdit ID="edNumberOfRecords" runat="server" DataField="NumberOfRecords" />
                             <px:PXNumberEdit ID="edIterations" runat="server" DataField="Iterations" />
                             <px:PXNumberEdit ID="edParallelBatchSize" runat="server" DataField="ParallelBatchSize" />
@@ -195,6 +213,35 @@
 
             <px:PXTabItem Text="Run Tests">
                 <Template>
+                    <px:PXFormView ID="frmRunTest" runat="server" DataSourceID="ds" DataMember="Filter" Width="100%" Caption="Run a Test">
+                        <Template>
+                            <px:PXLayoutRule runat="server" StartColumn="True" GroupCaption="Test" LabelsWidth="M" ControlSize="XL" />
+                            <px:PXDropDown ID="edSelectedTestCode" runat="server" DataField="SelectedTestCode" CommitChanges="True" />
+                            <px:PXNumberEdit ID="edWorkScale" runat="server" DataField="WorkScale" CommitChanges="True" />
+                            <px:PXNumberEdit ID="edPassesOverride" runat="server" DataField="PassesOverride" CommitChanges="True" />
+                            <px:PXNumberEdit ID="edWarmUpPassesOverride" runat="server" DataField="WarmUpPassesOverride" />
+                            <px:PXNumberEdit ID="edRunBudgetSec" runat="server" DataField="RunBudgetSec" />
+
+                            <px:PXLayoutRule runat="server" StartColumn="True" GroupCaption="Campaign Context (set by the suite)" LabelsWidth="M" ControlSize="XM" />
+                            <px:PXTextEdit ID="edCampaignID" runat="server" DataField="CampaignID" />
+                            <px:PXNumberEdit ID="edRepetitionNo" runat="server" DataField="RepetitionNo" />
+                            <px:PXCheckBox ID="edIsWarmup" runat="server" DataField="IsWarmup" />
+                            <px:PXTextEdit ID="edRunBlock" runat="server" DataField="RunBlock" />
+                            <px:PXNumberEdit ID="edOrderPosition" runat="server" DataField="OrderPosition" />
+                        </Template>
+                    </px:PXFormView>
+
+                    <div class="perf-button-grid">
+                        <div class="perf-button-cell"><px:PXButton ID="btnRunBenchmark" runat="server" Text="Run Benchmark" CommandName="RunBenchmark" CommandSourceID="ds" Width="100%" Height="40px" /></div>
+                        <div class="perf-button-cell"><px:PXButton ID="btnAbortBenchmark" runat="server" Text="Abort Benchmark" CommandName="AbortBenchmark" CommandSourceID="ds" Width="100%" Height="40px" /></div>
+                        <div class="perf-button-cell"><px:PXButton ID="btnClearTestRecords" runat="server" Text="Clear Test Records" CommandName="ClearTestRecords" CommandSourceID="ds" Width="100%" Height="40px" /></div>
+                        <div class="perf-button-cell"><px:PXButton ID="btnRefreshStatus" runat="server" Text="Refresh Status" CommandName="RefreshStatus" CommandSourceID="ds" Width="100%" Height="40px" /></div>
+                        <div class="perf-button-cell"><px:PXButton ID="btnExportExcel" runat="server" Text="Export to Excel" CommandName="ExportToExcel" CommandSourceID="ds" Width="100%" Height="40px" /></div>
+                        <div class="perf-button-cell"><px:PXButton ID="btnClearData" runat="server" Text="Clear Test Data" CommandName="ClearTestData" CommandSourceID="ds" Width="100%" Height="40px" /></div>
+                    </div>
+
+                    <div class="perf-section-title">Legacy buttons</div>
+                    <p class="perf-legacy-note">The 12 original tests. Each button starts the matching platform-basics test (for example Sequential Read starts CORE_READ_1U).</p>
                     <div class="perf-button-grid">
                         <div class="perf-button-cell"><px:PXButton ID="btnSeqRead" runat="server" Text="Sequential Read" CommandName="RunSequentialRead" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnSeqWrite" runat="server" Text="Sequential Write" CommandName="RunSequentialWrite" CommandSourceID="ds" Width="100%" Height="40px" /></div>
@@ -208,16 +255,13 @@
                         <div class="perf-button-cell"><px:PXButton ID="btnParDelete" runat="server" Text="Parallel Delete" CommandName="RunParallelDelete" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnParComplex" runat="server" Text="Complex Join (Parallel)" CommandName="RunParallelComplexJoin" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                         <div class="perf-button-cell"><px:PXButton ID="btnParProjection" runat="server" Text="PXProjection (Parallel)" CommandName="RunParallelProjection" CommandSourceID="ds" Width="100%" Height="40px" /></div>
-                        <div class="perf-button-cell"><px:PXButton ID="btnRefreshStatus" runat="server" Text="Refresh Status" CommandName="RefreshStatus" CommandSourceID="ds" Width="100%" Height="40px" /></div>
-                        <div class="perf-button-cell"><px:PXButton ID="btnExportExcel" runat="server" Text="Export to Excel" CommandName="ExportToExcel" CommandSourceID="ds" Width="100%" Height="40px" /></div>
-                        <div class="perf-button-cell"><px:PXButton ID="btnClearData" runat="server" Text="Clear Test Data" CommandName="ClearTestData" CommandSourceID="ds" Width="100%" Height="40px" /></div>
                     </div>
 
                     <div class="perf-progress-shell">
                         <div class="perf-progress-title">Progress</div>
                         <div class="perf-progress-bar"><span></span></div>
                         <div class="perf-progress-help">
-                            Acumatica will show the standard long-operation progress while each benchmark runs. The moving bar above is a visual cue for business users and the hidden PXSmartPanel below is reserved for progress-related messaging.
+                            Acumatica shows the standard long-operation progress while each benchmark runs. Use Abort Benchmark to stop a run early; the run budget stops it automatically.
                         </div>
                     </div>
 
@@ -243,13 +287,34 @@
                         <Levels>
                             <px:PXGridLevel DataMember="BenchmarkCatalog">
                                 <Columns>
-                                    <px:PXGridColumn DataField="TestCode" Width="130" />
-                                    <px:PXGridColumn DataField="DisplayName" Width="250" />
-                                    <px:PXGridColumn DataField="ActionName" Width="180" />
-                                    <px:PXGridColumn DataField="Category" Width="150" />
-                                    <px:PXGridColumn DataField="ExecutionMode" Width="110" />
+                                    <px:PXGridColumn DataField="SortOrder" Width="70" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="TestCode" Width="200" />
+                                    <px:PXGridColumn DataField="DisplayName" Width="300" />
+                                    <px:PXGridColumn DataField="Family" Width="110" />
+                                    <px:PXGridColumn DataField="RunBlock" Width="60" />
+                                    <px:PXGridColumn DataField="ShortLabel" Width="100" />
+                                    <px:PXGridColumn DataField="UserCount" Width="60" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="ReaderUnit" Width="170" />
+                                    <px:PXGridColumn DataField="HeadlineKind" Width="110" />
+                                    <px:PXGridColumn DataField="HeadlineUnit" Width="80" />
+                                    <px:PXGridColumn DataField="HigherIsBetter" Width="80" Type="CheckBox" TextAlign="Center" />
+                                    <px:PXGridColumn DataField="OpsUnit" Width="90" />
+                                    <px:PXGridColumn DataField="DefaultOpsPerPass" Width="90" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="DefaultPasses" Width="80" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="DefaultWarmUpPasses" Width="80" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="ParityExpected" Width="80" Type="CheckBox" TextAlign="Center" />
+                                    <px:PXGridColumn DataField="IsDestructive" Width="90" Type="CheckBox" TextAlign="Center" />
+                                    <px:PXGridColumn DataField="IsOptional" Width="70" Type="CheckBox" TextAlign="Center" />
+                                    <px:PXGridColumn DataField="ExcludeFromComparison" Width="90" Type="CheckBox" TextAlign="Center" />
+                                    <px:PXGridColumn DataField="LegacyTestCode" Width="120" />
+                                    <px:PXGridColumn DataField="ScenarioVersion" Width="70" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="Question" Width="360" />
+                                    <px:PXGridColumn DataField="WhatItSimulates" Width="420" />
+                                    <px:PXGridColumn DataField="WhyItMatters" Width="420" />
+                                    <px:PXGridColumn DataField="ActionName" Width="140" Visible="False" />
+                                    <px:PXGridColumn DataField="Category" Width="100" />
+                                    <px:PXGridColumn DataField="ExecutionMode" Width="100" />
                                     <px:PXGridColumn DataField="ShortDescription" Width="420" />
-                                    <px:PXGridColumn DataField="SortOrder" Width="90" TextAlign="Right" />
                                 </Columns>
                             </px:PXGridLevel>
                         </Levels>
@@ -267,7 +332,39 @@
                                 <Columns>
                                     <px:PXGridColumn DataField="ResultID" Width="90" TextAlign="Right" />
                                     <px:PXGridColumn DataField="DisplayName" Width="250" />
-                                    <px:PXGridColumn DataField="TestCode" Width="130" />
+                                    <px:PXGridColumn DataField="TestCode" Width="180" />
+                                    <px:PXGridColumn DataField="Family" Width="110" />
+                                    <px:PXGridColumn DataField="Status" Width="90" />
+                                    <px:PXGridColumn DataField="InvalidReason" Width="180" />
+                                    <px:PXGridColumn DataField="HeadlineValue" Width="110" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="HeadlineUnit" Width="80" />
+                                    <px:PXGridColumn DataField="HigherIsBetter" Width="80" Type="CheckBox" TextAlign="Center" Visible="False" />
+                                    <px:PXGridColumn DataField="UserCount" Width="60" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="ElapsedMsPrecise" Width="120" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="OpsCount" Width="90" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="OpsPerSec" Width="100" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="P50Ms" Width="90" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="P95Ms" Width="90" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="P99Ms" Width="90" TextAlign="Right" Visible="False" />
+                                    <px:PXGridColumn DataField="MaxOpMs" Width="100" TextAlign="Right" Visible="False" />
+                                    <px:PXGridColumn DataField="ErrorCount" Width="70" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="DeadlockCount" Width="80" TextAlign="Right" Visible="False" />
+                                    <px:PXGridColumn DataField="RetryCount" Width="70" TextAlign="Right" Visible="False" />
+                                    <px:PXGridColumn DataField="LockViolationCount" Width="90" TextAlign="Right" Visible="False" />
+                                    <px:PXGridColumn DataField="TimeoutCount" Width="80" TextAlign="Right" Visible="False" />
+                                    <px:PXGridColumn DataField="WorkersObservedPeak" Width="90" TextAlign="Right" Visible="False" />
+                                    <px:PXGridColumn DataField="RowsReturned" Width="100" TextAlign="Right" Visible="False" />
+                                    <px:PXGridColumn DataField="Checksum" Width="200" Visible="False" />
+                                    <px:PXGridColumn DataField="CampaignID" Width="220" Visible="False" />
+                                    <px:PXGridColumn DataField="RepetitionNo" Width="80" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="IsWarmup" Width="80" Type="CheckBox" TextAlign="Center" />
+                                    <px:PXGridColumn DataField="RunBlock" Width="60" Visible="False" />
+                                    <px:PXGridColumn DataField="OrderPosition" Width="70" TextAlign="Right" Visible="False" />
+                                    <px:PXGridColumn DataField="MethodologyVersion" Width="100" Visible="False" />
+                                    <px:PXGridColumn DataField="ParamsHash" Width="140" Visible="False" />
+                                    <px:PXGridColumn DataField="DllSha256" Width="200" Visible="False" />
+                                    <px:PXGridColumn DataField="AppDomainStartUtc" Width="200" Visible="False" />
+                                    <px:PXGridColumn DataField="ResultJson" Width="300" Visible="False" />
                                     <px:PXGridColumn DataField="RunID" Width="220" />
                                     <px:PXGridColumn DataField="RequestedAtUtc" Width="150" />
                                     <px:PXGridColumn DataField="CapturedAtUtc" Width="150" />
@@ -293,10 +390,25 @@
                             <px:PXGridLevel DataMember="ComparisonResults">
                                 <Columns>
                                     <px:PXGridColumn DataField="TestDisplayName" Width="250" />
-                                    <px:PXGridColumn DataField="TestCategory" Width="150" />
-                                    <px:PXGridColumn DataField="ExecutionMode" Width="110" />
-                                    <px:PXGridColumn DataField="DatabaseType" Width="170" />
-                                    <px:PXGridColumn DataField="InstanceName" Width="120" />
+                                    <px:PXGridColumn DataField="Family" Width="110" />
+                                    <px:PXGridColumn DataField="ShortLabel" Width="100" Visible="False" />
+                                    <px:PXGridColumn DataField="SortOrder" Width="70" TextAlign="Right" Visible="False" />
+                                    <px:PXGridColumn DataField="UserCount" Width="60" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="TestCategory" Width="110" />
+                                    <px:PXGridColumn DataField="ExecutionMode" Width="100" />
+                                    <px:PXGridColumn DataField="DatabaseType" Width="140" />
+                                    <px:PXGridColumn DataField="InstanceName" Width="110" />
+                                    <px:PXGridColumn DataField="HeadlineValue" Width="110" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="HeadlineUnit" Width="80" />
+                                    <px:PXGridColumn DataField="HigherIsBetter" Width="80" Type="CheckBox" TextAlign="Center" Visible="False" />
+                                    <px:PXGridColumn DataField="RelToFastest" Width="90" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="Verdict" Width="200" />
+                                    <px:PXGridColumn DataField="IsComparable" Width="90" Type="CheckBox" TextAlign="Center" />
+                                    <px:PXGridColumn DataField="P95Ms" Width="90" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="OpsPerSec" Width="100" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="ErrorCount" Width="70" TextAlign="Right" />
+                                    <px:PXGridColumn DataField="Status" Width="90" />
+                                    <px:PXGridColumn DataField="ParamsHash" Width="140" Visible="False" />
                                     <px:PXGridColumn DataField="ElapsedMs" Width="110" TextAlign="Right" />
                                     <px:PXGridColumn DataField="RecordsCount" Width="100" TextAlign="Right" />
                                     <px:PXGridColumn DataField="Iterations" Width="90" TextAlign="Right" />
@@ -317,11 +429,11 @@
             <px:PXTabItem Text="Visualization">
                 <Template>
                     <div class="perf-instructions">
-                        <p><span class="perf-highlight">Green winner rows</span> indicate the fastest currently available database result for a benchmark. Run the same tests on all three sibling instances to complete the comparison set.</p>
+                        <p>One chart per family, in catalog order. The in-app comparison is <span class="perf-highlight">indicative</span>: it appears only when all instances ran the test with the same parameters and DLL. Published verdicts use six repetitions and the tie rule (report generator).</p>
                     </div>
 
                     <div class="perf-visual-section">
-                        <div class="perf-progress-title">All Benchmarks</div>
+                        <div class="perf-progress-title">All Tests</div>
                         <px:PXSerialChart ID="OverviewChart" runat="server" Width="100%" SkinID="Chart1" Height="280px" LegendEnabled="True" OnLoad="OverviewChart_OnLoad">
                             <DataFields Category="Category" Value="Values" Description="Labels"></DataFields>
                             <CategoryAxis ShowFirstLabel="True" ShowLastLabel="True" LabelRotation="25" StartOnAxis="True"></CategoryAxis>
@@ -329,16 +441,48 @@
                     </div>
 
                     <div class="perf-visual-section">
-                        <div class="perf-progress-title">Analytical Workloads</div>
-                        <px:PXSerialChart ID="ComplexChart" runat="server" Width="100%" SkinID="Chart1" Height="260px" LegendEnabled="True" OnLoad="ComplexChart_OnLoad">
+                        <div class="perf-progress-title">Everyday screens</div>
+                        <px:PXSerialChart ID="chartFamilyScreens" runat="server" Width="100%" SkinID="Chart1" Height="240px" LegendEnabled="True" OnLoad="FamilyChart_OnLoad">
                             <DataFields Category="Category" Value="Values" Description="Labels"></DataFields>
                             <CategoryAxis ShowFirstLabel="True" ShowLastLabel="True" LabelRotation="20" StartOnAxis="True"></CategoryAxis>
                         </px:PXSerialChart>
                     </div>
 
                     <div class="perf-visual-section">
-                        <div class="perf-progress-title">Read / Write / Update / Delete</div>
-                        <px:PXSerialChart ID="DmlChart" runat="server" Width="100%" SkinID="Chart1" Height="260px" LegendEnabled="True" OnLoad="DmlChart_OnLoad">
+                        <div class="perf-progress-title">Reports &amp; month-end</div>
+                        <px:PXSerialChart ID="chartFamilyReports" runat="server" Width="100%" SkinID="Chart1" Height="240px" LegendEnabled="True" OnLoad="FamilyChart_OnLoad">
+                            <DataFields Category="Category" Value="Values" Description="Labels"></DataFields>
+                            <CategoryAxis ShowFirstLabel="True" ShowLastLabel="True" LabelRotation="20" StartOnAxis="True"></CategoryAxis>
+                        </px:PXSerialChart>
+                    </div>
+
+                    <div class="perf-visual-section">
+                        <div class="perf-progress-title">Order entry (1 clerk)</div>
+                        <px:PXSerialChart ID="chartFamilyOrderEntry" runat="server" Width="100%" SkinID="Chart1" Height="200px" LegendEnabled="True" OnLoad="FamilyChart_OnLoad">
+                            <DataFields Category="Category" Value="Values" Description="Labels"></DataFields>
+                            <CategoryAxis ShowFirstLabel="True" ShowLastLabel="True" LabelRotation="20" StartOnAxis="True"></CategoryAxis>
+                        </px:PXSerialChart>
+                    </div>
+
+                    <div class="perf-visual-section">
+                        <div class="perf-progress-title">Many simultaneous users</div>
+                        <px:PXSerialChart ID="chartFamilyManyUsers" runat="server" Width="100%" SkinID="Chart1" Height="240px" LegendEnabled="True" OnLoad="FamilyChart_OnLoad">
+                            <DataFields Category="Category" Value="Values" Description="Labels"></DataFields>
+                            <CategoryAxis ShowFirstLabel="True" ShowLastLabel="True" LabelRotation="20" StartOnAxis="True"></CategoryAxis>
+                        </px:PXSerialChart>
+                    </div>
+
+                    <div class="perf-visual-section">
+                        <div class="perf-progress-title">Invoice release to GL</div>
+                        <px:PXSerialChart ID="chartFamilyInvoiceRelease" runat="server" Width="100%" SkinID="Chart1" Height="200px" LegendEnabled="True" OnLoad="FamilyChart_OnLoad">
+                            <DataFields Category="Category" Value="Values" Description="Labels"></DataFields>
+                            <CategoryAxis ShowFirstLabel="True" ShowLastLabel="True" LabelRotation="20" StartOnAxis="True"></CategoryAxis>
+                        </px:PXSerialChart>
+                    </div>
+
+                    <div class="perf-visual-section">
+                        <div class="perf-progress-title">Platform basics: bulk record work</div>
+                        <px:PXSerialChart ID="chartFamilyCore" runat="server" Width="100%" SkinID="Chart1" Height="260px" LegendEnabled="True" OnLoad="FamilyChart_OnLoad">
                             <DataFields Category="Category" Value="Values" Description="Labels"></DataFields>
                             <CategoryAxis ShowFirstLabel="True" ShowLastLabel="True" LabelRotation="20" StartOnAxis="True"></CategoryAxis>
                         </px:PXSerialChart>
@@ -351,11 +495,14 @@
                                 <px:PXGridLevel DataMember="ComparisonResults">
                                     <Columns>
                                         <px:PXGridColumn DataField="TestDisplayName" Width="250" />
-                                        <px:PXGridColumn DataField="ExecutionMode" Width="110" />
-                                        <px:PXGridColumn DataField="DatabaseType" Width="170" />
-                                        <px:PXGridColumn DataField="InstanceName" Width="120" />
-                                        <px:PXGridColumn DataField="ElapsedMs" Width="110" TextAlign="Right" />
-                                        <px:PXGridColumn DataField="WinnerDisplay" Width="210" />
+                                        <px:PXGridColumn DataField="Family" Width="110" />
+                                        <px:PXGridColumn DataField="DatabaseType" Width="140" />
+                                        <px:PXGridColumn DataField="InstanceName" Width="110" />
+                                        <px:PXGridColumn DataField="HeadlineValue" Width="110" TextAlign="Right" />
+                                        <px:PXGridColumn DataField="HeadlineUnit" Width="80" />
+                                        <px:PXGridColumn DataField="RelToFastest" Width="90" TextAlign="Right" />
+                                        <px:PXGridColumn DataField="Verdict" Width="200" />
+                                        <px:PXGridColumn DataField="Status" Width="90" />
                                         <px:PXGridColumn DataField="CapturedAtUtc" Width="150" />
                                     </Columns>
                                 </px:PXGridLevel>
