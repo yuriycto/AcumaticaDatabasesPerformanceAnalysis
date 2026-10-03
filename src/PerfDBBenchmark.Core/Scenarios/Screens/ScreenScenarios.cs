@@ -537,11 +537,16 @@ internal sealed class ScreenCustomerSearchScenario : ReadScenarioBase<ScreenCust
     /// <summary>
     /// Untimed, informational: how each engine treats accented letters in a 'contains' search. Keys starting with "probe."
     /// never block ranking; the report shows them as a "Same answer?" row. SQL Server today: 0 / 1 / 1.
+    /// Keys are "probe.accent.&lt;n&gt;.&lt;term&gt;" (1 = quebec, 2 = Québec, 3 = QUÉBEC): the number keeps the keys distinct
+    /// when compared without case, because Windows PowerShell 5.1 (the campaign suite) cannot parse a JSON object whose
+    /// keys differ only in case ("Québec" / "QUÉBEC"), and the whole ResultJson would be lost.
     /// </summary>
     protected override void VerifyMore(PerfScenarioContext context, PerfRunMetrics metrics)
     {
-        foreach (var probe in AccentProbes)
+        for (var i = 0; i < AccentProbes.Length; i++)
         {
+            var probe = AccentProbes[i];
+            var key = "probe.accent." + (i + 1).ToString(CultureInfo.InvariantCulture) + "." + probe;
             try
             {
                 var n = 0;
@@ -551,11 +556,11 @@ internal sealed class ScreenCustomerSearchScenario : ReadScenarioBase<ScreenCust
                 {
                     n++;
                 }
-                context.Parity["probe.accent." + probe] = Invariant(n);
+                context.Parity[key] = Invariant(n);
             }
             catch (Exception ex)
             {
-                context.Notes["probe.accent." + probe] = "unavailable: " + ex.Message;
+                context.Notes[key] = "unavailable: " + ex.Message;
             }
         }
     }
