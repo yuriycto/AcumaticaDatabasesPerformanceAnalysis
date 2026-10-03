@@ -1,0 +1,13 @@
+# PostgreSQL password file for the PerfDBBenchmark campaign scripts (SPEC section 6, conventions).
+#
+# 1. Copy this file to  <repo>\Exceptions\pgpass.conf
+#    (Exceptions\ is git-excluded and has the antivirus exception; never commit the copy).
+# 2. Replace CHANGE_ME with the password of the postgres superuser.
+#
+# The scripts use it only through the PGPASSFILE environment variable, for example:
+#   $env:PGPASSFILE = "<repo>\Exceptions\pgpass.conf"; & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -h localhost -d postgres -w
+#   scripts\Get-PerfEnvironment.ps1 -PgPassFile "<repo>\Exceptions\pgpass.conf"
+# The password is never placed on a command line, printed or written anywhere else.
+#
+# Format: hostname:port:database:username:password   ('*' matches anything; lines starting with '#' are comments)
+localhost:5432:*:postgres:CHANGE_ME

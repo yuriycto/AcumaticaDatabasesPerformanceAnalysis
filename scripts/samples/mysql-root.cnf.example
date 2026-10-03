@@ -1,0 +1,17 @@
+# MySQL client credentials for the PerfDBBenchmark campaign scripts (SPEC section 6, conventions).
+#
+# 1. Copy this file to  <repo>\Exceptions\mysql-root.cnf
+#    (Exceptions\ is git-excluded and has the antivirus exception; never commit the copy).
+# 2. Replace CHANGE_ME with the MySQL root password.
+#
+# The scripts pass the file only as the first option of the MySQL tools, for example:
+#   mysql.exe --defaults-extra-file="<repo>\Exceptions\mysql-root.cnf" -e "SELECT @@version"
+#   scripts\Get-PerfEnvironment.ps1 -MySqlDefaultsFile "<repo>\Exceptions\mysql-root.cnf"
+# The password is never placed on a command line, printed or written anywhere else.
+# Avoid ';' and '=' in the password (Acumatica connection-string limitation).
+
+[client]
+user=root
+password=CHANGE_ME
+host=localhost
+port=3306
