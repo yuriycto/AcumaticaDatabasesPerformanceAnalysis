@@ -52,7 +52,7 @@
         </data-set>
     </SiteMapNode>
     <EntityEndpoint Description="PerfDB benchmark control, catalog, and results API.">
-        <Endpoint xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="PerfDBBenchmark" version="26.100.001" systemContractVersion="4" xmlns="http://www.acumatica.com/entity/maintenance/5.31">
+        <Endpoint xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="PerfDBBenchmark" version="26.200.001" systemContractVersion="4" xmlns="http://www.acumatica.com/entity/maintenance/5.31">
             <Detail name="LocalResults">
                 <Fields>
                     <Field name="ResultID" type="IntValue" />
@@ -67,6 +67,18 @@
                     <Field name="BatchSize" type="IntValue" />
                     <Field name="MaxThreads" type="IntValue" />
                     <Field name="Notes" type="StringValue" />
+                    <Field name="CampaignID" type="GuidValue" />
+                    <Field name="RepetitionNo" type="IntValue" />
+                    <Field name="IsWarmup" type="BooleanValue" />
+                    <Field name="Family" type="StringValue" />
+                    <Field name="ParamsHash" type="StringValue" />
+                    <Field name="ElapsedMsPrecise" type="DecimalValue" />
+                    <Field name="HeadlineValue" type="DecimalValue" />
+                    <Field name="OpsPerSec" type="DecimalValue" />
+                    <Field name="P50Ms" type="DecimalValue" />
+                    <Field name="P95Ms" type="DecimalValue" />
+                    <Field name="ErrorCount" type="IntValue" />
+                    <Field name="Status" type="StringValue" />
                 </Fields>
             </Detail>
             <Detail name="BenchmarkCatalog">
@@ -78,6 +90,27 @@
                     <Field name="ExecutionMode" type="StringValue" />
                     <Field name="ShortDescription" type="StringValue" />
                     <Field name="SortOrder" type="IntValue" />
+                    <Field name="Family" type="StringValue" />
+                    <Field name="RunBlock" type="StringValue" />
+                    <Field name="ShortLabel" type="StringValue" />
+                    <Field name="Question" type="StringValue" />
+                    <Field name="WhatItSimulates" type="StringValue" />
+                    <Field name="WhyItMatters" type="StringValue" />
+                    <Field name="ReaderUnit" type="StringValue" />
+                    <Field name="UserCount" type="IntValue" />
+                    <Field name="HeadlineKind" type="StringValue" />
+                    <Field name="HeadlineUnit" type="StringValue" />
+                    <Field name="HigherIsBetter" type="BooleanValue" />
+                    <Field name="OpsUnit" type="StringValue" />
+                    <Field name="ParityExpected" type="BooleanValue" />
+                    <Field name="IsDestructive" type="BooleanValue" />
+                    <Field name="IsOptional" type="BooleanValue" />
+                    <Field name="ExcludeFromComparison" type="BooleanValue" />
+                    <Field name="LegacyTestCode" type="StringValue" />
+                    <Field name="ScenarioVersion" type="IntValue" />
+                    <Field name="DefaultOpsPerPass" type="IntValue" />
+                    <Field name="DefaultPasses" type="IntValue" />
+                    <Field name="DefaultWarmUpPasses" type="IntValue" />
                 </Fields>
             </Detail>
             <TopLevelEntity name="BenchmarkResult" screen="AC301001">
@@ -98,6 +131,38 @@
                     <Field name="BatchSize" type="IntValue" />
                     <Field name="MaxThreads" type="IntValue" />
                     <Field name="Notes" type="StringValue" />
+                    <Field name="CampaignID" type="GuidValue" />
+                    <Field name="RepetitionNo" type="IntValue" />
+                    <Field name="IsWarmup" type="BooleanValue" />
+                    <Field name="RunBlock" type="StringValue" />
+                    <Field name="OrderPosition" type="IntValue" />
+                    <Field name="Family" type="StringValue" />
+                    <Field name="MethodologyVersion" type="StringValue" />
+                    <Field name="ParamsHash" type="StringValue" />
+                    <Field name="UserCount" type="IntValue" />
+                    <Field name="ElapsedMsPrecise" type="DecimalValue" />
+                    <Field name="HeadlineValue" type="DecimalValue" />
+                    <Field name="HeadlineUnit" type="StringValue" />
+                    <Field name="HigherIsBetter" type="BooleanValue" />
+                    <Field name="OpsCount" type="IntValue" />
+                    <Field name="OpsPerSec" type="DecimalValue" />
+                    <Field name="P50Ms" type="DecimalValue" />
+                    <Field name="P95Ms" type="DecimalValue" />
+                    <Field name="P99Ms" type="DecimalValue" />
+                    <Field name="MaxOpMs" type="DecimalValue" />
+                    <Field name="RowsReturned" type="LongValue" />
+                    <Field name="Checksum" type="StringValue" />
+                    <Field name="ErrorCount" type="IntValue" />
+                    <Field name="DeadlockCount" type="IntValue" />
+                    <Field name="RetryCount" type="IntValue" />
+                    <Field name="LockViolationCount" type="IntValue" />
+                    <Field name="TimeoutCount" type="IntValue" />
+                    <Field name="WorkersObservedPeak" type="IntValue" />
+                    <Field name="Status" type="StringValue" />
+                    <Field name="InvalidReason" type="StringValue" />
+                    <Field name="DllSha256" type="StringValue" />
+                    <Field name="AppDomainStartUtc" type="StringValue" />
+                    <Field name="ResultJson" type="StringValue" />
                 </Fields>
                 <Mappings>
                     <Mapping field="ResultID">
@@ -148,6 +213,102 @@
                     <Mapping field="Notes">
                         <To object="Results" field="Notes" />
                     </Mapping>
+                    <Mapping field="CampaignID">
+                        <To object="Results" field="CampaignID" />
+                    </Mapping>
+                    <Mapping field="RepetitionNo">
+                        <To object="Results" field="RepetitionNo" />
+                    </Mapping>
+                    <Mapping field="IsWarmup">
+                        <To object="Results" field="IsWarmup" />
+                    </Mapping>
+                    <Mapping field="RunBlock">
+                        <To object="Results" field="RunBlock" />
+                    </Mapping>
+                    <Mapping field="OrderPosition">
+                        <To object="Results" field="OrderPosition" />
+                    </Mapping>
+                    <Mapping field="Family">
+                        <To object="Results" field="Family" />
+                    </Mapping>
+                    <Mapping field="MethodologyVersion">
+                        <To object="Results" field="MethodologyVersion" />
+                    </Mapping>
+                    <Mapping field="ParamsHash">
+                        <To object="Results" field="ParamsHash" />
+                    </Mapping>
+                    <Mapping field="UserCount">
+                        <To object="Results" field="UserCount" />
+                    </Mapping>
+                    <Mapping field="ElapsedMsPrecise">
+                        <To object="Results" field="ElapsedMsPrecise" />
+                    </Mapping>
+                    <Mapping field="HeadlineValue">
+                        <To object="Results" field="HeadlineValue" />
+                    </Mapping>
+                    <Mapping field="HeadlineUnit">
+                        <To object="Results" field="HeadlineUnit" />
+                    </Mapping>
+                    <Mapping field="HigherIsBetter">
+                        <To object="Results" field="HigherIsBetter" />
+                    </Mapping>
+                    <Mapping field="OpsCount">
+                        <To object="Results" field="OpsCount" />
+                    </Mapping>
+                    <Mapping field="OpsPerSec">
+                        <To object="Results" field="OpsPerSec" />
+                    </Mapping>
+                    <Mapping field="P50Ms">
+                        <To object="Results" field="P50Ms" />
+                    </Mapping>
+                    <Mapping field="P95Ms">
+                        <To object="Results" field="P95Ms" />
+                    </Mapping>
+                    <Mapping field="P99Ms">
+                        <To object="Results" field="P99Ms" />
+                    </Mapping>
+                    <Mapping field="MaxOpMs">
+                        <To object="Results" field="MaxOpMs" />
+                    </Mapping>
+                    <Mapping field="RowsReturned">
+                        <To object="Results" field="RowsReturned" />
+                    </Mapping>
+                    <Mapping field="Checksum">
+                        <To object="Results" field="Checksum" />
+                    </Mapping>
+                    <Mapping field="ErrorCount">
+                        <To object="Results" field="ErrorCount" />
+                    </Mapping>
+                    <Mapping field="DeadlockCount">
+                        <To object="Results" field="DeadlockCount" />
+                    </Mapping>
+                    <Mapping field="RetryCount">
+                        <To object="Results" field="RetryCount" />
+                    </Mapping>
+                    <Mapping field="LockViolationCount">
+                        <To object="Results" field="LockViolationCount" />
+                    </Mapping>
+                    <Mapping field="TimeoutCount">
+                        <To object="Results" field="TimeoutCount" />
+                    </Mapping>
+                    <Mapping field="WorkersObservedPeak">
+                        <To object="Results" field="WorkersObservedPeak" />
+                    </Mapping>
+                    <Mapping field="Status">
+                        <To object="Results" field="Status" />
+                    </Mapping>
+                    <Mapping field="InvalidReason">
+                        <To object="Results" field="InvalidReason" />
+                    </Mapping>
+                    <Mapping field="DllSha256">
+                        <To object="Results" field="DllSha256" />
+                    </Mapping>
+                    <Mapping field="AppDomainStartUtc">
+                        <To object="Results" field="AppDomainStartUtc" />
+                    </Mapping>
+                    <Mapping field="ResultJson">
+                        <To object="Results" field="ResultJson" />
+                    </Mapping>
                 </Mappings>
             </TopLevelEntity>
             <TopLevelEntity name="BenchmarkControl" screen="AC301000">
@@ -169,6 +330,19 @@
                     <Field name="LastRequestCompletedAtUtc" type="DateTimeValue" />
                     <Field name="LastRequestElapsedMs" type="IntValue" />
                     <Field name="LastRequestMessage" type="StringValue" />
+                    <Field name="SelectedTestCode" type="StringValue" />
+                    <Field name="CampaignID" type="GuidValue" />
+                    <Field name="RepetitionNo" type="IntValue" />
+                    <Field name="IsWarmup" type="BooleanValue" />
+                    <Field name="RunBlock" type="StringValue" />
+                    <Field name="OrderPosition" type="IntValue" />
+                    <Field name="WorkScale" type="DecimalValue" />
+                    <Field name="PassesOverride" type="IntValue" />
+                    <Field name="WarmUpPassesOverride" type="IntValue" />
+                    <Field name="RunBudgetSec" type="IntValue" />
+                    <Field name="ServerAppStartUtc" type="StringValue" />
+                    <Field name="ServerDllSha256" type="StringValue" />
+                    <Field name="ServerMethodologyVersion" type="StringValue" />
                     <Field name="LocalResults" type="LocalResults[]" />
                     <Field name="BenchmarkCatalog" type="BenchmarkCatalog[]" />
                 </Fields>
@@ -224,6 +398,45 @@
                     <Mapping field="LastRequestMessage">
                         <To object="Filter" field="LastRequestMessage" />
                     </Mapping>
+                    <Mapping field="SelectedTestCode">
+                        <To object="Filter" field="SelectedTestCode" />
+                    </Mapping>
+                    <Mapping field="CampaignID">
+                        <To object="Filter" field="CampaignID" />
+                    </Mapping>
+                    <Mapping field="RepetitionNo">
+                        <To object="Filter" field="RepetitionNo" />
+                    </Mapping>
+                    <Mapping field="IsWarmup">
+                        <To object="Filter" field="IsWarmup" />
+                    </Mapping>
+                    <Mapping field="RunBlock">
+                        <To object="Filter" field="RunBlock" />
+                    </Mapping>
+                    <Mapping field="OrderPosition">
+                        <To object="Filter" field="OrderPosition" />
+                    </Mapping>
+                    <Mapping field="WorkScale">
+                        <To object="Filter" field="WorkScale" />
+                    </Mapping>
+                    <Mapping field="PassesOverride">
+                        <To object="Filter" field="PassesOverride" />
+                    </Mapping>
+                    <Mapping field="WarmUpPassesOverride">
+                        <To object="Filter" field="WarmUpPassesOverride" />
+                    </Mapping>
+                    <Mapping field="RunBudgetSec">
+                        <To object="Filter" field="RunBudgetSec" />
+                    </Mapping>
+                    <Mapping field="ServerAppStartUtc">
+                        <To object="Filter" field="ServerAppStartUtc" />
+                    </Mapping>
+                    <Mapping field="ServerDllSha256">
+                        <To object="Filter" field="ServerDllSha256" />
+                    </Mapping>
+                    <Mapping field="ServerMethodologyVersion">
+                        <To object="Filter" field="ServerMethodologyVersion" />
+                    </Mapping>
                     <Mapping field="LocalResults">
                         <Mapping field="ResultID">
                             <To object="LocalResults" field="ResultID" />
@@ -261,6 +474,42 @@
                         <Mapping field="Notes">
                             <To object="LocalResults" field="Notes" />
                         </Mapping>
+                        <Mapping field="CampaignID">
+                            <To object="LocalResults" field="CampaignID" />
+                        </Mapping>
+                        <Mapping field="RepetitionNo">
+                            <To object="LocalResults" field="RepetitionNo" />
+                        </Mapping>
+                        <Mapping field="IsWarmup">
+                            <To object="LocalResults" field="IsWarmup" />
+                        </Mapping>
+                        <Mapping field="Family">
+                            <To object="LocalResults" field="Family" />
+                        </Mapping>
+                        <Mapping field="ParamsHash">
+                            <To object="LocalResults" field="ParamsHash" />
+                        </Mapping>
+                        <Mapping field="ElapsedMsPrecise">
+                            <To object="LocalResults" field="ElapsedMsPrecise" />
+                        </Mapping>
+                        <Mapping field="HeadlineValue">
+                            <To object="LocalResults" field="HeadlineValue" />
+                        </Mapping>
+                        <Mapping field="OpsPerSec">
+                            <To object="LocalResults" field="OpsPerSec" />
+                        </Mapping>
+                        <Mapping field="P50Ms">
+                            <To object="LocalResults" field="P50Ms" />
+                        </Mapping>
+                        <Mapping field="P95Ms">
+                            <To object="LocalResults" field="P95Ms" />
+                        </Mapping>
+                        <Mapping field="ErrorCount">
+                            <To object="LocalResults" field="ErrorCount" />
+                        </Mapping>
+                        <Mapping field="Status">
+                            <To object="LocalResults" field="Status" />
+                        </Mapping>
                     </Mapping>
                     <Mapping field="BenchmarkCatalog">
                         <Mapping field="TestCode">
@@ -284,6 +533,69 @@
                         <Mapping field="SortOrder">
                             <To object="BenchmarkCatalog" field="SortOrder" />
                         </Mapping>
+                        <Mapping field="Family">
+                            <To object="BenchmarkCatalog" field="Family" />
+                        </Mapping>
+                        <Mapping field="RunBlock">
+                            <To object="BenchmarkCatalog" field="RunBlock" />
+                        </Mapping>
+                        <Mapping field="ShortLabel">
+                            <To object="BenchmarkCatalog" field="ShortLabel" />
+                        </Mapping>
+                        <Mapping field="Question">
+                            <To object="BenchmarkCatalog" field="Question" />
+                        </Mapping>
+                        <Mapping field="WhatItSimulates">
+                            <To object="BenchmarkCatalog" field="WhatItSimulates" />
+                        </Mapping>
+                        <Mapping field="WhyItMatters">
+                            <To object="BenchmarkCatalog" field="WhyItMatters" />
+                        </Mapping>
+                        <Mapping field="ReaderUnit">
+                            <To object="BenchmarkCatalog" field="ReaderUnit" />
+                        </Mapping>
+                        <Mapping field="UserCount">
+                            <To object="BenchmarkCatalog" field="UserCount" />
+                        </Mapping>
+                        <Mapping field="HeadlineKind">
+                            <To object="BenchmarkCatalog" field="HeadlineKind" />
+                        </Mapping>
+                        <Mapping field="HeadlineUnit">
+                            <To object="BenchmarkCatalog" field="HeadlineUnit" />
+                        </Mapping>
+                        <Mapping field="HigherIsBetter">
+                            <To object="BenchmarkCatalog" field="HigherIsBetter" />
+                        </Mapping>
+                        <Mapping field="OpsUnit">
+                            <To object="BenchmarkCatalog" field="OpsUnit" />
+                        </Mapping>
+                        <Mapping field="ParityExpected">
+                            <To object="BenchmarkCatalog" field="ParityExpected" />
+                        </Mapping>
+                        <Mapping field="IsDestructive">
+                            <To object="BenchmarkCatalog" field="IsDestructive" />
+                        </Mapping>
+                        <Mapping field="IsOptional">
+                            <To object="BenchmarkCatalog" field="IsOptional" />
+                        </Mapping>
+                        <Mapping field="ExcludeFromComparison">
+                            <To object="BenchmarkCatalog" field="ExcludeFromComparison" />
+                        </Mapping>
+                        <Mapping field="LegacyTestCode">
+                            <To object="BenchmarkCatalog" field="LegacyTestCode" />
+                        </Mapping>
+                        <Mapping field="ScenarioVersion">
+                            <To object="BenchmarkCatalog" field="ScenarioVersion" />
+                        </Mapping>
+                        <Mapping field="DefaultOpsPerPass">
+                            <To object="BenchmarkCatalog" field="DefaultOpsPerPass" />
+                        </Mapping>
+                        <Mapping field="DefaultPasses">
+                            <To object="BenchmarkCatalog" field="DefaultPasses" />
+                        </Mapping>
+                        <Mapping field="DefaultWarmUpPasses">
+                            <To object="BenchmarkCatalog" field="DefaultWarmUpPasses" />
+                        </Mapping>
                     </Mapping>
                 </Mappings>
                 <Actions>
@@ -302,6 +614,9 @@
                     <Action name="RunParallelDelete" mappedTo="RunParallelDelete" />
                     <Action name="RunParallelComplexJoin" mappedTo="RunParallelComplexJoin" />
                     <Action name="RunParallelProjection" mappedTo="RunParallelProjection" />
+                    <Action name="RunBenchmark" mappedTo="RunBenchmark" />
+                    <Action name="ClearTestRecords" mappedTo="ClearTestRecords" />
+                    <Action name="AbortBenchmark" mappedTo="AbortBenchmark" />
                 </Actions>
             </TopLevelEntity>
         </Endpoint>
@@ -333,6 +648,16 @@
   <col name="LastRequestCompletedAtUtc" type="DateTime" nullable="true" />
   <col name="LastRequestElapsedMs" type="Int" nullable="true" />
   <col name="LastRequestMessage" type="NVarChar(1024)" nullable="true" />
+  <col name="SelectedTestCode" type="NVarChar(64)" nullable="true" />
+  <col name="CampaignID" type="UniqueIdentifier" nullable="true" />
+  <col name="RepetitionNo" type="Int" nullable="true" />
+  <col name="IsWarmup" type="Bit" nullable="true" />
+  <col name="RunBlock" type="NVarChar(8)" nullable="true" />
+  <col name="OrderPosition" type="Int" nullable="true" />
+  <col name="WorkScale" type="Decimal(9,4)" nullable="true" />
+  <col name="PassesOverride" type="Int" nullable="true" />
+  <col name="WarmUpPassesOverride" type="Int" nullable="true" />
+  <col name="RunBudgetSec" type="Int" nullable="true" />
   <col name="BLOB" type="VarBinary(MAX)" nullable="true" />
   <col name="FileURL" type="NVarChar(255)" nullable="true" />
   <col name="NoteID" type="UniqueIdentifier" />
@@ -407,6 +732,38 @@
   <col name="ElapsedMs" type="Int" nullable="true" />
   <col name="Notes" type="NVarChar(1024)" nullable="true" />
   <col name="CapturedAtUtc" type="DateTime" nullable="true" />
+  <col name="CampaignID" type="UniqueIdentifier" nullable="true" />
+  <col name="RepetitionNo" type="Int" nullable="true" />
+  <col name="IsWarmup" type="Bit" nullable="true" />
+  <col name="RunBlock" type="NVarChar(8)" nullable="true" />
+  <col name="OrderPosition" type="Int" nullable="true" />
+  <col name="Family" type="NVarChar(32)" nullable="true" />
+  <col name="MethodologyVersion" type="NVarChar(16)" nullable="true" />
+  <col name="ParamsHash" type="NVarChar(16)" nullable="true" />
+  <col name="UserCount" type="Int" nullable="true" />
+  <col name="ElapsedMsPrecise" type="Decimal(19,3)" nullable="true" />
+  <col name="HeadlineValue" type="Decimal(19,4)" nullable="true" />
+  <col name="HeadlineUnit" type="NVarChar(16)" nullable="true" />
+  <col name="HigherIsBetter" type="Bit" nullable="true" />
+  <col name="OpsCount" type="Int" nullable="true" />
+  <col name="OpsPerSec" type="Decimal(19,3)" nullable="true" />
+  <col name="P50Ms" type="Decimal(19,3)" nullable="true" />
+  <col name="P95Ms" type="Decimal(19,3)" nullable="true" />
+  <col name="P99Ms" type="Decimal(19,3)" nullable="true" />
+  <col name="MaxOpMs" type="Decimal(19,3)" nullable="true" />
+  <col name="RowsReturned" type="BigInt" nullable="true" />
+  <col name="Checksum" type="NVarChar(40)" nullable="true" />
+  <col name="ErrorCount" type="Int" nullable="true" />
+  <col name="DeadlockCount" type="Int" nullable="true" />
+  <col name="RetryCount" type="Int" nullable="true" />
+  <col name="LockViolationCount" type="Int" nullable="true" />
+  <col name="TimeoutCount" type="Int" nullable="true" />
+  <col name="WorkersObservedPeak" type="Int" nullable="true" />
+  <col name="Status" type="NVarChar(16)" nullable="true" />
+  <col name="InvalidReason" type="NVarChar(256)" nullable="true" />
+  <col name="DllSha256" type="NVarChar(64)" nullable="true" />
+  <col name="AppDomainStartUtc" type="NVarChar(40)" nullable="true" />
+  <col name="ResultJson" type="NVarChar(MAX)" nullable="true" />
   <col name="BLOB" type="VarBinary(MAX)" nullable="true" />
   <col name="FileURL" type="NVarChar(255)" nullable="true" />
   <col name="NoteID" type="UniqueIdentifier" />
@@ -429,6 +786,11 @@
   <index name="PerfTestResult_RunID">
     <col name="CompanyID" />
     <col name="RunID" />
+  </index>
+  <index name="PerfTestResult_CampaignID_TestCode">
+    <col name="CompanyID" />
+    <col name="CampaignID" />
+    <col name="TestCode" />
   </index>
   <index name="PerfTestResult_PK" clustered="true" primary="true" unique="true">
     <col name="CompanyID" />

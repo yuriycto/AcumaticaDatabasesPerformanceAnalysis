@@ -169,6 +169,74 @@ public sealed class PerfBenchmarkFilter : PXBqlTable, IBqlTable
     public abstract class lastModifiedDateTime : BqlDateTime.Field<lastModifiedDateTime> { }
     [PXDBLastModifiedDateTime]
     public DateTime? LastModifiedDateTime { get; set; }
+
+    // ---- P0 additions (SPEC §3.1) ----
+
+    public abstract class selectedTestCode : BqlString.Field<selectedTestCode> { }
+    [PXDBString(64, IsUnicode = true)]
+    [PXStringList(ExclusiveValues = false)]
+    [PXUIField(DisplayName = "Test to Run")]
+    public string SelectedTestCode { get; set; }
+
+    public abstract class campaignID : BqlGuid.Field<campaignID> { }
+    [PXDBGuid]
+    [PXUIField(DisplayName = "Campaign ID")]
+    public Guid? CampaignID { get; set; }
+
+    public abstract class repetitionNo : BqlInt.Field<repetitionNo> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Repetition")]
+    public int? RepetitionNo { get; set; }
+
+    public abstract class isWarmup : BqlBool.Field<isWarmup> { }
+    [PXDBBool]
+    [PXUIField(DisplayName = "Warm-up Run")]
+    public bool? IsWarmup { get; set; }
+
+    public abstract class runBlock : BqlString.Field<runBlock> { }
+    [PXDBString(8, IsUnicode = true)]
+    [PXUIField(DisplayName = "Block")]
+    public string RunBlock { get; set; }
+
+    public abstract class orderPosition : BqlInt.Field<orderPosition> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Order Position")]
+    public int? OrderPosition { get; set; }
+
+    public abstract class workScale : BqlDecimal.Field<workScale> { }
+    [PXDBDecimal(4)]
+    [PXUIField(DisplayName = "Work Scale (1 = full)")]
+    public decimal? WorkScale { get; set; }
+
+    public abstract class passesOverride : BqlInt.Field<passesOverride> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Measured Passes (0 = test default)")]
+    public int? PassesOverride { get; set; }
+
+    public abstract class warmUpPassesOverride : BqlInt.Field<warmUpPassesOverride> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Warm-up Passes (blank = test default)")]
+    public int? WarmUpPassesOverride { get; set; }
+
+    public abstract class runBudgetSec : BqlInt.Field<runBudgetSec> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Run Budget (s, 0 = 15 min)")]
+    public int? RunBudgetSec { get; set; }
+
+    public abstract class serverAppStartUtc : BqlString.Field<serverAppStartUtc> { }
+    [PXString(40, IsUnicode = true)]
+    [PXUIField(DisplayName = "Server App Start (UTC)", Enabled = false)]
+    public string ServerAppStartUtc { get; set; }
+
+    public abstract class serverDllSha256 : BqlString.Field<serverDllSha256> { }
+    [PXString(64, IsUnicode = true)]
+    [PXUIField(DisplayName = "Server DLL SHA-256", Enabled = false)]
+    public string ServerDllSha256 { get; set; }
+
+    public abstract class serverMethodologyVersion : BqlString.Field<serverMethodologyVersion> { }
+    [PXString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Methodology Version", Enabled = false)]
+    public string ServerMethodologyVersion { get; set; }
 }
 
 [Serializable]
@@ -362,6 +430,168 @@ public sealed class PerfTestResult : PXBqlTable, IBqlTable
     public abstract class lastModifiedDateTime : BqlDateTime.Field<lastModifiedDateTime> { }
     [PXDBLastModifiedDateTime]
     public DateTime? LastModifiedDateTime { get; set; }
+
+    // ---- P0 additions (SPEC §3.2) ----
+
+    public abstract class campaignID : BqlGuid.Field<campaignID> { }
+    [PXDBGuid]
+    [PXUIField(DisplayName = "Campaign ID", Enabled = false)]
+    public Guid? CampaignID { get; set; }
+
+    public abstract class repetitionNo : BqlInt.Field<repetitionNo> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Repetition", Enabled = false)]
+    public int? RepetitionNo { get; set; }
+
+    public abstract class isWarmup : BqlBool.Field<isWarmup> { }
+    [PXDBBool]
+    [PXUIField(DisplayName = "Warm-up Run", Enabled = false)]
+    public bool? IsWarmup { get; set; }
+
+    public abstract class runBlock : BqlString.Field<runBlock> { }
+    [PXDBString(8, IsUnicode = true)]
+    [PXUIField(DisplayName = "Block", Enabled = false)]
+    public string RunBlock { get; set; }
+
+    public abstract class orderPosition : BqlInt.Field<orderPosition> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Order Position", Enabled = false)]
+    public int? OrderPosition { get; set; }
+
+    public abstract class family : BqlString.Field<family> { }
+    [PXDBString(32, IsUnicode = true)]
+    [PXUIField(DisplayName = "Family", Enabled = false)]
+    public string Family { get; set; }
+
+    public abstract class methodologyVersion : BqlString.Field<methodologyVersion> { }
+    [PXDBString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Methodology Version", Enabled = false)]
+    public string MethodologyVersion { get; set; }
+
+    public abstract class paramsHash : BqlString.Field<paramsHash> { }
+    [PXDBString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Parameters Hash", Enabled = false)]
+    public string ParamsHash { get; set; }
+
+    public abstract class userCount : BqlInt.Field<userCount> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Users", Enabled = false)]
+    public int? UserCount { get; set; }
+
+    public abstract class elapsedMsPrecise : BqlDecimal.Field<elapsedMsPrecise> { }
+    [PXDBDecimal(3)]
+    [PXUIField(DisplayName = "Measured Time (ms)", Enabled = false)]
+    public decimal? ElapsedMsPrecise { get; set; }
+
+    public abstract class headlineValue : BqlDecimal.Field<headlineValue> { }
+    [PXDBDecimal(4)]
+    [PXUIField(DisplayName = "Headline Value", Enabled = false)]
+    public decimal? HeadlineValue { get; set; }
+
+    public abstract class headlineUnit : BqlString.Field<headlineUnit> { }
+    [PXDBString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Headline Unit", Enabled = false)]
+    public string HeadlineUnit { get; set; }
+
+    public abstract class higherIsBetter : BqlBool.Field<higherIsBetter> { }
+    [PXDBBool]
+    [PXUIField(DisplayName = "Higher Is Better", Enabled = false)]
+    public bool? HigherIsBetter { get; set; }
+
+    public abstract class opsCount : BqlInt.Field<opsCount> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Operations", Enabled = false)]
+    public int? OpsCount { get; set; }
+
+    public abstract class opsPerSec : BqlDecimal.Field<opsPerSec> { }
+    [PXDBDecimal(3)]
+    [PXUIField(DisplayName = "Operations per Second", Enabled = false)]
+    public decimal? OpsPerSec { get; set; }
+
+    public abstract class p50Ms : BqlDecimal.Field<p50Ms> { }
+    [PXDBDecimal(3)]
+    [PXUIField(DisplayName = "p50 (ms)", Enabled = false)]
+    public decimal? P50Ms { get; set; }
+
+    public abstract class p95Ms : BqlDecimal.Field<p95Ms> { }
+    [PXDBDecimal(3)]
+    [PXUIField(DisplayName = "p95 (ms)", Enabled = false)]
+    public decimal? P95Ms { get; set; }
+
+    public abstract class p99Ms : BqlDecimal.Field<p99Ms> { }
+    [PXDBDecimal(3)]
+    [PXUIField(DisplayName = "p99 (ms)", Enabled = false)]
+    public decimal? P99Ms { get; set; }
+
+    public abstract class maxOpMs : BqlDecimal.Field<maxOpMs> { }
+    [PXDBDecimal(3)]
+    [PXUIField(DisplayName = "Max Operation (ms)", Enabled = false)]
+    public decimal? MaxOpMs { get; set; }
+
+    public abstract class rowsReturned : BqlLong.Field<rowsReturned> { }
+    [PXDBLong]
+    [PXUIField(DisplayName = "Rows Returned", Enabled = false)]
+    public long? RowsReturned { get; set; }
+
+    public abstract class checksum : BqlString.Field<checksum> { }
+    [PXDBString(40, IsUnicode = true)]
+    [PXUIField(DisplayName = "Checksum", Enabled = false)]
+    public string Checksum { get; set; }
+
+    public abstract class errorCount : BqlInt.Field<errorCount> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Errors", Enabled = false)]
+    public int? ErrorCount { get; set; }
+
+    public abstract class deadlockCount : BqlInt.Field<deadlockCount> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Deadlocks", Enabled = false)]
+    public int? DeadlockCount { get; set; }
+
+    public abstract class retryCount : BqlInt.Field<retryCount> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Retries", Enabled = false)]
+    public int? RetryCount { get; set; }
+
+    public abstract class lockViolationCount : BqlInt.Field<lockViolationCount> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Lock Violations", Enabled = false)]
+    public int? LockViolationCount { get; set; }
+
+    public abstract class timeoutCount : BqlInt.Field<timeoutCount> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Timeouts", Enabled = false)]
+    public int? TimeoutCount { get; set; }
+
+    public abstract class workersObservedPeak : BqlInt.Field<workersObservedPeak> { }
+    [PXDBInt]
+    [PXUIField(DisplayName = "Workers Observed", Enabled = false)]
+    public int? WorkersObservedPeak { get; set; }
+
+    public abstract class status : BqlString.Field<status> { }
+    [PXDBString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Run Status", Enabled = false)]
+    public string Status { get; set; }
+
+    public abstract class invalidReason : BqlString.Field<invalidReason> { }
+    [PXDBString(256, IsUnicode = true)]
+    [PXUIField(DisplayName = "Invalid Reason", Enabled = false)]
+    public string InvalidReason { get; set; }
+
+    public abstract class dllSha256 : BqlString.Field<dllSha256> { }
+    [PXDBString(64, IsUnicode = true)]
+    [PXUIField(DisplayName = "DLL SHA-256", Enabled = false)]
+    public string DllSha256 { get; set; }
+
+    public abstract class appDomainStartUtc : BqlString.Field<appDomainStartUtc> { }
+    [PXDBString(40, IsUnicode = true)]
+    [PXUIField(DisplayName = "App Start (UTC)", Enabled = false)]
+    public string AppDomainStartUtc { get; set; }
+
+    public abstract class resultJson : BqlString.Field<resultJson> { }
+    [PXDBText(IsUnicode = true)]
+    [PXUIField(DisplayName = "Result JSON", Enabled = false)]
+    public string ResultJson { get; set; }
 }
 
 [Serializable]
@@ -402,6 +632,113 @@ public sealed class PerfBenchmarkDefinition : PXBqlTable, IBqlTable
     [PXInt]
     [PXUIField(DisplayName = "Sort Order", Enabled = false)]
     public int? SortOrder { get; set; }
+
+    // ---- P0 additions (SPEC §3.3) ----
+
+    public abstract class family : BqlString.Field<family> { }
+    [PXString(32, IsUnicode = true)]
+    [PXUIField(DisplayName = "Family", Enabled = false)]
+    public string Family { get; set; }
+
+    public abstract class runBlock : BqlString.Field<runBlock> { }
+    [PXString(8, IsUnicode = true)]
+    [PXUIField(DisplayName = "Block", Enabled = false)]
+    public string RunBlock { get; set; }
+
+    public abstract class shortLabel : BqlString.Field<shortLabel> { }
+    [PXString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Short Label", Enabled = false)]
+    public string ShortLabel { get; set; }
+
+    public abstract class question : BqlString.Field<question> { }
+    [PXString(1024, IsUnicode = true)]
+    [PXUIField(DisplayName = "Question", Enabled = false)]
+    public string Question { get; set; }
+
+    public abstract class whatItSimulates : BqlString.Field<whatItSimulates> { }
+    [PXString(1024, IsUnicode = true)]
+    [PXUIField(DisplayName = "What It Simulates", Enabled = false)]
+    public string WhatItSimulates { get; set; }
+
+    public abstract class whyItMatters : BqlString.Field<whyItMatters> { }
+    [PXString(1024, IsUnicode = true)]
+    [PXUIField(DisplayName = "Why It Matters", Enabled = false)]
+    public string WhyItMatters { get; set; }
+
+    public abstract class readerUnit : BqlString.Field<readerUnit> { }
+    [PXString(64, IsUnicode = true)]
+    [PXUIField(DisplayName = "Reader Unit", Enabled = false)]
+    public string ReaderUnit { get; set; }
+
+    public abstract class userCount : BqlInt.Field<userCount> { }
+    [PXInt]
+    [PXUIField(DisplayName = "Users", Enabled = false)]
+    public int? UserCount { get; set; }
+
+    public abstract class headlineKind : BqlString.Field<headlineKind> { }
+    [PXString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Headline Kind", Enabled = false)]
+    public string HeadlineKind { get; set; }
+
+    public abstract class headlineUnit : BqlString.Field<headlineUnit> { }
+    [PXString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Headline Unit", Enabled = false)]
+    public string HeadlineUnit { get; set; }
+
+    public abstract class higherIsBetter : BqlBool.Field<higherIsBetter> { }
+    [PXBool]
+    [PXUIField(DisplayName = "Higher Is Better", Enabled = false)]
+    public bool? HigherIsBetter { get; set; }
+
+    public abstract class opsUnit : BqlString.Field<opsUnit> { }
+    [PXString(32, IsUnicode = true)]
+    [PXUIField(DisplayName = "Operation Unit", Enabled = false)]
+    public string OpsUnit { get; set; }
+
+    public abstract class parityExpected : BqlBool.Field<parityExpected> { }
+    [PXBool]
+    [PXUIField(DisplayName = "Parity Expected", Enabled = false)]
+    public bool? ParityExpected { get; set; }
+
+    public abstract class isDestructive : BqlBool.Field<isDestructive> { }
+    [PXBool]
+    [PXUIField(DisplayName = "Permanent Data Changes", Enabled = false)]
+    public bool? IsDestructive { get; set; }
+
+    public abstract class isOptional : BqlBool.Field<isOptional> { }
+    [PXBool]
+    [PXUIField(DisplayName = "Optional", Enabled = false)]
+    public bool? IsOptional { get; set; }
+
+    public abstract class excludeFromComparison : BqlBool.Field<excludeFromComparison> { }
+    [PXBool]
+    [PXUIField(DisplayName = "Excluded from Comparison", Enabled = false)]
+    public bool? ExcludeFromComparison { get; set; }
+
+    public abstract class legacyTestCode : BqlString.Field<legacyTestCode> { }
+    [PXString(64, IsUnicode = true)]
+    [PXUIField(DisplayName = "Legacy Test Code", Enabled = false)]
+    public string LegacyTestCode { get; set; }
+
+    public abstract class scenarioVersion : BqlInt.Field<scenarioVersion> { }
+    [PXInt]
+    [PXUIField(DisplayName = "Scenario Version", Enabled = false)]
+    public int? ScenarioVersion { get; set; }
+
+    public abstract class defaultOpsPerPass : BqlInt.Field<defaultOpsPerPass> { }
+    [PXInt]
+    [PXUIField(DisplayName = "Operations per Pass", Enabled = false)]
+    public int? DefaultOpsPerPass { get; set; }
+
+    public abstract class defaultPasses : BqlInt.Field<defaultPasses> { }
+    [PXInt]
+    [PXUIField(DisplayName = "Measured Passes", Enabled = false)]
+    public int? DefaultPasses { get; set; }
+
+    public abstract class defaultWarmUpPasses : BqlInt.Field<defaultWarmUpPasses> { }
+    [PXInt]
+    [PXUIField(DisplayName = "Warm-up Passes", Enabled = false)]
+    public int? DefaultWarmUpPasses { get; set; }
 }
 
 [Serializable]
@@ -550,4 +887,81 @@ public sealed class PerfComparisonResult : PXBqlTable, IBqlTable
     [PXString(1024, IsUnicode = true)]
     [PXUIField(DisplayName = "Notes")]
     public string Notes { get; set; }
+
+    // ---- P0 additions (SPEC §3.4) ----
+
+    public abstract class family : BqlString.Field<family> { }
+    [PXString(32, IsUnicode = true)]
+    [PXUIField(DisplayName = "Family", Enabled = false)]
+    public string Family { get; set; }
+
+    public abstract class shortLabel : BqlString.Field<shortLabel> { }
+    [PXString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Short Label", Enabled = false)]
+    public string ShortLabel { get; set; }
+
+    public abstract class sortOrder : BqlInt.Field<sortOrder> { }
+    [PXInt]
+    [PXUIField(DisplayName = "Sort Order", Enabled = false)]
+    public int? SortOrder { get; set; }
+
+    public abstract class userCount : BqlInt.Field<userCount> { }
+    [PXInt]
+    [PXUIField(DisplayName = "Users", Enabled = false)]
+    public int? UserCount { get; set; }
+
+    public abstract class headlineValue : BqlDecimal.Field<headlineValue> { }
+    [PXDecimal(4)]
+    [PXUIField(DisplayName = "Headline Value", Enabled = false)]
+    public decimal? HeadlineValue { get; set; }
+
+    public abstract class headlineUnit : BqlString.Field<headlineUnit> { }
+    [PXString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Headline Unit", Enabled = false)]
+    public string HeadlineUnit { get; set; }
+
+    public abstract class higherIsBetter : BqlBool.Field<higherIsBetter> { }
+    [PXBool]
+    [PXUIField(DisplayName = "Higher Is Better", Enabled = false)]
+    public bool? HigherIsBetter { get; set; }
+
+    public abstract class p95Ms : BqlDecimal.Field<p95Ms> { }
+    [PXDecimal(3)]
+    [PXUIField(DisplayName = "p95 (ms)", Enabled = false)]
+    public decimal? P95Ms { get; set; }
+
+    public abstract class opsPerSec : BqlDecimal.Field<opsPerSec> { }
+    [PXDecimal(3)]
+    [PXUIField(DisplayName = "Operations per Second", Enabled = false)]
+    public decimal? OpsPerSec { get; set; }
+
+    public abstract class errorCount : BqlInt.Field<errorCount> { }
+    [PXInt]
+    [PXUIField(DisplayName = "Errors", Enabled = false)]
+    public int? ErrorCount { get; set; }
+
+    public abstract class status : BqlString.Field<status> { }
+    [PXString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Run Status", Enabled = false)]
+    public string Status { get; set; }
+
+    public abstract class paramsHash : BqlString.Field<paramsHash> { }
+    [PXString(16, IsUnicode = true)]
+    [PXUIField(DisplayName = "Parameters Hash", Enabled = false)]
+    public string ParamsHash { get; set; }
+
+    public abstract class relToFastest : BqlDecimal.Field<relToFastest> { }
+    [PXDecimal(4)]
+    [PXUIField(DisplayName = "x Fastest", Enabled = false)]
+    public decimal? RelToFastest { get; set; }
+
+    public abstract class verdict : BqlString.Field<verdict> { }
+    [PXString(128, IsUnicode = true)]
+    [PXUIField(DisplayName = "Verdict", Enabled = false)]
+    public string Verdict { get; set; }
+
+    public abstract class isComparable : BqlBool.Field<isComparable> { }
+    [PXBool]
+    [PXUIField(DisplayName = "Comparable", Enabled = false)]
+    public bool? IsComparable { get; set; }
 }

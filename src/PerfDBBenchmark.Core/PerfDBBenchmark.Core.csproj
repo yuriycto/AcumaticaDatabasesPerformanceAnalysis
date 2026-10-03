@@ -28,6 +28,10 @@
       <HintPath>$(AcumaticaBinFolder)PX.Data.BQL.Fluent.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="PX.DbServices">
+      <HintPath>$(AcumaticaBinFolder)PX.DbServices.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="PX.Objects">
       <HintPath>$(AcumaticaBinFolder)PX.Objects.dll</HintPath>
       <Private>False</Private>
