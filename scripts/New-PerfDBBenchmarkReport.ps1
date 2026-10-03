@@ -660,6 +660,70 @@ function Get-SideFile {
     return $null
 }
 
+function Add-EnvShapeAliases {
+    # WP7 integration: the real producers name things differently from the sample fixture this report was written
+    # against. Get-PerfEnvironment.ps1 (WP5) writes databases.<Engine>, host.cpu/os/power, antivirus.bitdefender* and
+    # acumatica.instances.<i>.driverVersions; ENV_CAPTURE (WP1) writes dataFingerprint.values["count.<Table>"].
+    # Add the keys this report reads, only when they are missing, so fixture-shaped input is unchanged.
+    param($Doc, [switch]$EnvCapture)
+    if (-not ($Doc -is [System.Collections.IDictionary])) { return }
+    if ($EnvCapture) {
+        $fp = Get-Field $Doc 'dataFingerprint'
+        $values = Get-Field $fp 'values'
+        if ($fp -is [System.Collections.IDictionary] -and (Test-IsMap $values) -and $null -eq (Get-Field $fp 'counts')) {
+            $counts = [ordered]@{}
+            foreach ($k in (Get-Keys $values)) { if ($k -like 'count.*') { $counts[$k.Substring(6)] = Get-Field $values $k } }
+            if ($counts.Count) { $fp['counts'] = $counts }
+        }
+        return
+    }
+    $dbs = Get-Field $Doc 'databases'
+    if ($dbs -is [System.Collections.IDictionary]) {
+        foreach ($pair in @(@('SQLServer', 'sqlServer'), @('MySQL', 'mySql'), @('PostgreSQL', 'postgreSql'))) {
+            $cap = Get-Field $dbs $pair[0]
+            if (-not ($cap -is [System.Collections.IDictionary])) { continue }
+            $mb = $null
+            switch ($pair[0]) {
+                'SQLServer' {
+                    $mb = ConvertTo-Num (Get-PathValue $cap 'files.totalMB')
+                    $qs = Get-PathValue $cap 'queryStore.actual_state_desc'
+                    if ($qs -and $null -eq (Get-Field $cap 'query_store')) { $cap['query_store'] = $qs }
+                }
+                'MySQL' {
+                    $a = ConvertTo-Num (Get-PathValue $cap 'schemaSize.dataBytes'); $b = ConvertTo-Num (Get-PathValue $cap 'schemaSize.indexBytes')
+                    if ($null -ne $a -and $null -ne $b) { $mb = ($a + $b) / 1MB }
+                }
+                'PostgreSQL' { $a = ConvertTo-Num (Get-PathValue $cap 'version.dbSizeBytes'); if ($null -ne $a) { $mb = $a / 1MB } }
+            }
+            if ($null -ne $mb -and $null -eq (Get-Field $cap 'databaseSizeMb')) { $cap['databaseSizeMb'] = [Math]::Round($mb, 0) }
+            if ($null -eq (Get-Field $Doc $pair[1])) { $Doc[$pair[1]] = $cap }
+        }
+    }
+    if ($null -eq (Get-Field $Doc 'drivers')) {
+        $insts = Get-PathValue $Doc 'acumatica.instances'
+        $dv = $null
+        foreach ($k in (Get-Keys $insts)) { $dv = Get-Field (Get-Field $insts $k) 'driverVersions'; if (Test-IsMap $dv) { break } }
+        if (Test-IsMap $dv) {
+            $drv = [ordered]@{}
+            $v = Get-Field $dv 'Microsoft.Data.SqlClient.dll'; if ($v) { $drv['sqlServer'] = 'Microsoft.Data.SqlClient ' + $v }
+            $v = Get-Field $dv 'MySqlConnector.dll'; if ($v) { $drv['mySql'] = 'MySqlConnector ' + $v }
+            $v = Get-Field $dv 'Npgsql.dll'; if ($v) { $drv['postgreSql'] = 'Npgsql ' + $v }
+            if ($drv.Count) { $Doc['drivers'] = $drv }
+        }
+    }
+    $h = Get-Field $Doc 'host'
+    if ($h -is [System.Collections.IDictionary]) {
+        if ($null -eq (Get-Field $h 'cpuName')) { $v = Get-PathValue $h 'cpu.name'; if ($v) { $h['cpuName'] = $v } }
+        if ($null -eq (Get-Field $h 'logicalCpus')) { $v = Get-PathValue $h 'cpu.logicalProcessors'; if ($null -ne $v) { $h['logicalCpus'] = $v } }
+        if ($null -eq (Get-Field $h 'powerScheme')) { $v = Get-PathValue $h 'power.activeSchemeName'; if ($v) { $h['powerScheme'] = $v } }
+        if ($null -eq (Get-Field $h 'osCaption')) { $v = Get-PathValue $h 'os.caption'; if ($v) { $h['osCaption'] = ([string]$v + ' ' + [string](Get-PathValue $h 'os.version')).Trim() } }
+    }
+    $av = Get-Field $Doc 'antivirus'
+    if ($av -is [System.Collections.IDictionary] -and $null -eq (Get-Field $av 'exclusions')) {
+        $v = Get-Field $av 'bitdefenderExclusionsManual'; if ($v) { $av['exclusions'] = $v }
+    }
+}
+
 function Import-Campaign {
     param([string[]]$Paths)
     $docs = @()
@@ -719,6 +783,8 @@ function Import-Campaign {
     if ($campaigns.Count -eq 0) { throw 'No campaign object found in the input JSON.' }
     if ($starts.Count -eq 0) { $s = Get-SideFile $dirs 'environment-start.json'; if ($s) { $starts += , $s } }
     if ($ends.Count -eq 0) { $s = Get-SideFile $dirs 'environment-end.json'; if ($s) { $ends += , $s } }
+    foreach ($s in @($starts) + @($ends)) { Add-EnvShapeAliases $s }
+    foreach ($ec in $envCaptures) { Add-EnvShapeAliases (Get-Field $ec 'env') -EnvCapture }
     $decisions = Get-SideFile $dirs 'decisions.json'
     $calibration = Get-SideFile $dirs 'calibration.json'
 
@@ -1329,9 +1395,15 @@ function Get-EnvGateReasons {
         $a = [ordered]@{}; Get-LeafMap $Data.start '' $a
         $b = [ordered]@{}; Get-LeafMap $Data.end '' $b
         $diff = @()
+        # Leaves the environment script marks as volatile, and sizes (e.g. databases.PostgreSQL.version.dbSizeBytes),
+        # change during any campaign and say nothing about the software versions this check is about.
+        $volatile = @(@(Get-Field $Data.start 'volatileFields') | Where-Object { $_ } | ForEach-Object { [string]$_ })
+        # Add-EnvShapeAliases copies databases.<Engine> to top-level sqlServer/mySql/postgreSql; compare the original only.
+        if (Test-IsMap (Get-Field $Data.start 'databases')) { $volatile += @('sqlServer', 'mySql', 'postgreSql') }
         foreach ($k in $a.Keys) {
             if ($k -notmatch '(?i)(sha256|dll|build|pxdata|version|edition)') { continue }
-            if ($k -match '(?i)(uptime|captured|time|label|date)') { continue }
+            if ($k -match '(?i)(uptime|captured|time|label|date|size|bytes)') { continue }
+            if (@($volatile | Where-Object { $k -eq $_ -or $k.StartsWith($_ + '.') -or $k.StartsWith($_ + '[') }).Count -gt 0) { continue }
             if ($b.Contains($k) -and [string]$b[$k] -ne [string]$a[$k]) { $diff += $k }
         }
         if ($diff.Count -gt 0) { $reasons += ('environment changed between start and end (' + ($diff -join ', ') + ')') }
@@ -2614,8 +2686,8 @@ function Get-DisclosureTables {
     & $add ('| OS | ' + (Get-MdCell (Format-EnvValue (Find-Setting $host1 @('os', 'osCaption', 'caption')))) + ' |')
     & $add ('| Power plan | ' + (Get-MdCell (Format-EnvValue (Find-Setting $host1 @('powerScheme', 'powerPlan')))) + ' |')
     $build = $null
-    foreach ($ec in @($Data.envCaptures)) { $build = Find-Setting @((Get-Field $ec 'env')) @('pxDataVersion', 'acumaticaBuild', 'PX.Data.dll'); if ($build) { break } }
-    if (-not $build) { $build = Find-Setting $host1 @('pxDataVersion', 'acumaticaBuild') }
+    foreach ($ec in @($Data.envCaptures)) { $build = Find-Setting @((Get-Field $ec 'env')) @('pxDataVersion', 'pxDataFileVersion', 'acumaticaBuild', 'PX.Data.dll'); if ($build) { break } }
+    if (-not $build) { $build = Find-Setting $host1 @('pxDataVersion', 'pxDataFileVersion', 'pxDataFileVersionInstaller', 'acumaticaBuild') }
     & $add ('| Acumatica | ' + (Format-EnvValue $build) + ' |')
     $wc = $null
     foreach ($ec in @($Data.envCaptures)) { $wc = Get-PathValue $ec 'env.webConfig'; if ($wc) { break } }
