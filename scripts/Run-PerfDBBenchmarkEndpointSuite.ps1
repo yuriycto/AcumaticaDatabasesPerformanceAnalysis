@@ -946,12 +946,23 @@ function Invoke-InstanceAction {
 
 function Get-BenchmarkControl {
     param([Parameter(Mandatory = $true)]$Inst, [switch]$WithCatalog)
-    $query = '?$top=1'
-    if ($WithCatalog) { $query += '&$expand=BenchmarkCatalog' }
-    $response = Invoke-InstanceRequest -Inst $Inst -Method GET -RelativeUri ("/BenchmarkControl" + $query)
+    $response = Invoke-InstanceRequest -Inst $Inst -Method GET -RelativeUri '/BenchmarkControl?$top=1'
     $record = Get-FirstRecord -Json $response.Json
     if ($null -eq $record) {
         throw ("BenchmarkControl was not returned by {0}" -f $Inst.Name)
+    }
+    if ($WithCatalog) {
+        # A list GET with $expand=BenchmarkCatalog fails with "Optimization cannot be performed ... View
+        # BenchmarkCatalog has BQL delegate". Fetching the single record by its id is not optimized.
+        $id = [string]$record.id
+        if ([string]::IsNullOrWhiteSpace($id)) {
+            throw ("BenchmarkControl from {0} has no id" -f $Inst.Name)
+        }
+        $response = Invoke-InstanceRequest -Inst $Inst -Method GET -RelativeUri ("/BenchmarkControl/" + $id + '?$expand=BenchmarkCatalog')
+        $record = Get-FirstRecord -Json $response.Json
+        if ($null -eq $record) {
+            throw ("BenchmarkControl {0} was not returned by {1}" -f $id, $Inst.Name)
+        }
     }
     return $record
 }
