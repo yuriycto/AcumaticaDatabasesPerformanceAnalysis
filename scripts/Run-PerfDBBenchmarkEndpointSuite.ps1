@@ -2657,6 +2657,13 @@ function Get-EnvFacts {
             $value = 0.0
             if ([double]::TryParse([string]$leftovers, [ref]$value)) { $facts.leftovers = $value }
         }
+        elseif ($null -ne (Get-Prop $leftovers "total")) {
+            # ENV_CAPTURE writes leftovers.total next to its parts: use it, so the parts are not counted twice.
+            # A non-numeric total ("unavailable") means a part could not be read: leave it unread (G3 warning).
+            $value = 0.0
+            $total = Get-Prop $leftovers "total"
+            if ($total -isnot [bool] -and [double]::TryParse([string]$total, [ref]$value)) { $facts.leftovers = $value }
+        }
         else {
             $sum = 0.0
             foreach ($entry in (Get-JsonLeaves -Node $leftovers).GetEnumerator()) {
