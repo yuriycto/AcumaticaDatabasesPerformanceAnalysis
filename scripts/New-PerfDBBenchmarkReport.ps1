@@ -816,6 +816,18 @@ function Select-SlotRun {
     return $null
 }
 
+function Get-ProcGroupCpuMs {
+    # CPU ms of one process group during a run. Prefers the suite's per-process 'delta' (correct when processes
+    # start or exit during the run, e.g. PostgreSQL backends); falls back to end - start of the group sums.
+    param($Pc, [string]$Group)
+    $d = ConvertTo-Num (Get-Field (Get-Field (Get-Field $Pc 'delta') $Group) 'cpuMs')
+    if ($null -ne $d) { return $d }
+    $a = ConvertTo-Num (Get-Field (Get-Field (Get-Field $Pc 'start') $Group) 'cpuMs')
+    $b = ConvertTo-Num (Get-Field (Get-Field (Get-Field $Pc 'end') $Group) 'cpuMs')
+    if ($null -ne $a -and $null -ne $b) { return ($b - $a) }
+    return $null
+}
+
 function Get-RunCpu {
     # Database and Acumatica CPU of one run from the cumulative per-process counters (SPEC 5.4 item 15).
     param($Run)
@@ -824,11 +836,8 @@ function Get-RunCpu {
     $s = Get-Field $pc 'start'; $e = Get-Field $pc 'end'
     if (-not $s -or -not $e) { return $null }
     $proc = $script:EngineInfo[$Run.engine].process
-    $db = $null; $app = $null
-    $ds = ConvertTo-Num (Get-Field (Get-Field $s $proc) 'cpuMs'); $de = ConvertTo-Num (Get-Field (Get-Field $e $proc) 'cpuMs')
-    if ($null -ne $ds -and $null -ne $de) { $db = $de - $ds }
-    $as = ConvertTo-Num (Get-Field (Get-Field $s ('w3wp:' + $Run.instance)) 'cpuMs'); $ae = ConvertTo-Num (Get-Field (Get-Field $e ('w3wp:' + $Run.instance)) 'cpuMs')
-    if ($null -ne $as -and $null -ne $ae) { $app = $ae - $as }
+    $db = Get-ProcGroupCpuMs $pc $proc
+    $app = Get-ProcGroupCpuMs $pc ('w3wp:' + $Run.instance)
     $ops = 0.0
     foreach ($p in @(Get-Field $Run.result 'passes')) { $o = ConvertTo-Num (Get-Field $p 'ops'); if ($o) { $ops += $o } }
     foreach ($p in @(Get-Field $Run.result 'warmupPasses')) { $o = ConvertTo-Num (Get-Field $p 'ops'); if ($o) { $ops += $o } }
@@ -844,12 +853,10 @@ function Get-OthersCpu {
     $pc = $Run.procCounters
     $out = @{}
     if (-not $pc) { return $out }
-    $s = Get-Field $pc 'start'; $e = Get-Field $pc 'end'
     foreach ($eng in $script:EngineOrder) {
         if ($eng -eq $Run.engine) { continue }
-        $proc = $script:EngineInfo[$eng].process
-        $a = ConvertTo-Num (Get-Field (Get-Field $s $proc) 'cpuMs'); $b = ConvertTo-Num (Get-Field (Get-Field $e $proc) 'cpuMs')
-        if ($null -ne $a -and $null -ne $b) { $out[$eng] = $b - $a }
+        $v = Get-ProcGroupCpuMs $pc $script:EngineInfo[$eng].process
+        if ($null -ne $v) { $out[$eng] = $v }
     }
     return $out
 }
