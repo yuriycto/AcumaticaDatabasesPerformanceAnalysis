@@ -946,23 +946,28 @@ function Invoke-InstanceAction {
 
 function Get-BenchmarkControl {
     param([Parameter(Mandatory = $true)]$Inst, [switch]$WithCatalog)
-    $response = Invoke-InstanceRequest -Inst $Inst -Method GET -RelativeUri '/BenchmarkControl?$top=1'
-    $record = Get-FirstRecord -Json $response.Json
-    if ($null -eq $record) {
-        throw ("BenchmarkControl was not returned by {0}" -f $Inst.Name)
-    }
-    if ($WithCatalog) {
-        # A list GET with $expand=BenchmarkCatalog fails with "Optimization cannot be performed ... View
-        # BenchmarkCatalog has BQL delegate". Fetching the single record by its id is not optimized.
-        $id = [string]$record.id
+    # Always read the control row by id. A list GET is served by Acumatica's optimized path, which returns only
+    # stored columns: the server facts filled in by the graph (ServerDllSha256, ServerMethodologyVersion,
+    # ServerAppStartUtc) come back empty, and $expand=BenchmarkCatalog fails with "Optimization cannot be
+    # performed ... View BenchmarkCatalog has BQL delegate".
+    $id = $null
+    if ($null -ne $Inst.Identity -and $Inst.Identity.ContainsKey("id")) { $id = [string]$Inst.Identity["id"] }
+    if ([string]::IsNullOrWhiteSpace($id)) {
+        $response = Invoke-InstanceRequest -Inst $Inst -Method GET -RelativeUri '/BenchmarkControl?$top=1'
+        $listRecord = Get-FirstRecord -Json $response.Json
+        if ($null -eq $listRecord) {
+            throw ("BenchmarkControl was not returned by {0}" -f $Inst.Name)
+        }
+        $id = [string]$listRecord.id
         if ([string]::IsNullOrWhiteSpace($id)) {
             throw ("BenchmarkControl from {0} has no id" -f $Inst.Name)
         }
-        $response = Invoke-InstanceRequest -Inst $Inst -Method GET -RelativeUri ("/BenchmarkControl/" + $id + '?$expand=BenchmarkCatalog')
-        $record = Get-FirstRecord -Json $response.Json
-        if ($null -eq $record) {
-            throw ("BenchmarkControl {0} was not returned by {1}" -f $id, $Inst.Name)
-        }
+    }
+    $query = if ($WithCatalog) { '?$expand=BenchmarkCatalog' } else { '' }
+    $response = Invoke-InstanceRequest -Inst $Inst -Method GET -RelativeUri ("/BenchmarkControl/" + $id + $query)
+    $record = Get-FirstRecord -Json $response.Json
+    if ($null -eq $record) {
+        throw ("BenchmarkControl {0} was not returned by {1}" -f $id, $Inst.Name)
     }
     return $record
 }
@@ -2437,7 +2442,11 @@ function Set-RunParameters {
         if ($null -eq $e -and $null -eq $a) { return }
         if ($null -eq $e -or $null -eq $a -or [Math]::Abs([double]$e - [double]$a) -gt 0.00005) { $mismatches.Add(("{0}: sent '{1}', got '{2}'" -f $name, $expected, $actual)) }
     }
-    & $compareText "SelectedTestCode" $Test.TestCode ([string](& $get "SelectedTestCode"))
+    # The contract-based API returns this list field as its label ("CODE – Name"); the stored value is the code.
+    $selected = [string](& $get "SelectedTestCode")
+    if (-not ($selected -ceq $Test.TestCode -or $selected.StartsWith($Test.TestCode + " ", [StringComparison]::Ordinal))) {
+        $mismatches.Add(("SelectedTestCode: sent '{0}', got '{1}'" -f $Test.TestCode, $selected))
+    }
     $gotCampaign = Convert-ToNullableGuid (& $get "CampaignID")
     if ($gotCampaign -ne [Guid]$script:State.campaign["id"]) { $mismatches.Add(("CampaignID: sent '{0}', got '{1}'" -f $script:State.campaign["id"], $gotCampaign)) }
     if (-not $IsEnv) {
