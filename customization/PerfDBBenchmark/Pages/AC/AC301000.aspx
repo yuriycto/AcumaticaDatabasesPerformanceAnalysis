@@ -337,7 +337,7 @@
                     </div>
 
                     <div class="perf-visual-section">
-                        <div class="perf-progress-title">Read / Write / Delete</div>
+                        <div class="perf-progress-title">Read / Write / Update / Delete</div>
                         <px:PXSerialChart ID="DmlChart" runat="server" Width="100%" SkinID="Chart1" Height="260px" LegendEnabled="True" OnLoad="DmlChart_OnLoad">
                             <DataFields Category="Category" Value="Values" Description="Labels"></DataFields>
                             <CategoryAxis ShowFirstLabel="True" ShowLastLabel="True" LabelRotation="20" StartOnAxis="True"></CategoryAxis>

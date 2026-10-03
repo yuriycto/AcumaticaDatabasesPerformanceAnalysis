@@ -292,11 +292,13 @@
                     <Action name="ClearTestData" mappedTo="ClearTestData" />
                     <Action name="RunSequentialRead" mappedTo="RunSequentialRead" />
                     <Action name="RunSequentialWrite" mappedTo="RunSequentialWrite" />
+                    <Action name="RunSequentialUpdate" mappedTo="RunSequentialUpdate" />
                     <Action name="RunSequentialDelete" mappedTo="RunSequentialDelete" />
                     <Action name="RunSequentialComplexJoin" mappedTo="RunSequentialComplexJoin" />
                     <Action name="RunSequentialProjection" mappedTo="RunSequentialProjection" />
                     <Action name="RunParallelRead" mappedTo="RunParallelRead" />
                     <Action name="RunParallelWrite" mappedTo="RunParallelWrite" />
+                    <Action name="RunParallelUpdate" mappedTo="RunParallelUpdate" />
                     <Action name="RunParallelDelete" mappedTo="RunParallelDelete" />
                     <Action name="RunParallelComplexJoin" mappedTo="RunParallelComplexJoin" />
                     <Action name="RunParallelProjection" mappedTo="RunParallelProjection" />

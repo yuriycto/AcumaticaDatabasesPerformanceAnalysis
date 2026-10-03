@@ -64,11 +64,13 @@ export class AC301000 extends PXScreen {
 	RefreshStatus: PXActionState;
 	RunSequentialRead: PXActionState;
 	RunSequentialWrite: PXActionState;
+	RunSequentialUpdate: PXActionState;
 	RunSequentialDelete: PXActionState;
 	RunSequentialComplexJoin: PXActionState;
 	RunSequentialProjection: PXActionState;
 	RunParallelRead: PXActionState;
 	RunParallelWrite: PXActionState;
+	RunParallelUpdate: PXActionState;
 	RunParallelDelete: PXActionState;
 	RunParallelComplexJoin: PXActionState;
 	RunParallelProjection: PXActionState;
@@ -130,7 +132,7 @@ export class AC301000 extends PXScreen {
 			this.VisualizationCharts = [
 				this.createEmptyChart("All Benchmarks"),
 				this.createEmptyChart("Analytical Workloads"),
-				this.createEmptyChart("Read / Write / Delete"),
+				this.createEmptyChart("Read / Write / Update / Delete"),
 			];
 			return;
 		}
@@ -141,8 +143,8 @@ export class AC301000 extends PXScreen {
 			this.createSvgChart(normalizedRows, databaseOrder, "Analytical Workloads", (row) =>
 				row.testCategory === "Complex BQL Join" || row.testCategory === "PXProjection"
 			),
-			this.createSvgChart(normalizedRows, databaseOrder, "Read / Write / Delete", (row) =>
-				row.testCategory === "Read" || row.testCategory === "Write" || row.testCategory === "Delete"
+			this.createSvgChart(normalizedRows, databaseOrder, "Read / Write / Update / Delete", (row) =>
+				row.testCategory === "Read" || row.testCategory === "Write" || row.testCategory === "Update" || row.testCategory === "Delete"
 			),
 		];
 	}
