@@ -157,15 +157,22 @@ function Invoke-NpmCommand {
     }
 
     $originalPath = $env:Path
+    $originalErrorAction = $ErrorActionPreference
     try {
         $env:Path = "$NodeJsRoot;$originalPath"
         Push-Location -LiteralPath $FrontendRoot
+        # npm writes notices to stderr. Under Windows PowerShell 5.1 a redirected stderr line becomes an
+        # ErrorRecord, which ErrorActionPreference=Stop turns into a terminating error, so rely on the exit code.
+        $ErrorActionPreference = "Continue"
         & $npmPath @Arguments 2>&1 | ForEach-Object { Write-Host $_ }
-        if ($LASTEXITCODE -ne 0) {
-            throw "npm $($Arguments -join ' ') failed with exit code $LASTEXITCODE in '$FrontendRoot'."
+        $npmExitCode = $LASTEXITCODE
+        $ErrorActionPreference = $originalErrorAction
+        if ($npmExitCode -ne 0) {
+            throw "npm $($Arguments -join ' ') failed with exit code $npmExitCode in '$FrontendRoot'."
         }
     }
     finally {
+        $ErrorActionPreference = $originalErrorAction
         Pop-Location
         $env:Path = $originalPath
     }
