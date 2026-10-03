@@ -25,6 +25,10 @@
     -EnvironmentScript none disables the pre-flight and the environment captures (default: Get-PerfEnvironment.ps1
     next to this script). List parameters also accept one comma-separated string (powershell -File callers);
     -Rotation entries use ">" between instance names, for example "PerfPG>PerfMySQL>PerfSQL".
+    -PreflightAllow <regex[]> is passed to Get-PerfEnvironment -Preflight (several patterns: separate them with ";").
+    At campaign start (the first block of an invocation) a pre-flight that cannot run or cannot check an engine stops
+    the suite like a failed one (gate G6), unless -AllowUncheckedPreflight is given.
+    With -WriteCalibration (DryRun), -CalibrationFile is the output path only; the dry run itself uses no budgets.
     Exit codes: 0 done; 1 error; 3 campaign aborted by a gate (G1/G4); 4 pre-flight failed at campaign start.
 
     The password is only used in memory for the REST login. It is never printed or written to disk.
@@ -95,12 +99,15 @@ param(
     [string]$EnvironmentScript = "",
     [string]$MySqlDefaultsFile = "",
     [string]$PgPassFile = "",
+    [string[]]$PreflightAllow = @(),
+    [switch]$AllowUncheckedPreflight,
     [switch]$PlanOnly,
     [switch]$PlanDetail,
     [switch]$ReportOnly,
     [string[]]$InputJson = @(),
     [string]$ReportScript = "",
     [string]$BetweenBlocksCommand = "",
+    [int]$BetweenBlocksTimeoutSec = 3600,
     [int]$BlockPauseSec = 120,
     [switch]$BackupsVerified,
     [string]$BackupFolder = "C:\PerfBackups",
@@ -154,6 +161,8 @@ $Blocks = [string[]](Split-ListParameter -Values $Blocks -Separators ', ')
 $IncludeTests = [string[]](Split-ListParameter -Values $IncludeTests)
 $ExcludeTests = [string[]](Split-ListParameter -Values $ExcludeTests)
 $InputJson = [string[]](Split-ListParameter -Values $InputJson -Separators ';')
+# Pre-flight allow patterns are regular expressions (they may contain commas): only ";" separates them.
+$PreflightAllow = [string[]](Split-ListParameter -Values $PreflightAllow -Separators ';')
 # Rotation entries: "PerfPG>PerfMySQL>PerfSQL"; several entries are separated by "," or "|".
 $Rotation = [string[]]@(foreach ($entry in @($Rotation)) { if ([string]$entry -match '>') { foreach ($piece in (Split-ListParameter -Values @($entry) -Separators ',|')) { $piece } } elseif (-not [string]::IsNullOrWhiteSpace([string]$entry)) { [string]$entry } })
 # -ExcludeOptional: the same as -IncludeOptional:$false (which powershell -File cannot pass).
@@ -166,12 +175,14 @@ if (@($Instances).Count -eq 0) { throw "-Instances is empty." }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $defaultReportsDirectory = Join-Path $repoRoot "artifacts\benchmark-reports"
 $reportsDirectory = if ([string]::IsNullOrWhiteSpace($ReportsDirectory)) { $defaultReportsDirectory } else { $ReportsDirectory }
+$script:EnvironmentScriptDisabled = $false
 if (-not $PSBoundParameters.ContainsKey("EnvironmentScript")) {
     $EnvironmentScript = Join-Path $PSScriptRoot "Get-PerfEnvironment.ps1"
 }
-elseif ($EnvironmentScript -ieq "none") {
+elseif ($EnvironmentScript -ieq "none" -or [string]::IsNullOrWhiteSpace($EnvironmentScript)) {
     # "-EnvironmentScript none" disables the pre-flight and environment captures (an empty string cannot be passed through powershell -File).
     $EnvironmentScript = ""
+    $script:EnvironmentScriptDisabled = $true
 }
 if ([string]::IsNullOrWhiteSpace($ReportScript)) {
     $ReportScript = Join-Path $PSScriptRoot "New-PerfDBBenchmarkReport.ps1"
@@ -199,9 +210,12 @@ $script:Catalog = @()
 $script:EnvTest = $null
 $script:Credential = $null
 $script:CalibrationBudgets = @{}
+$script:CalibrationWriteOnly = $false
 $script:LastRunUserCount = 0
 $script:HostCounters = $null
 $script:ThermalAvailable = $true
+$script:ThermalSampleSec = 15
+$script:PostedRun = $null
 $script:InvocationBlocks = @()
 $script:BlockOutcome = [ordered]@{}
 
@@ -350,13 +364,18 @@ function Convert-ToNullableBool {
 
 function Convert-ToNullableDateTime {
     # Returns a UTC DateTime. Strings without an offset are treated as UTC.
-    param([AllowNull()]$Value)
+    # -WallClockUtc: the value is a UTC wall-clock time that the REST layer serialized with the session's time-zone
+    # offset (a DateTimeValue field stored as UTC with UseTimeZone = false, e.g. LastRequestStartedAtUtc: the 26 R2
+    # serializer writes new DateTimeOffset(value, <session zone offset>)). The offset is ignored and the wall-clock
+    # part is taken as UTC.
+    param([AllowNull()]$Value, [switch]$WallClockUtc)
     if ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value)) { return $null }
-    if ($Value -is [DateTime]) { $dt = $Value }
+    if ($Value -is [DateTime]) { $dt = $Value; if ($WallClockUtc) { return [DateTime]::SpecifyKind($dt, [DateTimeKind]::Utc) } }
     else {
         $dto = [DateTimeOffset]::MinValue
         $text = [string]$Value
         if ($text -match '(Z|[+-]\d{2}:?\d{2})$' -and [DateTimeOffset]::TryParse($text, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$dto)) {
+            if ($WallClockUtc) { return [DateTime]::SpecifyKind($dto.DateTime, [DateTimeKind]::Utc) }
             return $dto.UtcDateTime
         }
         $dt = [DateTime]::Parse($text, [Globalization.CultureInfo]::InvariantCulture)
@@ -943,8 +962,8 @@ function Get-ControlFields {
         Status = [string](Get-RecordFieldValue -Record $Control -FieldName "LastRequestStatus")
         TestCode = [string](Get-RecordFieldValue -Record $Control -FieldName "LastRequestedTestCode")
         RequestId = Convert-ToNullableGuid (Get-RecordFieldValue -Record $Control -FieldName "LastRequestID")
-        StartedAtUtc = Convert-ToNullableDateTime (Get-RecordFieldValue -Record $Control -FieldName "LastRequestStartedAtUtc")
-        CompletedAtUtc = Convert-ToNullableDateTime (Get-RecordFieldValue -Record $Control -FieldName "LastRequestCompletedAtUtc")
+        StartedAtUtc = Convert-ToNullableDateTime (Get-RecordFieldValue -Record $Control -FieldName "LastRequestStartedAtUtc") -WallClockUtc
+        CompletedAtUtc = Convert-ToNullableDateTime (Get-RecordFieldValue -Record $Control -FieldName "LastRequestCompletedAtUtc") -WallClockUtc
         Message = [string](Get-RecordFieldValue -Record $Control -FieldName "LastRequestMessage")
         AppStart = [string](Get-RecordFieldValue -Record $Control -FieldName "ServerAppStartUtc")
         DllSha = [string](Get-RecordFieldValue -Record $Control -FieldName "ServerDllSha256")
@@ -1563,7 +1582,20 @@ function Get-ThermalC {
 }
 
 function Get-W3wpPoolMap {
+    # PID -> app pool. First the IIS performance-counter category W3SVC_W3WP (instance names "<PID>_<AppPool>"),
+    # which a non-elevated user can read; then appcmd (needs elevation) and the w3wp command line (empty for
+    # processes of another identity when not elevated).
     $map = @{}
+    try {
+        $category = New-Object System.Diagnostics.PerformanceCounterCategory("W3SVC_W3WP")
+        foreach ($name in @($category.GetInstanceNames())) {
+            $m = [regex]::Match([string]$name, '^(\d+)_(.+)$')
+            if ($m.Success) { $map[[int]$m.Groups[1].Value] = $m.Groups[2].Value }
+        }
+    }
+    catch {
+    }
+    if ($map.Count -gt 0) { return $map }
     $appcmd = Join-Path $env:windir "System32\inetsrv\appcmd.exe"
     if (Test-Path -LiteralPath $appcmd) {
         try {
@@ -1638,9 +1670,12 @@ function Get-SnapshotGroups {
 
 function Get-SnapshotDelta {
     # Per-process deltas summed by group; a process that appeared during the interval counts in full.
+    # A failed snapshot (WMI error: ok = false, no processes) gives no delta: otherwise every process of the other
+    # snapshot would count as new and add its whole-lifetime CPU.
     param($Start, $End, [string[]]$Groups = $null)
     $delta = [ordered]@{}
     if ($null -eq $Start -or $null -eq $End) { return $delta }
+    if (-not [bool]$Start["ok"] -or -not [bool]$End["ok"]) { return $delta }
     foreach ($procId in @($End.pids.Keys)) {
         $e = $End.pids[$procId]
         if ($null -ne $Groups -and $Groups -notcontains $e.group) { continue }
@@ -1708,7 +1743,13 @@ function Invoke-SettleGate {
             $result.cpuBeforePct = [Math]::Round($cpuAvg, 2)
             $result.diskBeforeMBps = [Math]::Round($diskAvg, 2)
             $quietOtherDb = $true
-            if ($checkOtherDb) {
+            if ($checkOtherDb -and (-not [bool]$samples[$n - $window].snap["ok"] -or -not [bool]$sample.snap["ok"])) {
+                # A process snapshot failed (WMI error): the other-database criterion cannot be evaluated for this
+                # window; the CPU and disk criteria still apply.
+                $result.otherDbCpuPctOfCore = $null
+                $result.otherDbIoMBps = $null
+            }
+            elseif ($checkOtherDb) {
                 $base = $samples[$n - $window]
                 $secs = [Math]::Max(0.001, $sample.t - $base.t)
                 $delta = Get-SnapshotDelta -Start $base.snap -End $sample.snap -Groups $otherGroups
@@ -1734,15 +1775,20 @@ function Invoke-SettleGate {
 function New-RunSampler {
     [void](Read-HostCounter -Name "Cpu")
     [void](Read-HostCounter -Name "ProcPerf")
-    return @{ cpu = (New-Object System.Collections.Generic.List[object]); perf = (New-Object System.Collections.Generic.List[object]); temp = (New-Object System.Collections.Generic.List[object]) }
+    return @{ cpu = (New-Object System.Collections.Generic.List[object]); perf = (New-Object System.Collections.Generic.List[object]); temp = (New-Object System.Collections.Generic.List[object]); tempClock = $null }
 }
 
 function Add-RunSample {
+    # Two cheap counter reads at every poll; the thermal-zone CIM query (WmiPrvSE work on the host under test) at
+    # most every $script:ThermalSampleSec seconds while a run is measured.
     param($Sampler)
     if ($null -eq $Sampler) { return }
     $Sampler.cpu.Add((Read-HostCounter -Name "Cpu"))
     $Sampler.perf.Add((Read-HostCounter -Name "ProcPerf"))
-    $Sampler.temp.Add((Get-ThermalC))
+    if ($null -eq $Sampler.tempClock -or $Sampler.tempClock.Elapsed.TotalSeconds -ge $script:ThermalSampleSec) {
+        $Sampler.temp.Add((Get-ThermalC))
+        $Sampler.tempClock = [System.Diagnostics.Stopwatch]::StartNew()
+    }
 }
 
 #endregion
@@ -1789,7 +1835,7 @@ function New-CampaignState {
             blocksBCD = [ordered]@{ otherDbCpuPctOfCore = $SettleOtherDbCpuPctOfCore; otherDbIoMBps = $SettleOtherDbIoMBps; timeoutSec = $SettleTimeoutSecBCD }
             coolDownSecAfterMultiUser = $CoolDownSecAfterMultiUser
         }
-        calibrationFile = $(if ([string]::IsNullOrWhiteSpace($CalibrationFile)) { $null } else { $CalibrationFile })
+        calibrationFile = $(if ([string]::IsNullOrWhiteSpace($CalibrationFile) -or $script:CalibrationWriteOnly) { $null } else { $CalibrationFile })
         noRerun = [bool]$NoRerun
         clientConnection = [ordered]@{}
         poll = [ordered]@{ fastSec = $PollFastSec; fastForSec = $PollFastForSec; slowSec = $PollSlowSec }
@@ -1840,7 +1886,7 @@ function Import-CampaignState {
         campaign = (ConvertTo-OrderedMap (Get-Prop $doc "campaign"))
         instances = @((Get-Prop $doc "instances") | Where-Object { $null -ne $_ })
         tests = @((Get-Prop $doc "tests") | Where-Object { $null -ne $_ })
-        environment = [ordered]@{ start = (Get-Prop $env "start"); end = (Get-Prop $env "end"); envCaptures = (ConvertTo-ObjectList (Get-Prop $env "envCaptures")) }
+        environment = [ordered]@{ start = (Get-Prop $env "start"); end = (Get-Prop $env "end"); envCaptures = (ConvertTo-ObjectList (Get-Prop $env "envCaptures")); tableCounts = (Get-Prop $env "tableCounts") }
         runs = (ConvertTo-ObjectList (Get-Prop $doc "runs"))
         events = (ConvertTo-ObjectList (Get-Prop $doc "events"))
         suiteState = $suite
@@ -1886,6 +1932,7 @@ function Save-CampaignState {
         runs = $script:State.runs.ToArray()
         events = $script:State.events.ToArray()
     }
+    if ($script:State.environment.Contains("tableCounts") -and $null -ne $script:State.environment["tableCounts"]) { $doc.environment["tableCounts"] = $script:State.environment["tableCounts"] }
     if ($script:State.Contains("diagnostics")) { $doc["diagnostics"] = $script:State["diagnostics"] }
     $doc["suiteState"] = $script:State.suiteState
     $json = $doc | ConvertTo-Json -Depth 40
@@ -2079,7 +2126,10 @@ function Update-RecordFromResultRow {
             $Record.result = $resultJson | ConvertFrom-Json
         }
         catch {
+            # Keep the raw text (for example keys that differ only in case, which Windows PowerShell 5.1 cannot turn
+            # into an object): the report parses it with a case-sensitive reader, and nothing is lost.
             $Record.message = ("ResultJson could not be parsed: " + $_.Exception.Message)
+            Set-RecordValue -Record $Record -Name "resultJsonRaw" -Value $resultJson
         }
     }
     $server = Get-Prop $Record.result "server"
@@ -2166,7 +2216,10 @@ function Invoke-EnvironmentScript {
     if (-not [string]::IsNullOrWhiteSpace($MySqlDefaultsFile)) { $arguments["MySqlDefaultsFile"] = $MySqlDefaultsFile }
     if (-not [string]::IsNullOrWhiteSpace($PgPassFile)) { $arguments["PgPassFile"] = $PgPassFile }
     switch ($Mode) {
-        "preflight" { $arguments["Preflight"] = $true }
+        "preflight" {
+            $arguments["Preflight"] = $true
+            if (@($PreflightAllow).Count -gt 0) { $arguments["PreflightAllow"] = [string[]]$PreflightAllow }
+        }
         "engineCounters" { $arguments["EngineCounters"] = $true }
         "tableCounts" { $arguments["TableCounts"] = $true }
     }
@@ -2186,11 +2239,76 @@ function Get-SiteNames {
     return , @($script:SuiteInstances | ForEach-Object { $_.Name })
 }
 
+function Add-TableCountsToState {
+    # SPEC 5.4 item 19 and 6.9 step 1: embed the table-count captures found in the campaign folder
+    # (Get-PerfEnvironment -TableCounts -> table-counts-<label>.json) under environment.tableCounts, in compact form:
+    # the tables whose row count changed against the capture's baseline, and the soft-deleted ARRegister/Batch rows.
+    # The report lists them as residue tables.
+    param([string]$Folder)
+    if ([string]::IsNullOrWhiteSpace($Folder) -or -not (Test-Path -LiteralPath $Folder)) { return }
+    $files = @(Get-ChildItem -LiteralPath $Folder -Filter "table-counts-*.json" -File -ErrorAction SilentlyContinue | Sort-Object Name)
+    if ($files.Count -eq 0) { return }
+    $map = [ordered]@{}
+    foreach ($file in $files) {
+        try {
+            $doc = [System.IO.File]::ReadAllText($file.FullName) | ConvertFrom-Json
+            $soft = [ordered]@{}
+            $engines = Get-Prop $doc "engines"
+            if ($null -ne $engines) {
+                foreach ($p in $engines.PSObject.Properties) { $soft[$p.Name] = Get-Prop $p.Value "softDeleted" }
+            }
+            $map[$file.Name] = [ordered]@{
+                label = Get-Prop $doc "label"
+                capturedAtUtc = Get-Prop $doc "capturedAtUtc"
+                baselineFile = Get-Prop $doc "baselineFile"
+                changedTables = Get-Prop $doc "changedTables"
+                softDeleted = $soft
+            }
+        }
+        catch {
+            Write-SuiteLog ("  {0} could not be embedded: {1}" -f $file.Name, $_.Exception.Message) "DarkYellow"
+        }
+    }
+    if ($map.Count -gt 0) { $script:State.environment["tableCounts"] = $map }
+}
+
+function Test-StartEnvironment {
+    # Warnings for the operator (SPEC 6.4): a dirty working tree or DLL hashes that differ between the build and the
+    # three sites, as recorded by Get-PerfEnvironment in environment-start.json.
+    param($StartEnv)
+    if ($null -eq $StartEnv) { return }
+    $git = Get-Prop (Get-Prop $StartEnv "repo") "git"
+    $clean = Get-Prop $git "clean"
+    if ($null -ne $clean -and -not [bool]$clean) {
+        Add-SuiteEvent -Kind "GateWarning" -Instance $null -Detail ("environment-start: the repository working tree is not clean ({0} changed file(s)); the published results must come from a committed state" -f (Get-Prop $git "porcelainLines"))
+    }
+    $dll = Get-Prop (Get-Prop $StartEnv "repo") "dll"
+    $allEqual = Get-Prop $dll "allEqual"
+    if ($null -ne $allEqual -and -not [bool]$allEqual) {
+        Add-SuiteEvent -Kind "GateWarning" -Instance $null -Detail "environment-start: the PerfDBBenchmark.Core.dll hashes of the build and the three sites are not all equal (repo.dll.sha256)"
+    }
+}
+
 function Invoke-PreflightGate {
     # SPEC 5.4 item 17 / gate G6: at P4 start a failure stops the suite; before later blocks wait up to 5 min, then warn.
+    # At campaign start a pre-flight that cannot run, or cannot check an engine (for example no credential file), is
+    # not a pass: it stops the suite too, unless -AllowUncheckedPreflight. Later blocks only log it.
     param([string]$Block, [bool]$IsFirstBlock)
+    $strict = $IsFirstBlock -and -not $AllowUncheckedPreflight
+    $uncheckedStop = {
+        param([string]$Why)
+        $text = "Block {0}: {1}" -f $Block, $Why
+        Add-SuiteEvent -Kind "Preflight" -Instance $null -Detail $text
+        if ($strict) {
+            throw (New-SuiteStop -Kind "preflight" -Message ("Pre-flight could not verify the database clients at campaign start (gate G6). Fix it, or start again with -AllowUncheckedPreflight to accept an unchecked pre-flight. " + $text))
+        }
+    }
+    if ($script:EnvironmentScriptDisabled) {
+        Add-SuiteEvent -Kind "Preflight" -Instance $null -Detail ("Block {0}: pre-flight skipped (-EnvironmentScript none)" -f $Block)
+        return
+    }
     if ([string]::IsNullOrWhiteSpace($EnvironmentScript) -or -not (Test-Path -LiteralPath $EnvironmentScript)) {
-        Add-SuiteEvent -Kind "Preflight" -Instance $null -Detail ("Block {0}: pre-flight skipped (no environment script)" -f $Block)
+        & $uncheckedStop ("pre-flight skipped: environment script not found ({0})" -f $EnvironmentScript)
         return
     }
     $folder = Split-Path -Parent $script:State.suiteState["path"]
@@ -2201,10 +2319,11 @@ function Invoke-PreflightGate {
         $outFile = Join-Path $folder ("preflight-{0}-{1:yyyyMMdd-HHmmss}.json" -f $Block, (Get-Date))
         $result = Invoke-EnvironmentScript -Mode "preflight" -OutFile $outFile -InstanceNames (Get-SiteNames)
         if ($null -eq $result) {
-            Add-SuiteEvent -Kind "Preflight" -Instance $null -Detail ("Block {0}: pre-flight could not run" -f $Block)
+            & $uncheckedStop "pre-flight could not run"
             return
         }
         $offenders = New-Object System.Collections.Generic.List[string]
+        $unchecked = New-Object System.Collections.Generic.List[string]
         $checks = Get-Prop $result "checks"
         if ($null -ne $checks) {
             foreach ($p in $checks.PSObject.Properties) {
@@ -2212,9 +2331,16 @@ function Invoke-PreflightGate {
                     if ($null -ne $o) { $offenders.Add(("{0}: {1} x{2}" -f $p.Name, (Get-Prop $o "client"), (Get-Prop $o "sessions"))) }
                 }
                 if (-not [bool](Get-Prop $p.Value "checked")) {
+                    $unchecked.Add(("{0} ({1})" -f $p.Name, (Get-Prop $p.Value "note")))
                     if ($attempt -eq 1) { Write-SuiteLog ("  Pre-flight {0}: {1}" -f $p.Name, (Get-Prop $p.Value "note")) "DarkYellow" }
                 }
             }
+        }
+        else {
+            $unchecked.Add("no checks in the pre-flight output")
+        }
+        if ($attempt -eq 1 -and $unchecked.Count -gt 0) {
+            & $uncheckedStop ("pre-flight could not check: " + ($unchecked -join "; "))
         }
         if ($offenders.Count -eq 0) {
             Write-SuiteLog ("  Pre-flight before Block {0}: OK" -f $Block) "DarkGray"
@@ -2223,7 +2349,7 @@ function Invoke-PreflightGate {
         $detail = "Block {0}: unexpected database clients: {1}" -f $Block, ($offenders -join "; ")
         if ($IsFirstBlock) {
             Add-SuiteEvent -Kind "Preflight" -Instance $null -Detail $detail
-            throw (New-SuiteStop -Kind "preflight" -Message ("Pre-flight failed at campaign start. Close the other clients (or allow them with Get-PerfEnvironment -PreflightAllow) and start again. " + $detail))
+            throw (New-SuiteStop -Kind "preflight" -Message ("Pre-flight failed at campaign start. Close the other clients (or allow them with -PreflightAllow <regex>, which is passed to Get-PerfEnvironment) and start again. " + $detail))
         }
         if ([DateTime]::UtcNow -ge $deadline) {
             Add-SuiteEvent -Kind "Preflight" -Instance $null -Detail ($detail + " (continuing after 5 min)")
@@ -2324,15 +2450,38 @@ function Set-RunParameters {
     return [pscustomobject]@{ Mismatches = $mismatches.ToArray(); Control = $control; Fields = $fields }
 }
 
+function Get-PendingInFlightDeadline {
+    # Block D resume: the run that was in flight when the suite stopped may still be running on the server. It is
+    # never aborted while it is within its own wait limit (run budget + 5 min, counted from its request time), because
+    # an aborted invoice run leaves a partial set of permanent invoices on one engine only.
+    param($Inst)
+    $pending = $script:State.suiteState["pendingInFlight"]
+    if ($null -eq $pending -or [string](Get-Prop $pending "instance") -ne $Inst.Name) { return $null }
+    $limit = Get-WaitLimitSec -TestCode ([string](Get-Prop $pending "testCode"))
+    $requested = $null
+    try { $requested = Convert-ToNullableDateTime (Get-Prop $pending "requestedAtUtc") } catch { $requested = $null }
+    $fromNow = [DateTime]::UtcNow.AddSeconds($limit)
+    if ($null -eq $requested) { return $fromNow }
+    $fromRequest = $requested.AddSeconds($limit)
+    # A clock or marker problem must not make the wait unbounded: at most the wait limit from now.
+    if ($fromRequest -gt $fromNow) { return $fromNow }
+    return $fromRequest
+}
+
 function Wait-InstanceIdle {
     # Never send RunBenchmark to an instance whose control row says Running (SPEC 5.4 item 14).
     param($Inst, [string]$Block)
     $deadline = [DateTime]::UtcNow.AddSeconds($AbortWaitSec)
+    $pendingDeadline = Get-PendingInFlightDeadline -Inst $Inst
     $abortSent = $false
     while ($true) {
         $fields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst)
         Update-InstanceFromControl -Inst $Inst -Fields $fields
         if (-not (Test-ControlRunning -Inst $Inst -Fields $fields)) { return $true }
+        if ($null -ne $pendingDeadline -and $pendingDeadline -gt $deadline) {
+            $deadline = $pendingDeadline
+            Add-SuiteEvent -Kind "Resume" -Instance $Inst.Name -Detail ("the interrupted Block D run of {0} is still in progress; waiting for it until {1:HH:mm:ss} UTC before any AbortBenchmark" -f [string](Get-Prop $script:State.suiteState["pendingInFlight"] "testCode"), $deadline)
+        }
         if ([DateTime]::UtcNow -ge $deadline) {
             if (-not $abortSent) {
                 try { [void](Invoke-InstanceAction -Inst $Inst -ActionName "AbortBenchmark") } catch { }
@@ -2537,6 +2686,9 @@ function Invoke-SuiteRun {
     $record.startedAtUtc = $invocationStartedUtc.ToString("o")
     $actionInvocationErrorMessage = $null
     $Inst.RunningRequestAppStart = $verify.Fields.AppStart
+    # From here on the server may run (and, in Block D, create permanent invoices) even if this suite fails:
+    # Invoke-GroupRuns then keeps the in-flight marker for the resume instead of recording a Failed run.
+    $script:PostedRun = [ordered]@{ instance = $Inst.Name; testCode = $Test.TestCode; block = $Block }
     try {
         [void](Invoke-InstanceAction -Inst $Inst -ActionName "RunBenchmark")
     }
@@ -2632,6 +2784,7 @@ function Invoke-SuiteRun {
 
     if (-not $isEnv) { $script:LastRunUserCount = if ($null -ne $record.userCount) { [int]$record.userCount } else { 1 } }
     Add-RunRecord -Record $record
+    $script:PostedRun = $null
     Write-RunLine -Record $record -Prefix $ProgressPrefix
     if ($StopOnFailure -and $record.status -eq "Failed") {
         throw (New-SuiteStop -Kind "failure" -Message ("-StopOnFailure: {0} failed on {1}: {2}" -f $Test.TestCode, $Inst.Name, $record.message))
@@ -2717,7 +2870,24 @@ function Invoke-EnvCapture {
     param($Inst, [string]$Block, $Rep, $OrderPosition, [int]$RerunRound, $ProfileSettings)
     for ($attempt = 1; $attempt -le 2; $attempt++) {
         if ($Inst.StuckBlock -eq $Block) { return $null }
-        $record = Invoke-SuiteRun -Inst $Inst -Test $script:EnvTest -Block $Block -Rep $Rep -OrderPosition $OrderPosition -Role "gate" -RerunRound $RerunRound -ParamProfile "env" -ProfileSettings $ProfileSettings -ProgressPrefix "  env"
+        try {
+            $record = Invoke-SuiteRun -Inst $Inst -Test $script:EnvTest -Block $Block -Rep $Rep -OrderPosition $OrderPosition -Role "gate" -RerunRound $RerunRound -ParamProfile "env" -ProfileSettings $ProfileSettings -ProgressPrefix "  env"
+        }
+        catch {
+            # A REST error must not end the campaign (SPEC 5.4 item 14): the gates skip this instance for the
+            # repetition; an unreadable control row marks it Stuck for the block.
+            if (Test-SuiteStopError $_) { throw }
+            $script:PostedRun = $null
+            if ($null -ne $script:State.suiteState["inFlight"] -and [string](Get-Prop $script:State.suiteState["inFlight"] "testCode") -eq $script:EnvCaptureCode) { $script:State.suiteState["inFlight"] = $null }
+            Add-SuiteEvent -Kind "GateWarning" -Instance $Inst.Name -Detail ("ENV_CAPTURE attempt {0} failed: {1}" -f $attempt, $_.Exception.Message)
+            if (-not (Test-InstanceReachable -Inst $Inst)) {
+                $Inst.StuckBlock = $Block
+                Save-InstanceState -Inst $Inst
+                Add-SuiteEvent -Kind "Stuck" -Instance $Inst.Name -Detail ("control row not readable after an ENV_CAPTURE error; instance skipped for the rest of Block {0}" -f $Block)
+            }
+            Save-CampaignState
+            continue
+        }
         if ($null -eq $record) { continue }
         $env = Get-Prop $record.result "env"
         if ($null -ne $env) {
@@ -2803,7 +2973,15 @@ function Test-RepetitionGates {
         }
     }
 
-    $present = @($facts.Keys | Where-Object { $facts[$_].present })
+    # Instances skipped by G3 (leftovers that ClearTestRecords could not remove) do not run in this repetition: their
+    # leftover documents change the pools behind masterDataHash and the counts behind dataFingerprintHash, so they
+    # are left out of G1, G2/G2d, G5 and G7 instead of aborting the campaign or the block for everyone.
+    $present = @($facts.Keys | Where-Object { $facts[$_].present -and $out.Skip -notcontains $_ })
+    foreach ($name in @($out.Skip | Select-Object -Unique)) {
+        if ($facts.Contains($name) -and $facts[$name].present) {
+            Add-SuiteEvent -Kind "GateWarning" -Instance $name -Detail ("{0}: skipped by G3, so not compared by G1/G2 (masterDataHash {1}, dataFingerprintHash {2})" -f $label, $facts[$name].masterDataHash, $facts[$name].dataFingerprintHash)
+        }
+    }
     if ($present.Count -lt 2) {
         $out.AbortBlock = ("{0}: fewer than two environment captures; the gates cannot compare instances" -f $label)
         return $out
@@ -3022,6 +3200,77 @@ function Resolve-InFlightRun {
     return $record
 }
 
+function Test-SuiteStopError {
+    # True for the exceptions that are meant to end the suite (New-SuiteStop: gates G1/G4, pre-flight, -StopOnFailure).
+    param($ErrorRecord)
+    $ex = if ($ErrorRecord -is [System.Management.Automation.ErrorRecord]) { $ErrorRecord.Exception } else { $ErrorRecord }
+    while ($null -ne $ex) {
+        if ($ex.Data.Contains("SuiteStop")) { return $true }
+        $ex = $ex.InnerException
+    }
+    return $false
+}
+
+function Test-InstanceReachable {
+    # After a suite error: can the control row be read again? 3 attempts, 30 s apart (each GET has its own retries).
+    param($Inst)
+    for ($i = 1; $i -le 3; $i++) {
+        try {
+            [void](Get-BenchmarkControl -Inst $Inst)
+            return $true
+        }
+        catch {
+            if ($i -lt 3) { Start-Sleep -Seconds 30 }
+        }
+    }
+    return $false
+}
+
+function Register-SuiteRunError {
+    # A REST or script error during one run (SPEC 5.4 item 14): record a Failed run (the slot gets its triple re-run at
+    # the end of the block), and mark the instance Stuck for the block when its control row stays unreadable or the
+    # errors repeat. Block D after RunBenchmark was sent (or while an interrupted run is being resolved) stops the
+    # suite instead and keeps the in-flight marker, so the resume adopts that run and never repeats it.
+    param($ErrorRecord, $Inst, $Test, [string]$Block, $Rep, $OrderPosition, [string]$Role, [int]$RerunRound, [string]$ParamProfile, $RerunOf, [string]$Prefix)
+    if (Test-SuiteStopError $ErrorRecord) { throw $ErrorRecord }
+    $message = $ErrorRecord.Exception.Message
+    $posted = $script:PostedRun
+    $script:PostedRun = $null
+    $postedHere = ($null -ne $posted -and [string]$posted["instance"] -eq $Inst.Name)
+    if ($Block -eq "D") {
+        $pending = $script:State.suiteState["pendingInFlight"]
+        $pendingHere = ($null -ne $pending -and [string](Get-Prop $pending "instance") -eq $Inst.Name)
+        if ($postedHere -or $pendingHere) {
+            Add-SuiteEvent -Kind "Abort" -Instance $Inst.Name -Detail ("Block D {0}: suite error after the run may have started: {1}" -f $Test.TestCode, $message)
+            throw (New-SuiteStop -Kind "failure" -Message ("Block D: {0} on {1} failed after its run may have started ({2}). Resume with the same -CampaignId: the run is then adopted from the server, never repeated." -f $Test.TestCode, $Inst.Name, $message))
+        }
+    }
+    $runParams = Get-RunParameters -Test $Test -Block $Block -ParamProfile $ParamProfile -ProfileSettings $script:ProfileSettings
+    $record = New-RunRecord -Inst $Inst -Test $Test -Block $Block -Rep $Rep -OrderPosition $OrderPosition -IsWarmup ([bool]$runParams.IsWarmup) -Role $Role -RerunRound $RerunRound -RerunOf $RerunOf -RunParams $runParams -RunBudgetSec (Get-RunBudgetSec -TestCode $Test.TestCode)
+    $record.status = "Failed"
+    $record.invalidReason = "SuiteError"
+    $record.completedAtUtc = [DateTime]::UtcNow.ToString("o")
+    $record.message = "Suite error: " + $message + $(if ($postedHere) { " (RunBenchmark had been sent)" } else { " (the run was not started)" })
+    Add-SuiteEvent -Kind "GateWarning" -Instance $Inst.Name -Detail ("{0}: suite error, run recorded as Failed (re-run at the end of the block): {1}" -f $Test.TestCode, $message)
+    Add-RunRecord -Record $record
+    Write-RunLine -Record $record -Prefix $Prefix
+    $Inst.ConsecutiveSuiteErrors = [int]$Inst.ConsecutiveSuiteErrors + 1
+    $stuckWhy = $null
+    if (-not (Test-InstanceReachable -Inst $Inst)) { $stuckWhy = "control row not readable after a suite error" }
+    elseif ($Inst.ConsecutiveSuiteErrors -ge 3) { $stuckWhy = ("{0} suite errors in a row" -f $Inst.ConsecutiveSuiteErrors) }
+    if ($null -ne $stuckWhy) {
+        $Inst.StuckBlock = $Block
+        $Inst.ConsecutiveSuiteErrors = 0
+        Save-InstanceState -Inst $Inst
+        Add-SuiteEvent -Kind "Stuck" -Instance $Inst.Name -Detail ("{0}; instance skipped for the rest of Block {1}" -f $stuckWhy, $Block)
+        Save-CampaignState
+    }
+    if ($StopOnFailure) {
+        throw (New-SuiteStop -Kind "failure" -Message ("-StopOnFailure: {0} failed on {1}: {2}" -f $Test.TestCode, $Inst.Name, $record.message))
+    }
+    return $record
+}
+
 function Invoke-GroupRuns {
     # Runs one (test, repetition, round) group on the decided instances.
     param($BlockPlan, $Test, [int]$Rep, [string[]]$Order, [int]$Round, $Decision, [string[]]$SkipInstances, [bool]$IsWarmupRep, [string]$Prefix)
@@ -3049,12 +3298,20 @@ function Invoke-GroupRuns {
             if ($original.Count -gt 0) { $rerunOf = $original[0].requestId }
         }
         $record = $null
-        if ($BlockPlan.Block -eq "D") {
-            $record = Resolve-InFlightRun -Inst $inst -Test $Test -Block $BlockPlan.Block -Rep $Rep -Round $Round -Role $Decision.Role -OrderPosition $position
+        $paramProfile = if ($IsWarmupRep) { "r0" } else { "regular" }
+        try {
+            if ($BlockPlan.Block -eq "D") {
+                $record = Resolve-InFlightRun -Inst $inst -Test $Test -Block $BlockPlan.Block -Rep $Rep -Round $Round -Role $Decision.Role -OrderPosition $position
+            }
+            if ($null -eq $record) {
+                $record = Invoke-SuiteRun -Inst $inst -Test $Test -Block $BlockPlan.Block -Rep $Rep -OrderPosition $position -Role $Decision.Role -RerunRound $Round -ParamProfile $paramProfile -RerunOf $rerunOf -ProfileSettings $script:ProfileSettings -ProgressPrefix $Prefix
+            }
+            $inst.ConsecutiveSuiteErrors = 0
         }
-        if ($null -eq $record) {
-            $paramProfile = if ($IsWarmupRep) { "r0" } else { "regular" }
-            $record = Invoke-SuiteRun -Inst $inst -Test $Test -Block $BlockPlan.Block -Rep $Rep -OrderPosition $position -Role $Decision.Role -RerunRound $Round -ParamProfile $paramProfile -RerunOf $rerunOf -ProfileSettings $script:ProfileSettings -ProgressPrefix $Prefix
+        catch {
+            # SPEC 5.4 item 14: an instance that misbehaves (REST errors that outlast the request retries) must not end
+            # the unattended campaign. Gate stops (G1, G4, pre-flight, -StopOnFailure) still end it.
+            $record = Register-SuiteRunError -ErrorRecord $_ -Inst $inst -Test $Test -Block $BlockPlan.Block -Rep $Rep -OrderPosition $position -Role $Decision.Role -RerunRound $Round -ParamProfile $paramProfile -RerunOf $rerunOf -Prefix $Prefix
         }
         if ($null -eq $record) {
             Add-SkippedEntry -Block $BlockPlan.Block -TestCode $Test.TestCode -Rep $Rep -Round $Round -Instance $name -Reason "Stuck"
@@ -3403,11 +3660,16 @@ function Invoke-BetweenBlocks {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     if (-not [string]::IsNullOrWhiteSpace($BetweenBlocksCommand)) {
         try {
+            # A child powershell.exe: a native tool that writes to stderr inside the command cannot stop it half-way
+            # (the suite's ErrorActionPreference = Stop would turn the first stderr line into a terminating error).
             Write-SuiteLog ("  Between-blocks command: {0}" -f $BetweenBlocksCommand) "DarkGray"
-            $global:LASTEXITCODE = 0
-            & $BetweenBlocksCommand *>&1 | ForEach-Object { Write-SuiteLog ("    " + [string]$_) "DarkGray" }
-            if ($LASTEXITCODE -ne 0) {
-                Add-SuiteEvent -Kind "GateWarning" -Instance $null -Detail ("between-blocks command exited with code {0}" -f $LASTEXITCODE)
+            $shell = Join-Path $PSHOME "powershell.exe"
+            if (-not (Test-Path -LiteralPath $shell)) { $shell = "powershell.exe" }
+            $r = Invoke-NativeProcess -FilePath $shell -Arguments ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}"' -f $BetweenBlocksCommand) -TimeoutSec $BetweenBlocksTimeoutSec
+            foreach ($line in @(([string]$r.StdOut) -split "`r?`n" | Where-Object { $_ -ne "" })) { Write-SuiteLog ("    " + $line) "DarkGray" }
+            foreach ($line in @(([string]$r.StdErr) -split "`r?`n" | Where-Object { $_ -ne "" })) { Write-SuiteLog ("    stderr: " + $line) "DarkYellow" }
+            if ($r.ExitCode -ne 0) {
+                Add-SuiteEvent -Kind "GateWarning" -Instance $null -Detail ("between-blocks command exited with code {0}" -f $r.ExitCode)
             }
         }
         catch {
@@ -3546,7 +3808,10 @@ function Invoke-Campaign {
     }
     $script:State.campaign["blocks"] = @(@(@($script:State.campaign["blocks"]) + $selectedBlocks) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique | Sort-Object)
     if ($BackupsVerified) { $script:State.campaign["backupsVerified"] = $true }
-    if (-not [string]::IsNullOrWhiteSpace($CalibrationFile)) { $script:State.campaign["calibrationFile"] = $CalibrationFile }
+    if (-not [string]::IsNullOrWhiteSpace($CalibrationFile)) {
+        if ($script:CalibrationWriteOnly) { $script:State.campaign["calibrationWrittenTo"] = $CalibrationFile }
+        else { $script:State.campaign["calibrationFile"] = $CalibrationFile }
+    }
     $script:State.suiteState["invocations"].Add([pscustomobject][ordered]@{
             startedAtUtc = [DateTime]::UtcNow.ToString("o")
             blocks = $selectedBlocks
@@ -3570,6 +3835,7 @@ function Invoke-Campaign {
                 Name = $definition.DisplayName; Definition = $definition; BaseUrl = $null; Session = $null; Identity = $null
                 DbEngine = "Unknown"; LastAppStartUtc = $null; LastDllSha = $null; LastMethodology = $null
                 StuckBlock = $null; NeedsRewarm = $false; RunningRequestId = $null; RunningRequestAppStart = $null
+                ConsecutiveSuiteErrors = 0
             }
         })
     foreach ($inst in $script:SuiteInstances) { $script:InstancesByName[$inst.Name] = $inst }
@@ -3636,6 +3902,14 @@ function Invoke-Campaign {
     }
     if (Test-Path -LiteralPath $startFile) {
         $script:State.environment.start = [System.IO.File]::ReadAllText($startFile) | ConvertFrom-Json
+        Test-StartEnvironment -StartEnv $script:State.environment.start
+    }
+
+    # Acumatica CPU per operation needs every site's w3wp mapped to its app pool (SPEC 5.4 item 15).
+    $poolMap = Get-W3wpPoolMap
+    $unmapped = @($script:SuiteInstances | Where-Object { @($poolMap.Values) -notcontains $_.Name } | ForEach-Object { $_.Name })
+    if ($unmapped.Count -gt 0) {
+        Add-SuiteEvent -Kind "GateWarning" -Instance $null -Detail ("no w3wp process could be mapped to the app pool of {0} (W3SVC_W3WP counters, appcmd and the process command line all failed); Acumatica CPU per operation will be missing for it" -f ($unmapped -join ", "))
     }
 
     if ($ClearExistingData) {
@@ -3680,7 +3954,10 @@ try {
     if ($WriteCalibration -and $script:ProfileName -ne "DryRun") {
         Write-Warning "-WriteCalibration only applies to the DryRun profile; ignored."
     }
-    $script:CalibrationBudgets = Read-CalibrationFile -Path $CalibrationFile
+    # With -WriteCalibration (DryRun) -CalibrationFile names the file to write: it is not read, so it may be a new
+    # path, and the calibration dry run is not limited by older budgets (engine default 15 min).
+    $script:CalibrationWriteOnly = ($WriteCalibration -and $script:ProfileName -eq "DryRun")
+    $script:CalibrationBudgets = if ($script:CalibrationWriteOnly) { @{} } else { Read-CalibrationFile -Path $CalibrationFile }
     $maxWait = 900 + $WaitLimitExtraSec
     foreach ($v in $script:CalibrationBudgets.Values) { $maxWait = [Math]::Max($maxWait, [int]$v + $WaitLimitExtraSec) }
     if ($maxWait + $AbortWaitSec -ge $ActionTimeoutMinutes * 60) {
@@ -3737,9 +4014,13 @@ finally {
                 [void](Invoke-EnvironmentScript -Mode "environment" -OutFile $endFile -InstanceNames (Get-SiteNames))
                 if (Test-Path -LiteralPath $endFile) { $script:State.environment.end = [System.IO.File]::ReadAllText($endFile) | ConvertFrom-Json }
             }
+            Add-TableCountsToState -Folder $folder
             $allDone = ($exitCode -eq 0) -and (@($script:BlockOrder | Where-Object { $script:State.campaign["blocks"] -contains $_ -and [string](Get-Prop $script:State.suiteState["blockState"] $_) -ne "completed" }).Count -eq 0)
             if ($allDone) { $script:State.campaign["completedAtUtc"] = [DateTime]::UtcNow.ToString("o") }
-            $script:State.suiteState["inFlight"] = $null
+            # The in-flight marker is NOT cleared here: Add-RunRecord clears it for every recorded run, so a marker that
+            # is still set belongs to a run that was interrupted (Ctrl+C, a terminating error) after it may have
+            # started. Import-CampaignState turns a Block D marker into pendingInFlight, and the resume adopts that
+            # run from the server instead of running the (test, instance) a second time (SPEC 5.4 item 10).
             Save-CampaignState
             Write-SuiteLog ("Campaign JSON: {0}" -f $script:State.suiteState["path"]) "Green"
         }
