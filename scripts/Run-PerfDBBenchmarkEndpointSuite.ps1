@@ -2425,6 +2425,21 @@ function Set-RunParameters {
         $body["NumberOfRecords"] = @{ value = $CoreRecords }
         $body["Iterations"] = @{ value = $CoreIterations }
         $body["ParallelBatchSize"] = @{ value = $CoreChunkSize }
+
+        # For an IntValue field the contract-based API treats empty and 0 as "no change": a PUT from empty to 0
+        # (or from 0 to empty) is silently ignored. WarmUpPassesOverride gives them different meanings
+        # (empty = test default, 0 = no warm-up), so cross that boundary through a temporary value of 1.
+        $wantWarm = $RunParams.WarmUpPassesOverride
+        $current = Get-RecordFieldValue -Record (Get-BenchmarkControl -Inst $Inst) -FieldName "WarmUpPassesOverride"
+        $currentBlank = ($null -eq $current -or [string]::IsNullOrWhiteSpace([string]$current))
+        $wantBlank = ($null -eq $wantWarm -or [string]::IsNullOrWhiteSpace([string]$wantWarm))
+        if (($wantBlank -and -not $currentBlank -and [int]$current -eq 0) -or (-not $wantBlank -and [int]$wantWarm -eq 0 -and $currentBlank)) {
+            $bridge = [ordered]@{}
+            if ($Inst.Identity.ContainsKey("id")) { $bridge["id"] = $Inst.Identity["id"] }
+            $bridge["SetupID"] = @{ value = $SetupID }
+            $bridge["WarmUpPassesOverride"] = @{ value = 1 }
+            [void](Invoke-InstanceRequest -Inst $Inst -Method PUT -RelativeUri "/BenchmarkControl" -Body $bridge)
+        }
     }
     [void](Invoke-InstanceRequest -Inst $Inst -Method PUT -RelativeUri "/BenchmarkControl" -Body $body)
 
