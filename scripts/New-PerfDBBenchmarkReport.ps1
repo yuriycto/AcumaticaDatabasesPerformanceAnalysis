@@ -60,6 +60,10 @@ param(
     [string]$ChartUrlPrefix = 'charts/'
 )
 
+# The suite (Run-PerfDBBenchmarkEndpointSuite.ps1 -ReportOnly, and its end-of-campaign report) runs this script in its
+# own session, which uses Set-StrictMode -Version Latest. This script is written for non-strict semantics (for example
+# @(...)[0] on an empty result is $null), so strict mode is switched off for this script's scope.
+Set-StrictMode -Off
 $ErrorActionPreference = 'Stop'
 
 #region ---------------------------------------------------------------- tie rule (single source of every threshold)
@@ -232,12 +236,18 @@ function Read-PerfJson {
     param([string]$Path)
     $full = (Resolve-Path -LiteralPath $Path).ProviderPath
     $text = [IO.File]::ReadAllText($full, [Text.Encoding]::UTF8)
-    if ($PSVersionTable.PSVersion.Major -ge 6) { return , ($text | ConvertFrom-Json -AsHashtable -Depth 200) }
+    return , (ConvertFrom-PerfJsonText $text)
+}
+
+function ConvertFrom-PerfJsonText {
+    # Case-sensitive JSON reader (keys that differ only in case are kept apart).
+    param([string]$Text)
+    if ($PSVersionTable.PSVersion.Major -ge 6) { return , ($Text | ConvertFrom-Json -AsHashtable -Depth 200) }
     Add-Type -AssemblyName System.Web.Extensions
     $ser = New-Object System.Web.Script.Serialization.JavaScriptSerializer
     $ser.MaxJsonLength = [int]::MaxValue
     $ser.RecursionLimit = 1000
-    return , $ser.DeserializeObject($text)
+    return , $ser.DeserializeObject($Text)
 }
 
 function ConvertTo-JsonText {
@@ -739,7 +749,7 @@ function Import-Campaign {
     $warnings = New-Object System.Collections.ArrayList
     $campaigns = @(); $runs = New-Object System.Collections.ArrayList; $events = New-Object System.Collections.ArrayList
     $tests = [ordered]@{}; $instances = [ordered]@{}; $envCaptures = New-Object System.Collections.ArrayList
-    $starts = @(); $ends = @(); $diag = [ordered]@{}; $seen = @{}
+    $starts = @(); $ends = @(); $diag = [ordered]@{}; $seen = @{}; $tableCounts = New-Object System.Collections.ArrayList; $tcSeen = @{}
     foreach ($d in $docs) {
         $c = Get-Field $d 'campaign'
         if ($c) { $campaigns += , $c }
@@ -775,6 +785,14 @@ function Import-Campaign {
             $s = Get-Field $env 'start'; if ($s) { $starts += , $s }
             $en = Get-Field $env 'end'; if ($en) { $ends += , $en }
             foreach ($ec in @(Get-Field $env 'envCaptures')) { if ($ec) { [void]$envCaptures.Add($ec) } }
+            # table counts embedded by the suite (environment.tableCounts: file name -> compact capture)
+            $tcs = Get-Field $env 'tableCounts'
+            foreach ($name in (Get-Keys $tcs)) {
+                if ($tcSeen.ContainsKey($name)) { continue }
+                $tcSeen[$name] = $true
+                $entry = Get-Field $tcs $name
+                if (Test-IsMap $entry) { $entry['source'] = $name; [void]$tableCounts.Add($entry) }
+            }
         }
         $dg = Get-Field $d 'diagnostics'
         if ($dg) { foreach ($k in (Get-Keys $dg)) { $diag[$k] = Get-Field $dg $k } }
@@ -787,6 +805,15 @@ function Import-Campaign {
     foreach ($ec in $envCaptures) { Add-EnvShapeAliases (Get-Field $ec 'env') -EnvCapture }
     $decisions = Get-SideFile $dirs 'decisions.json'
     $calibration = Get-SideFile $dirs 'calibration.json'
+    # table-counts-<label>.json written by Get-PerfEnvironment -TableCounts next to an input (SPEC 5.4 item 19, 6.6 3n)
+    foreach ($dir in $dirs) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter 'table-counts-*.json' -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
+            if ($tcSeen.ContainsKey($f.Name)) { continue }
+            $tcSeen[$f.Name] = $true
+            try { $doc = Read-PerfJson $f.FullName; if (Test-IsMap $doc) { $doc['source'] = $f.Name; [void]$tableCounts.Add($doc) } }
+            catch { Write-Warning ("Could not read {0}: {1}" -f $f.FullName, $_.Exception.Message) }
+        }
+    }
 
     $ids = @($campaigns | ForEach-Object { [string](Get-Field $_ 'id') } | Where-Object { $_ } | Select-Object -Unique)
     $meta = $campaigns[0]
@@ -794,7 +821,7 @@ function Import-Campaign {
         meta = $meta; campaignIds = $ids; runs = $runs; events = $events; tests = $tests; instances = $instances
         start = $(if ($starts.Count) { $starts[0] } else { $null }); end = $(if ($ends.Count) { $ends[-1] } else { $null })
         envCaptures = $envCaptures; diagnosticsIn = $diag; decisions = $decisions; calibration = $calibration
-        warnings = $warnings; inputDirs = $dirs
+        tableCounts = $tableCounts; warnings = $warnings; inputDirs = $dirs
     }
 }
 
@@ -833,6 +860,11 @@ function New-RunModel {
     $isRerun = ConvertTo-Flag (Get-Field $Raw 'isRerun')
     if (-not $role) { $role = if ($isRerun) { 'rerun' } else { 'original' } }
     $result = Get-Field $Raw 'result'
+    if ($null -eq $result) {
+        # The suite keeps the raw ResultJson when Windows PowerShell 5.1 could not parse it (resultJsonRaw).
+        $rawText = Get-Field $Raw 'resultJsonRaw'
+        if ($rawText -is [string] -and $rawText.Trim().StartsWith('{')) { try { $result = ConvertFrom-PerfJsonText $rawText } catch { $result = $null } }
+    }
     $params = Get-Field $result 'params'
     $settle = Get-Field $Raw 'settle'
     $capped = Get-Field $result 'capped'
@@ -882,6 +914,16 @@ function Select-SlotRun {
     return $null
 }
 
+function Test-ProcCountersUsable {
+    # The suite marks procCounters.available = false when a process snapshot failed (WMI error); such a run has no
+    # usable CPU figures (a missing flag, as in older files, counts as available).
+    param($Pc)
+    if (-not $Pc) { return $false }
+    $av = Get-Field $Pc 'available'
+    if ($null -ne $av -and -not (ConvertTo-Flag $av)) { return $false }
+    return $true
+}
+
 function Get-ProcGroupCpuMs {
     # CPU ms of one process group during a run. Prefers the suite's per-process 'delta' (correct when processes
     # start or exit during the run, e.g. PostgreSQL backends); falls back to end - start of the group sums.
@@ -898,7 +940,7 @@ function Get-RunCpu {
     # Database and Acumatica CPU of one run from the cumulative per-process counters (SPEC 5.4 item 15).
     param($Run)
     $pc = $Run.procCounters
-    if (-not $pc) { return $null }
+    if (-not (Test-ProcCountersUsable $pc)) { return $null }
     $s = Get-Field $pc 'start'; $e = Get-Field $pc 'end'
     if (-not $s -or -not $e) { return $null }
     $proc = $script:EngineInfo[$Run.engine].process
@@ -918,7 +960,7 @@ function Get-OthersCpu {
     param($Run)
     $pc = $Run.procCounters
     $out = @{}
-    if (-not $pc) { return $out }
+    if (-not (Test-ProcCountersUsable $pc)) { return $out }
     foreach ($eng in $script:EngineOrder) {
         if ($eng -eq $Run.engine) { continue }
         $v = Get-ProcGroupCpuMs $pc $script:EngineInfo[$eng].process
@@ -978,7 +1020,9 @@ function New-Cell {
     $valid = [double[]]@($tpu | Where-Object { $null -ne $_ })
     $finite = Get-FiniteValues $valid
     $n = $valid.Count
-    $cappedRuns = $n - $finite.Count
+    # Capped runs are counted by status: a throughput of 0 (every save failed) is +inf time per order as well, but it
+    # did not hit the time limit and must not be labelled so.
+    $cappedRuns = @($selected | Where-Object { $_.capped }).Count
     $median = Get-Median $valid
     $cv = Get-RobustCvPct $valid
     $cappedCell = ($n -gt 0) -and ($cappedRuns -ge $TieRule.cappedCellShare * $n)
@@ -1122,7 +1166,14 @@ function Get-TestVerdict {
             }
             else {
                 $v.resultsDiffer = $true
-                $v.parityNote = 'Every database returned a different answer; no speed verdict.'
+                # Engines without a signature (every analysis-set run was capped, so no complete answer) are unknown,
+                # not "different": say "every database" only when all of them answered.
+                $answered = @($Engines | Where-Object { $byEngine[$_] -and $byEngine[$_].paritySignature })
+                $unknown = @($Engines | Where-Object { $answered -notcontains $_ })
+                if ($unknown.Count -gt 0) {
+                    $v.parityNote = (Join-EngineNames $answered) + ' returned different answers; ' + (Join-EngineNames $unknown) + "'s answer is unknown (no complete run to compare); no speed verdict."
+                }
+                else { $v.parityNote = 'Every database returned a different answer; no speed verdict.' }
             }
         }
         foreach ($e in $Engines) { $c = $byEngine[$e]; if ($c -and $c.paritySignatures -gt 1) { $v.parityNote = (([string]$v.parityNote + ' ' + (Get-EngineName $e) + ' did not return the same answer in every run.').Trim()) } }
@@ -1141,8 +1192,14 @@ function Get-TestVerdict {
     }
 
     if ($v.resultsDiffer) {
-        $v.headline = 'Results differ on every database; no speed verdict.'
-        $v.sentenceMd = '**Results differ:** every database returned a different answer, so there is no speed verdict.'
+        if ($v.parityNote -like 'Every database*') {
+            $v.headline = 'Results differ on every database; no speed verdict.'
+            $v.sentenceMd = '**Results differ:** every database returned a different answer, so there is no speed verdict.'
+        }
+        else {
+            $v.headline = 'Results differ; no speed verdict.'
+            $v.sentenceMd = '**Results differ:** ' + $v.parityNote
+        }
         return $v
     }
 
@@ -1229,7 +1286,10 @@ function Get-TieSentence {
 function Get-VerdictText {
     param($Test, $Verdict, [hashtable]$ByEngine, $Spec, [bool]$Md)
     if (-not $Verdict.comparable) { return 'n/a: not comparable (' + $Verdict.reason + ').' }
-    if ($Verdict.resultsDiffer) { return (Get-Bold 'Results differ:' $Md) + ' every database returned a different answer, so there is no speed verdict.' }
+    if ($Verdict.resultsDiffer) {
+        if ([string]$Verdict.parityNote -like 'Every database*') { return (Get-Bold 'Results differ:' $Md) + ' every database returned a different answer, so there is no speed verdict.' }
+        return (Get-Bold 'Results differ:' $Md) + ' ' + [string]$Verdict.parityNote
+    }
     $parts = @()
     foreach ($x in @($Verdict.excludedEngines)) {
         if ($x.why -eq 'different answer') { $parts += ((Get-Bold ((Get-EngineName $x.engine) + ' returned a different answer') $Md) + ' and is not ranked on this test.') }
@@ -2056,6 +2116,97 @@ function Get-Derived {
     return [ordered]@{ scaling = $scaling; hotItemPenalty = $hot; speedup1Uto8U = $speed; steadyState = $steady }
 }
 
+function Get-ResidueTables {
+    # Residue tables (SPEC 5.4 item 19, 6.6 3n): per table-count capture, the tables whose row count changed against
+    # its baseline (Get-PerfEnvironment -TableCounts -BaselineFile) and the soft-deleted ARRegister/Batch rows.
+    param($Data)
+    $out = @()
+    foreach ($tc in @($Data.tableCounts)) {
+        if (-not $tc) { continue }
+        $changed = Get-Field $tc 'changedTables'
+        $soft = Get-Field $tc 'softDeleted'
+        if (-not (Test-IsMap $soft)) {
+            $soft = [ordered]@{}
+            $engs = Get-Field $tc 'engines'
+            foreach ($e in (Get-Keys $engs)) { $sd = Get-Field (Get-Field $engs $e) 'softDeleted'; if ($sd) { $soft[$e] = $sd } }
+        }
+        $byEngine = [ordered]@{}
+        foreach ($e in (Get-Keys $changed)) {
+            $rows = @(@(Get-Field $changed $e) | Where-Object { Test-IsMap $_ } | ForEach-Object {
+                    [ordered]@{ table = [string](Get-Field $_ 'table'); before = ConvertTo-Num (Get-Field $_ 'before'); after = ConvertTo-Num (Get-Field $_ 'after'); delta = ConvertTo-Num (Get-Field $_ 'delta') }
+                } | Sort-Object { - [Math]::Abs([double](0 + $_.delta)) })
+            $byEngine[$e] = $rows
+        }
+        $out += [ordered]@{
+            source = [string](Get-Field $tc 'source'); label = [string](Get-Field $tc 'label'); capturedAtUtc = [string](Get-Field $tc 'capturedAtUtc')
+            baselineFile = [string](Get-Field $tc 'baselineFile'); changedTables = $byEngine; softDeleted = $soft
+        }
+    }
+    return , $out
+}
+
+function Get-EnvChanges {
+    # SPEC 6.4: every difference between the start and end environment captures other than uptime and other volatile
+    # fields (listed by Get-PerfEnvironment in volatileFields) is listed in the README. Keys added by
+    # Add-EnvShapeAliases (copies of other keys) are skipped, so each change appears once.
+    param($Data)
+    $out = @()
+    if (-not $Data.start -or -not $Data.end) { return , $out }
+    $a = [ordered]@{}; Get-EnvLeafMap $Data.start '' $a
+    $b = [ordered]@{}; Get-EnvLeafMap $Data.end '' $b
+    $volatile = @(@(Get-Field $Data.start 'volatileFields') | Where-Object { $_ } | ForEach-Object { [string]$_ })
+    $volatile += @('volatileFields', 'errors', 'sqlServer', 'mySql', 'postgreSql', 'drivers', 'host.cpuName', 'host.logicalCpus', 'host.powerScheme', 'host.osCaption', 'antivirus.exclusions', 'kind', 'options')
+    $keys = @($a.Keys) + @($b.Keys | Where-Object { -not $a.Contains($_) })
+    $short = { param([string]$s) if ($null -eq $s) { return $null }; if ($s.Length -gt 200) { return $s.Substring(0, 200) + '...' }; return $s }
+    foreach ($k in $keys) {
+        if ($k -match '(?i)(uptime|capturedAt|generatedAt|lastBoot|bootTime|databaseSizeMb$|\.query_store$|^label$)') { continue }
+        if (@($volatile | Where-Object { $k -eq $_ -or $k.StartsWith($_ + '.') -or $k.StartsWith($_ + '[') }).Count -gt 0) { continue }
+        $va = if ($a.Contains($k)) { $a[$k] } else { $null }
+        $vb = if ($b.Contains($k)) { $b[$k] } else { $null }
+        if ($va -is [System.Collections.IList] -or $vb -is [System.Collections.IList]) {
+            # a list of plain values (for example running services) is compared as a set
+            $sa = @($va | Where-Object { $null -ne $_ }); $sb = @($vb | Where-Object { $null -ne $_ })
+            $added = @($sb | Where-Object { $sa -notcontains $_ }); $removed = @($sa | Where-Object { $sb -notcontains $_ })
+            if ($added.Count -or $removed.Count) {
+                $out += [ordered]@{ key = $k; start = (& $short ('removed: ' + $(if ($removed.Count) { $removed -join ', ' } else { 'none' }))); end = (& $short ('added: ' + $(if ($added.Count) { $added -join ', ' } else { 'none' }))) }
+            }
+            continue
+        }
+        if ([string]$va -ne [string]$vb) { $out += [ordered]@{ key = $k; start = (& $short ([string]$va)); end = (& $short ([string]$vb)) } }
+    }
+    return , $out
+}
+
+function Get-EnvLeafMap {
+    # Like Get-LeafMap, but a list of plain values is kept as one leaf (a sorted string array) so that start and end
+    # can be compared as sets instead of position by position.
+    param($Obj, [string]$Prefix, [System.Collections.IDictionary]$Into)
+    if ($null -eq $Obj) { return }
+    if (Test-IsMap $Obj) {
+        foreach ($k in (Get-Keys $Obj)) {
+            if ($Obj -is [System.Collections.IDictionary]) { $item = $Obj[$k] } else { $item = $Obj.PSObject.Properties[$k].Value }
+            Get-EnvLeafMap $item $(if ($Prefix) { $Prefix + '.' + $k } else { $k }) $Into
+        }
+        return
+    }
+    if (Test-IsList $Obj) {
+        $items = @($Obj)
+        if (@($items | Where-Object { (Test-IsMap $_) -or (Test-IsList $_) }).Count -eq 0) {
+            $Into[$Prefix] = [string[]]@($items | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ } | Sort-Object -Unique)
+            return
+        }
+        $i = 0
+        foreach ($x in $items) {
+            $name = $null
+            if (Test-IsMap $x) { foreach ($nk in @('name', 'Name', 'Variable_name', 'key')) { $nv = Get-Field $x $nk; if ($nv) { $name = [string]$nv; break } } }
+            Get-EnvLeafMap $x ($Prefix + '[' + $(if ($name) { $name } else { $i }) + ']') $Into
+            $i++
+        }
+        return
+    }
+    $Into[$Prefix] = [string]$Obj
+}
+
 function Get-Diagnostics {
     param($Data, [object[]]$Runs, [object[]]$Tests, $Cells, [string[]]$Engines, [int]$NSlots)
     $d = [ordered]@{}
@@ -2097,18 +2248,64 @@ function Get-Diagnostics {
         $thr[$e] = [ordered]@{ meanProcessorPerformancePct = $(if ($er.Count) { Get-Round (($er | Measure-Object -Property perfAvgPct -Average).Average) 2 } else { $null }); maxTempC = $(if ($tc.Count) { ($tc | Measure-Object -Property tempC -Maximum).Maximum } else { $null }); runs = $er.Count }
     }
     $d.throttleIndicator = $thr
-    foreach ($k in @('cacheDefeatProbe', 'aaCalibration', 'statementsPerOp', 'transportAB', 'apiReadMs', 'spillsAndJit')) {
+    foreach ($k in @('cacheDefeatProbe', 'aaCalibration', 'statementsPerOp', 'transportAB', 'apiReadMs', 'spillsAndJit', 'sqlServerPlanCheck')) {
         $d[$k] = $(if ($Data.diagnosticsIn.Contains($k)) { $Data.diagnosticsIn[$k] } else { 'not provided' })
     }
-    # statements per operation and spills from DryRun -Diagnostics deltas (runs[].diagnostics), when present
+    # SQL Server plan check (dry run 3m) may also be recorded in decisions.json
+    if ($d.sqlServerPlanCheck -is [string] -and $Data.decisions) { $pc = Get-Field $Data.decisions 'sqlServerPlanCheck'; if ($null -ne $pc) { $d.sqlServerPlanCheck = $pc } }
+    # Statements per operation and spills/JIT from the DryRun -Diagnostics engine counters. The suite stores them per
+    # run as diagnostics = { engine, start, end, delta = { counter: value } } (Get-PerfEnvironment -EngineCounters);
+    # a flat diagnostics object (counters at the top level) is read as well.
     $spo = [ordered]@{}
+    $sj = [ordered]@{}
     foreach ($r in @($Runs | Where-Object { $_.diagnostics })) {
+        $dl = Get-Field $r.diagnostics 'delta'
+        if (-not (Test-IsMap $dl)) { $dl = $r.diagnostics }
         $cnt = $null
-        foreach ($k in @('batchRequests', 'Batch Requests/sec', 'questions', 'Questions', 'pgStatStatementsCalls', 'calls', 'statements')) { $x = ConvertTo-Num (Get-Field $r.diagnostics $k); if ($null -ne $x) { $cnt = $x; break } }
+        foreach ($k in @('batchRequests', 'Batch Requests/sec', 'Questions', 'pgssCalls', 'pgStatStatementsCalls', 'calls', 'statements')) { $x = ConvertTo-Num (Get-Field $dl $k); if ($null -ne $x) { $cnt = $x; break } }
         $ops = (Get-RunCpu $r); $n = if ($ops) { $ops.ops } else { $r.opsCount }
         if ($null -ne $cnt -and $n) { if (-not $spo.Contains($r.testCode)) { $spo[$r.testCode] = [ordered]@{} }; $spo[$r.testCode][$r.engine] = Get-Round ($cnt / $n) 2 }
+        # spills to disk and JIT per report test (dry run 3d, Table 2)
+        if ($r.family -ne 'Reports' -and $r.testCode -notlike 'RPT_*') { continue }
+        $txt = $null
+        switch ($r.engine) {
+            'SQLServer' {
+                $sp = ConvertTo-Num (Get-Field $dl 'totalSpills')
+                if ($null -ne $sp) { $txt = $(if ($sp -gt 0) { 'spilled to tempdb (total_spills +' + (Format-Sig3 $sp) + ')' } else { 'no spill' }) }
+            }
+            'MySQL' {
+                $tmp = ConvertTo-Num (Get-Field $dl 'Created_tmp_disk_tables'); $smp = ConvertTo-Num (Get-Field $dl 'Sort_merge_passes')
+                if ($null -ne $tmp -or $null -ne $smp) {
+                    $txt = $(if ((0 + $tmp) -gt 0 -or (0 + $smp) -gt 0) { 'Created_tmp_disk_tables +' + (Format-Sig3 (0 + $tmp)) + ', Sort_merge_passes +' + (Format-Sig3 (0 + $smp)) } else { 'no on-disk temporary table or sort merge pass' })
+                }
+            }
+            'PostgreSQL' {
+                $tf = ConvertTo-Num (Get-Field $dl 'tempFiles'); $tb = ConvertTo-Num (Get-Field $dl 'tempBytes'); $jf = ConvertTo-Num (Get-Field $dl 'jitFunctions')
+                $partsPg = @()
+                if ($null -ne $tf) { $partsPg += $(if ($tf -gt 0) { 'temp_files +' + (Format-Sig3 $tf) + $(if ($null -ne $tb) { ' (' + (Format-Sig3 ($tb / 1MB)) + ' MB)' } else { '' }) } else { 'temp_files 0' }) }
+                if ($null -ne $jf) { $partsPg += $(if ($jf -gt 0) { 'JIT used (' + (Format-Sig3 $jf) + ' functions)' } else { 'JIT not used' }) }
+                elseif ($partsPg.Count) { $partsPg += 'JIT not measured (pg_stat_statements not loaded)' }
+                if ($partsPg.Count) { $txt = $partsPg -join '; ' }
+            }
+        }
+        if ($txt) { if (-not $sj.Contains($r.testCode)) { $sj[$r.testCode] = [ordered]@{} }; $sj[$r.testCode][$r.engine] = $txt }
     }
-    if ($spo.Count -gt 0) { $d.statementsPerOp = $spo }
+    if ($spo.Count -gt 0) {
+        # hand-entered diagnostics.statementsPerOp values are kept (they override a derived value of the same test and engine)
+        $manualSpo = $Data.diagnosticsIn['statementsPerOp']
+        if (Test-IsMap $manualSpo) { foreach ($t in (Get-Keys $manualSpo)) { foreach ($e in (Get-Keys (Get-Field $manualSpo $t))) { if (-not $spo.Contains($t)) { $spo[$t] = [ordered]@{} }; $spo[$t][$e] = Get-Field (Get-Field $manualSpo $t) $e } } }
+        $d.statementsPerOp = $spo
+    }
+    # an explicit diagnostics.spillsAndJit (hand-entered) overrides the derived values, test by test and engine by engine
+    if ($sj.Count -gt 0) {
+        $manual = $Data.diagnosticsIn['spillsAndJit']
+        if (Test-IsMap $manual) { foreach ($t in (Get-Keys $manual)) { foreach ($e in (Get-Keys (Get-Field $manual $t))) { if (-not $sj.Contains($t)) { $sj[$t] = [ordered]@{} }; $sj[$t][$e] = Get-Field (Get-Field $manual $t) $e } } }
+        $d.spillsAndJit = $sj
+    }
+    # Residue tables (dry run 3n, SPEC 5.4 item 19): tables whose row count changed, from table-counts-*.json
+    $d.residueTables = Get-ResidueTables $Data
+    # Start/end environment differences (SPEC 6.4), listed in the environment fragment
+    $d.environmentChanges = Get-EnvChanges $Data
     # background work left behind, per block: database CPU used while its engine was idle / CPU used in its own runs
     $bg = [ordered]@{}
     foreach ($blk in @($Runs | Where-Object { $_.block -and $_.block -ne 'G' } | ForEach-Object { $_.block } | Select-Object -Unique | Sort-Object)) {
@@ -2455,19 +2652,21 @@ function New-ReadmeFragments {
 
 function Get-ProbeSentence {
     param($Probes, [string[]]$Engines)
+    # Keys are "probe.accent.<n>.<term>" (WP3 numbers the terms so that no two keys differ only in case, which
+    # Windows PowerShell 5.1 cannot parse); older files use "probe.accent.<term>".
     $keys = @($Probes.Keys)
-    $short = @($keys | ForEach-Object { $_ -replace '^probe\.(accent\.)?', '' })
+    $short = @($keys | ForEach-Object { $_ -replace '^probe\.(accent\.)?(\d+\.)?', '' })
     $vals = @($Engines | ForEach-Object { $e = $_; (Get-EngineName $e) + ' ' + (($keys | ForEach-Object { $x = $Probes[$_][$e]; if ($null -eq $x -or $x -eq '') { '?' } else { $x } }) -join ' / ') })
     $same = $true
     foreach ($k in $keys) { if (@($Engines | ForEach-Object { [string]$Probes[$k][$_] } | Select-Object -Unique).Count -gt 1) { $same = $false } }
     $txt = 'hits for ' + ($short -join ' / ') + ': ' + ($vals -join '; ') + '.'
     if ($same) { return 'Yes. ' + $txt }
-    $plainKey = @($keys | Where-Object { $_ -match '^probe\.accent\.' -and (($_ -replace '^probe\.accent\.', '') -cmatch '^[a-z]+$') })[0]
+    $plainKey = @($keys | Where-Object { $_ -match '^probe\.accent\.' -and (($_ -replace '^probe\.accent\.(\d+\.)?', '') -cmatch '^[a-z]+$') })[0]
     if ($plainKey) {
         $finds = @($Engines | Where-Object { (ConvertTo-Num $Probes[$plainKey][$_]) -gt 0 })
         $nofinds = @($Engines | Where-Object { $finds -notcontains $_ })
         if ($finds.Count -gt 0 -and $nofinds.Count -gt 0) {
-            return 'No. ' + (Join-EngineNames $finds) + ' also ' + $(if ($finds.Count -eq 1) { 'finds' } else { 'find' }) + " accented names (such as 'Revenu Qu" + [char]0x00E9 + "bec') when you search without the accent ('" + ($plainKey -replace '^probe\.accent\.', '') + "'); " + (Join-EngineNames $nofinds) + ' ' + $(if ($nofinds.Count -eq 1) { 'does' } else { 'do' }) + ' not (accent-sensitive). Speed is reported separately. ' + $txt
+            return 'No. ' + (Join-EngineNames $finds) + ' also ' + $(if ($finds.Count -eq 1) { 'finds' } else { 'find' }) + " accented names (such as 'Revenu Qu" + [char]0x00E9 + "bec') when you search without the accent ('" + ($plainKey -replace '^probe\.accent\.(\d+\.)?', '') + "'); " + (Join-EngineNames $nofinds) + ' ' + $(if ($nofinds.Count -eq 1) { 'does' } else { 'do' }) + ' not (accent-sensitive). Speed is reported separately. ' + $txt
         }
     }
     return 'No. ' + $txt
@@ -2569,8 +2768,8 @@ function Get-DecisionGuide {
     foreach ($code in @('RPT_TRIAL_BALANCE', 'RPT_GL_ACCOUNT_DETAILS')) {
         if ($A.verdicts.Contains($code)) { $tt = @($A.tests | Where-Object { $_.code -eq $code })[0]; $t += ' ' + $tt.displayName + ': ' + $A.verdicts[$code].sentenceMd }
     }
-    $sp = $Data.diagnosticsIn['spillsAndJit']
-    if ($sp) { $t += ' Sort spills and JIT use per report are listed in the methodology appendix.' }
+    $sp = $A.diagnostics.spillsAndJit
+    if ($sp -and -not ($sp -is [string])) { $t += ' Sort spills and JIT use per report are listed in the methodology appendix.' }
     if ($MysqlRR -and $ir) { $t += ' ' + $isoSentence }
     $out += ('**Heavy month-end, GL and sales reporting:** ' + $t + (& $cpuNote @('Reports', 'InvoiceRelease')))
 
@@ -2631,6 +2830,7 @@ function Get-HowWeMeasured {
     $out = @()
     $out += ('Tests run in blocks (A: everyday screens and reports; B: platform basics; C: order entry and many users; D: invoice release, last and on a second night). Each block starts with a discarded warm-up repetition, then ' + $A.nSlots + ' repetitions; every repetition runs the three databases in a different order (' + $rotTxt + '), test by test.')
     $out += 'Every run warms up first (untimed warm-up passes or warm-up documents). Only the measured operation is timed: setup, data preparation, verification and cleanup are not.'
+    $out += 'With several users, a pass is timed by the wall clock from the common start to the last user''s finish, so it also includes each user''s screen reset between two documents (as when a clerk opens a fresh screen); that reset reads the database''s row-version stamp once per document, a small query whose cost differs slightly between the databases.'
     $out += ('Each value is the median of the ' + $A.nSlots + ' repetitions (the analysis set): a failed run is replaced by its re-run, which always repeats all three databases in the same order; outliers are flagged but never re-run or dropped.')
     $out += ('Tie rule in one sentence: a database is faster only when its median is at least ' + $TieRule.minGapPct + '% better (more for noisy tests) and it won at least 86% of the run pairings; differences too small to notice count as ties (see "How we decide faster").')
     $out += 'The results describe Acumatica running on each database on this machine, not raw database speed.'
@@ -2759,7 +2959,7 @@ function Get-DisclosureTables {
         }
     }
     & $row 'Sort/hash memory per query' { param($e) switch ($e) { 'SQLServer' { 'dynamic grant' } 'MySQL' { 'sort_buffer_size ' + (Format-EnvValue (Find-Setting $src[$e] @('sort_buffer_size'))) } 'PostgreSQL' { 'work_mem ' + (Format-EnvValue (Find-Setting $src[$e] @('work_mem'))) } } }
-    $spills = $Data.diagnosticsIn['spillsAndJit']
+    $spills = $A.diagnostics.spillsAndJit
     & $row 'Reports that spilled to disk / used JIT (dry run 3d)' { param($e) if ($spills -and (Test-IsMap $spills)) { $x = @((Get-Keys $spills) | ForEach-Object { $t = $_; $v = Get-Field (Get-Field $spills $t) $e; if ($v) { $t + ': ' + $v } }); if ($x.Count) { $x -join '; ' } else { '(not captured)' } } else { '(not captured)' } }
     & $row 'Statistics refresh before the campaign' { param($e) switch ($e) { 'SQLServer' { 'UPDATE STATISTICS, default sampling, every table' } 'MySQL' { 'ANALYZE TABLE, every table' } 'PostgreSQL' { 'VACUUM (ANALYZE), default target' } } }
     & $row 'Instrumentation on during the campaign' { param($e) switch ($e) { 'SQLServer' { 'Query Store ' + (Format-EnvValue (Find-Setting $src[$e] @('queryStore', 'query_store'))) + ' (default)' } 'MySQL' { 'performance_schema ' + (Format-EnvValue (Find-Setting $src[$e] @('performance_schema'))) + ' (default)' } 'PostgreSQL' { 'none (pg_stat_statements only in the dry run, if E12)' } } }
@@ -2803,7 +3003,7 @@ function Get-DisclosureTables {
     # Table 4
     & $add '### Table 4: where the CPU went'
     & $add ''
-    & $add ('Per family and database: database CPU per operation, Acumatica (w3wp) CPU per operation and the database share, over the analysis-set runs (whole run, untimed phases included, divided by every operation the run executed).')
+    & $add ('Per family and database: database CPU per operation, Acumatica (w3wp) CPU per operation and the database share, over the analysis-set runs (whole run, untimed phases included, divided by every operation the run executed). The untimed phases include data preparation and cleanup, for example re-creating the 10,000 records before each delete pass and deleting the orders after each order-entry pass, so these figures are upper bounds of the CPU per measured operation.')
     & $add ''
     & $add ('| Family | ' + (($engs | ForEach-Object { (Get-EngineName $_) + ': DB ms/op' + ' | ' + (Get-EngineName $_) + ': Acumatica ms/op | ' + (Get-EngineName $_) + ': DB share' }) -join ' | ') + ' |')
     & $add ('|---|' + (($engs | ForEach-Object { '---|---|---' }) -join '|') + '|')
@@ -2823,6 +3023,18 @@ function Get-DisclosureTables {
         & $add ('Database statements per operation (dry run 3f): ' + (((Get-Keys $spo) | ForEach-Object { $t = $_; $t + ' ' + (((Get-Keys (Get-Field $spo $t)) | ForEach-Object { (Get-EngineName $_) + ' ' + [string](Get-Field (Get-Field $spo $t) $_) }) -join ', ') }) -join '; ') + '.')
         & $add ''
     }
+
+    # Start/end differences (SPEC 6.4: every difference other than uptime is listed)
+    & $add '### Environment changes during the campaign'
+    & $add ''
+    $chg = @($A.diagnostics.environmentChanges)
+    if (-not $Data.start -or -not $Data.end) { & $add '- Not checked: the start and end environment captures were not both available.' }
+    elseif ($chg.Count -eq 0) { & $add '- None: the start and end environment captures agree (uptime, sizes and other volatile fields excluded).' }
+    else {
+        foreach ($c in @($chg | Select-Object -First 40)) { & $add ('- ' + (Get-MdCell $c.key) + ': ' + (Get-MdCell (Format-EnvValue $c.start)) + ' ' + $script:ARROW + ' ' + (Get-MdCell (Format-EnvValue $c.end))) }
+        if ($chg.Count -gt 40) { & $add ('- ... and ' + ($chg.Count - 40) + ' more (analysis.json, diagnostics.environmentChanges).') }
+    }
+    & $add ''
     return $sb.ToString()
 }
 
@@ -2862,11 +3074,27 @@ function Get-AppendixMd {
     if (@($bd.failedOps.Keys).Count) { $bdTxt += '. Failed operations: ' + ((@($bd.failedOps.Keys) | ForEach-Object { $_ + ' ' + (@($bd.failedOps[$_]) -join ', ') }) -join '; ') }
     if (@($bd.gateWarnings).Count) { $bdTxt += '. Gate log: ' + ((@($bd.gateWarnings) -join ' ').TrimEnd('.')) }
     & $add ('- **Block D data differences** (gate G2d): ' + $bdTxt + '.')
-    foreach ($k in @('transportAB', 'apiReadMs', 'cacheDefeatProbe', 'aaCalibration', 'statementsPerOp', 'spillsAndJit')) {
-        $label = @{ transportAB = 'Transport A/B (dry run 3k)'; apiReadMs = 'End-to-end API read, ms (dry run 3l)'; cacheDefeatProbe = 'Cache-defeat proof (dry run 3f)'; aaCalibration = 'A/A robust CV, % (dry run 3h)'; statementsPerOp = 'Database statements per operation (dry run 3f)'; spillsAndJit = 'Sort spills and JIT (dry run 3d)' }[$k]
+    foreach ($k in @('transportAB', 'apiReadMs', 'sqlServerPlanCheck', 'cacheDefeatProbe', 'aaCalibration', 'statementsPerOp', 'spillsAndJit')) {
+        $label = @{ transportAB = 'Transport A/B (dry run 3k)'; apiReadMs = 'End-to-end API read, ms (dry run 3l)'; sqlServerPlanCheck = 'SQL Server plan check: batch mode or parallelism in the report plans (dry run 3m)'; cacheDefeatProbe = 'Cache-defeat proof (dry run 3f)'; aaCalibration = 'A/A robust CV, % (dry run 3h)'; statementsPerOp = 'Database statements per operation (dry run 3f)'; spillsAndJit = 'Sort spills and JIT (dry run 3d)' }[$k]
         $v = $d[$k]
         $txt = if ($v -is [string]) { $v } else { $m = [ordered]@{}; Get-LeafMap $v '' $m; ((@($m.Keys) | ForEach-Object { $_ + ' = ' + $m[$_] }) -join '; ') }
         & $add ('- **' + $label + ':** ' + $txt + '.')
+    }
+    # residue tables (dry run 3n): the tables that grew outside the tested documents, and soft-deleted rows
+    $res = @($d.residueTables)
+    if ($res.Count -eq 0) { & $add '- **Residue tables (dry run 3n):** not provided (no table-counts-*.json next to the input or embedded in it).' }
+    foreach ($rt in $res) {
+        $parts = @()
+        foreach ($e in @($rt.changedTables.Keys)) {
+            $rows = @($rt.changedTables[$e])
+            $shown = @($rows | Select-Object -First 15 | ForEach-Object { $dlt = 0 + $_.delta; $_.table + ' ' + ('{0:N0}' -f (0 + $_.before)) + ' ' + $script:ARROW + ' ' + ('{0:N0}' -f (0 + $_.after)) + ' (' + $(if ($dlt -ge 0) { '+' } else { '' }) + ('{0:N0}' -f $dlt) + ')' })
+            $more = if ($rows.Count -gt 15) { ' and ' + ($rows.Count - 15) + ' more' } else { '' }
+            $parts += ((Get-EngineName $e) + ': ' + $(if ($rows.Count) { ($shown -join ', ') + $more } else { 'no table changed' }))
+        }
+        if (-not $rt.baselineFile -and @($rt.changedTables.Keys).Count -eq 0) { $parts += 'no baseline to compare with' }
+        $softTxt = @(Get-Keys $rt.softDeleted | ForEach-Object { $e = $_; $sd = Get-Field $rt.softDeleted $e; $kv = @(Get-Keys $sd | ForEach-Object { $_ + ' ' + [string](Get-Field $sd $_) }); if ($kv.Count) { (Get-EngineName $e) + ' ' + ($kv -join ', ') } })
+        if ($softTxt.Count) { $parts += ('soft-deleted / archived rows: ' + ($softTxt -join '; ')) }
+        & $add ('- **Residue tables (dry run 3n), ' + $(if ($rt.label) { $rt.label } else { $rt.source }) + ':** ' + ($parts -join '. ') + '.')
     }
     & $add ''
     return $sb.ToString()
