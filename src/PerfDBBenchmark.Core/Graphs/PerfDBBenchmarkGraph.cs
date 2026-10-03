@@ -4,28 +4,26 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
-using System.Reflection;
-using System.Threading;
 using PX.Data;
 using PX.Data.BQL;
 using PX.Data.BQL.Fluent;
-using PX.Data.ReducedMode;
-using PX.Objects.GL;
-using PX.Objects.IN;
 using PerfDBBenchmark.Core.DAC;
+using PerfDBBenchmark.Core.Scenarios;
 using PerfDBBenchmark.Core.Support;
-
-using GLBranch = PX.Objects.GL.Branch;
 
 namespace PerfDBBenchmark.Core.Graphs;
 
 /// <summary>
 /// PerfDBBenchmark was created by AcuPower LTD for Acumatica database performance analysis.
+/// The constructor only reads the control row (no WMI, no snapshot reads; SPEC §2.1 F4/F15). Runs go through
+/// PerfScenarioRunner and PerfResultWriter (SPEC §4.2); one run per instance at a time (PerfRunControl).
 /// </summary>
 public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
 {
-    private const string ReadSeedBatch = "READ-SEED";
     private const int BenchmarkControlID = 1;
+    private const string LoadErrorsPrefix = "[Catalog load errors: ";
+    private const string LoadErrorsSeparator = "] || ";
+    private const decimal VerdictBand = 0.05m;
 
     public PXSave<PerfBenchmarkFilter> Save;
     public PXCancel<PerfBenchmarkFilter> Cancel;
@@ -33,59 +31,165 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
     public SelectFrom<PerfBenchmarkFilter>.View Filter;
     public SelectFrom<PerfBenchmarkDefinition>.View BenchmarkCatalog;
     public SelectFrom<PerfTestRecord>.View Records;
-    public SelectFrom<PerfTestResult>.OrderBy<Desc<PerfTestResult.capturedAtUtc>>.View LocalResults;
+    public SelectFrom<PerfTestResult>.OrderBy<Desc<PerfTestResult.resultID>>.View LocalResults;
     public SelectFrom<PerfComparisonResult>.View ComparisonResults;
 
     public override bool IsDirty => Filter.Cache.IsDirty || Records.Cache.IsDirty || LocalResults.Cache.IsDirty;
 
-    // 26 R2 requires a throttler for ProcessItemsParallel; the platform registers one as a singleton.
-    [InjectDependency]
-    protected IReducedModeThrottler ReducedModeThrottler { get; set; }
-
     public PerfDBBenchmarkGraph()
     {
-        EnsureFilterContext(GetControlRow());
+        ConfigureTestCodeList();
+        GetControlRow();
     }
 
     public IEnumerable benchmarkCatalog()
     {
-        foreach (var descriptor in PerfBenchmarkCatalog.All)
+        IReadOnlyList<PerfTestDescriptor> all;
+        try
+        {
+            all = PerfScenarioRegistry.All;
+        }
+        catch
+        {
+            yield break;
+        }
+
+        foreach (var d in all)
         {
             yield return new PerfBenchmarkDefinition
             {
-                TestCode = descriptor.TestCode,
-                DisplayName = descriptor.DisplayName,
-                ActionName = descriptor.ActionName,
-                Category = descriptor.Category,
-                ExecutionMode = descriptor.ExecutionMode,
-                ShortDescription = descriptor.ShortDescription,
-                SortOrder = descriptor.SortOrder
+                TestCode = d.TestCode,
+                DisplayName = d.DisplayName,
+                ActionName = d.ActionName,
+                Category = d.Category,
+                ExecutionMode = d.ExecutionMode,
+                ShortDescription = d.ShortDescription,
+                SortOrder = d.SortOrder,
+                Family = d.Family,
+                RunBlock = d.RunBlock,
+                ShortLabel = d.ShortLabel,
+                Question = d.Question,
+                WhatItSimulates = d.WhatItSimulates,
+                WhyItMatters = d.WhyItMatters,
+                ReaderUnit = d.ReaderUnit,
+                UserCount = d.Users,
+                HeadlineKind = d.HeadlineKind,
+                HeadlineUnit = d.HeadlineUnit,
+                HigherIsBetter = d.HigherIsBetter,
+                OpsUnit = d.OpsUnit,
+                ParityExpected = d.ParityExpected,
+                IsDestructive = d.IsDestructive,
+                IsOptional = d.IsOptional,
+                ExcludeFromComparison = d.ExcludeFromComparison,
+                LegacyTestCode = d.LegacyTestCode,
+                ScenarioVersion = d.ScenarioVersion,
+                DefaultOpsPerPass = d.DefaultOpsPerPass,
+                DefaultPasses = d.DefaultPasses,
+                DefaultWarmUpPasses = d.DefaultWarmUpPasses
             };
         }
     }
 
     public IEnumerable comparisonResults()
     {
-        EnsureFilterContext(GetControlRow());
+        var row = GetControlRow();
+        ApplySnapshotStatus(row);
         return BuildComparisonRows();
     }
 
+    protected virtual void _(Events.RowSelected<PerfBenchmarkFilter> e)
+    {
+        if (e.Row == null) return;
+        ApplyServerFields(e.Row);
+    }
+
     #region Actions
+
+    public PXAction<PerfBenchmarkFilter> RunBenchmark;
+    [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.RunBenchmark)]
+    [PXUIField(DisplayName = "Run Selected Test", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
+    protected virtual IEnumerable runBenchmark(PXAdapter adapter)
+    {
+        var row = GetControlRow();
+        var selected = row.SelectedTestCode?.Trim();
+        if (string.IsNullOrEmpty(selected))
+        {
+            throw new PXException("Select a test in 'Test to Run' first.");
+        }
+
+        return StartBenchmark(adapter, selected);
+    }
+
+    public PXAction<PerfBenchmarkFilter> AbortBenchmark;
+    [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.AbortBenchmark)]
+    [PXUIField(DisplayName = "Abort Run", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
+    protected virtual IEnumerable abortBenchmark(PXAdapter adapter)
+    {
+        // Never throws (SPEC §3.1).
+        string message;
+        try
+        {
+            message = PerfRunControl.RequestAbort("AbortBenchmark action") ? "Abort requested" : "Nothing to abort";
+        }
+        catch (Exception ex)
+        {
+            message = "Abort request failed: " + ex.Message;
+        }
+
+        try
+        {
+            // Targeted single-column update: a run in progress owns the other control-row fields, so the row is never
+            // re-saved here (a stale copy could overwrite the run's Completed status).
+            PXDatabase.Update<PerfBenchmarkFilter>(
+                new PXDataFieldAssign<PerfBenchmarkFilter.lastRequestMessage>(PXDbType.NVarChar, 1024, message),
+                new PXDataFieldRestrict<PerfBenchmarkFilter.setupID>(PXDbType.Int, 4, BenchmarkControlID, PXComp.EQ));
+            Filter.Cache.Clear();
+            Filter.Cache.ClearQueryCache();
+            GetControlRow();
+        }
+        catch
+        {
+            try
+            {
+                if (Filter.Current != null) Filter.Current.LastRequestMessage = message;
+            }
+            catch
+            {
+                // never throw from AbortBenchmark
+            }
+        }
+
+        return adapter.Get();
+    }
+
+    public PXAction<PerfBenchmarkFilter> ClearTestRecords;
+    [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.ClearTestRecords)]
+    [PXUIField(DisplayName = "Clear Test Records", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
+    protected virtual IEnumerable clearTestRecords(PXAdapter adapter)
+    {
+        StartMaintenance(adapter, PerfScenarioCodes.ClearTestRecordsAction, "Clearing test records and leftovers", graph => graph.ClearTestRecordsCore());
+        return adapter.Get();
+    }
 
     public PXAction<PerfBenchmarkFilter> ApplyRecommendedSettings;
     [PXButton(CommitChanges = true)]
     [PXUIField(DisplayName = "Apply Recommended Settings", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
     protected virtual IEnumerable applyRecommendedSettings(PXAdapter adapter)
     {
-        var row = GetControlRow();
-        var recommendation = PerfHardwareInspector.Detect();
+        if (PerfRunControl.IsRunning)
+        {
+            throw new PXException("A benchmark run is already in progress on this instance.");
+        }
 
-        row.NumberOfRecords = recommendation.RecommendedRecords;
-        row.Iterations = recommendation.RecommendedIterations;
-        row.ParallelBatchSize = recommendation.RecommendedBatchSize;
-        row.ParallelMaxThreads = recommendation.RecommendedMaxThreads;
-        EnsureFilterContext(row);
-        PersistControlRow(row);
+        // Campaign constants, not hardware-derived values (SPEC §2.1 F22).
+        UpdateControlRowFresh(row =>
+        {
+            row.NumberOfRecords = PerfCampaignConstants.CoreRecords;
+            row.Iterations = PerfCampaignConstants.CoreMeasuredPasses;
+            row.ParallelBatchSize = PerfCampaignConstants.CoreChunkSize;
+            row.ParallelMaxThreads = PerfCampaignConstants.CoreParallelWorkers;
+            ApplyHardware(row, detect: true);
+        });
         return adapter.Get();
     }
 
@@ -94,71 +198,82 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
     [PXUIField(DisplayName = "Refresh Status", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
     protected virtual IEnumerable refreshStatus(PXAdapter adapter)
     {
-        var row = GetControlRow();
-        EnsureFilterContext(row);
-        PersistControlRow(row);
+        if (PerfRunControl.IsRunning)
+        {
+            // Never write the control row while a run owns it; show the status in memory only.
+            var current = GetControlRow();
+            ApplyHardware(current, detect: true);
+            ApplySnapshotStatus(current);
+            return adapter.Get();
+        }
+
+        UpdateControlRowFresh(row =>
+        {
+            ApplyHardware(row, detect: true);
+            ApplySnapshotStatus(row);
+        });
         return adapter.Get();
     }
 
     public PXAction<PerfBenchmarkFilter> RunSequentialRead;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.SequentialRead)]
     [PXUIField(DisplayName = "Sequential Read", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runSequentialRead(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.SequentialRead);
+    protected virtual IEnumerable runSequentialRead(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.SequentialRead));
 
     public PXAction<PerfBenchmarkFilter> RunSequentialWrite;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.SequentialWrite)]
     [PXUIField(DisplayName = "Sequential Write", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runSequentialWrite(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.SequentialWrite);
+    protected virtual IEnumerable runSequentialWrite(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.SequentialWrite));
 
     public PXAction<PerfBenchmarkFilter> RunSequentialUpdate;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.SequentialUpdate)]
     [PXUIField(DisplayName = "Sequential Update", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runSequentialUpdate(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.SequentialUpdate);
+    protected virtual IEnumerable runSequentialUpdate(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.SequentialUpdate));
 
     public PXAction<PerfBenchmarkFilter> RunSequentialDelete;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.SequentialDelete)]
     [PXUIField(DisplayName = "Sequential Delete", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runSequentialDelete(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.SequentialDelete);
+    protected virtual IEnumerable runSequentialDelete(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.SequentialDelete));
 
     public PXAction<PerfBenchmarkFilter> RunSequentialComplexJoin;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.SequentialComplexJoin)]
     [PXUIField(DisplayName = "Complex BQL Join (Sequential)", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runSequentialComplexJoin(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.SequentialComplexJoin);
+    protected virtual IEnumerable runSequentialComplexJoin(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.SequentialComplexJoin));
 
     public PXAction<PerfBenchmarkFilter> RunSequentialProjection;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.SequentialProjection)]
     [PXUIField(DisplayName = "PXProjection Analysis (Sequential)", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runSequentialProjection(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.SequentialProjection);
+    protected virtual IEnumerable runSequentialProjection(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.SequentialProjection));
 
     public PXAction<PerfBenchmarkFilter> RunParallelRead;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.ParallelRead)]
     [PXUIField(DisplayName = "Parallel Read", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runParallelRead(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.ParallelRead);
+    protected virtual IEnumerable runParallelRead(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.ParallelRead));
 
     public PXAction<PerfBenchmarkFilter> RunParallelWrite;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.ParallelWrite)]
     [PXUIField(DisplayName = "Parallel Write", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runParallelWrite(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.ParallelWrite);
+    protected virtual IEnumerable runParallelWrite(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.ParallelWrite));
 
     public PXAction<PerfBenchmarkFilter> RunParallelUpdate;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.ParallelUpdate)]
     [PXUIField(DisplayName = "Parallel Update", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runParallelUpdate(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.ParallelUpdate);
+    protected virtual IEnumerable runParallelUpdate(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.ParallelUpdate));
 
     public PXAction<PerfBenchmarkFilter> RunParallelDelete;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.ParallelDelete)]
     [PXUIField(DisplayName = "Parallel Delete", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runParallelDelete(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.ParallelDelete);
+    protected virtual IEnumerable runParallelDelete(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.ParallelDelete));
 
     public PXAction<PerfBenchmarkFilter> RunParallelComplexJoin;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.ParallelComplexJoin)]
     [PXUIField(DisplayName = "Complex BQL Join (Parallel)", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runParallelComplexJoin(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.ParallelComplexJoin);
+    protected virtual IEnumerable runParallelComplexJoin(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.ParallelComplexJoin));
 
     public PXAction<PerfBenchmarkFilter> RunParallelProjection;
     [PXButton(CommitChanges = true, Tooltip = PerfBenchmarkDescriptions.ParallelProjection)]
     [PXUIField(DisplayName = "PXProjection Analysis (Parallel)", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
-    protected virtual IEnumerable runParallelProjection(PXAdapter adapter) => StartBenchmark(adapter, PerfBenchmarkTestCodes.ParallelProjection);
+    protected virtual IEnumerable runParallelProjection(PXAdapter adapter) => StartBenchmark(adapter, PerfLegacyAliases.Map(PerfBenchmarkTestCodes.ParallelProjection));
 
     public PXAction<PerfBenchmarkFilter> ExportToExcel;
     [PXButton(CommitChanges = true)]
@@ -185,16 +300,13 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
     [PXUIField(DisplayName = "Clear Test Data", MapEnableRights = PXCacheRights.Select, MapViewRights = PXCacheRights.Select)]
     protected virtual IEnumerable clearTestData(PXAdapter adapter)
     {
-        PXLongOperation.StartOperation(this, () =>
-        {
-            var graph = CreateInstance<PerfDBBenchmarkGraph>();
-            graph.ClearAllBenchmarkData();
-        });
-
+        StartMaintenance(adapter, "ClearTestData", "Clearing all benchmark records and results", graph => graph.ClearAllBenchmarkData());
         return adapter.Get();
     }
 
     #endregion
+
+    #region Public methods used by the classic code-behind (signatures kept, SPEC §2.3)
 
     public List<PerfComparisonResult> GetComparisonResults() => BuildComparisonRows();
 
@@ -211,627 +323,383 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
         return PerfChartBuilder.GetOrderedDatabases(rows);
     }
 
+    #endregion
+
+    #region Run lifecycle
+
     private IEnumerable StartBenchmark(PXAdapter adapter, string testCode)
     {
-        var request = CreateRequest(testCode);
-        MarkRequestRunning(request);
-        PXLongOperation.StartOperation(this, () =>
+        if (PerfRunControl.IsRunning)
         {
-            var graph = CreateInstance<PerfDBBenchmarkGraph>();
-            graph.ExecuteBenchmark(request);
-        });
+            throw new PXException("A benchmark run is already in progress on this instance.");
+        }
+
+        var code = PerfLegacyAliases.Map(testCode?.Trim());
+        if (!PerfScenarioRegistry.TryGet(code, out var descriptor))
+        {
+            throw new PXException("Unknown benchmark test code: " + testCode + ".");
+        }
+
+        var request = CreateRequest(descriptor.TestCode);
+        if (!PerfRunControl.TryReserve(request.RequestID))
+        {
+            throw new PXException("A benchmark run is already in progress on this instance.");
+        }
+
+        try
+        {
+            MarkRequestRunning(request, descriptor);
+            PXLongOperation.StartOperation(this, () =>
+            {
+                var graph = CreateInstance<PerfDBBenchmarkGraph>();
+                graph.ExecuteBenchmark(request);
+            });
+        }
+        catch
+        {
+            PerfRunControl.CancelReservation(request.RequestID);
+            throw;
+        }
 
         return adapter.Get();
     }
 
-    private PerfBenchmarkRunRequest CreateRequest(string testCode)
+    private PerfRunRequest CreateRequest(string testCode)
     {
         var row = GetControlRow();
-        EnsureFilterContext(row);
+        ApplyContext(row);
         PersistControlRow(row);
 
-        return new PerfBenchmarkRunRequest
+        var workScale = row.WorkScale is decimal ws && ws > 0m && ws <= 1m ? ws : 1m;
+        return new PerfRunRequest
         {
             RequestID = Guid.NewGuid(),
             TestCode = testCode,
-            NumberOfRecords = Math.Max(row.NumberOfRecords ?? row.RecommendedRecords ?? 5000, 1),
-            Iterations = Math.Max(row.Iterations ?? row.RecommendedIterations ?? 3, 1),
-            BatchSize = Math.Max(row.ParallelBatchSize ?? row.RecommendedBatchSize ?? 100, 1),
-            MaxThreads = Math.Max(row.ParallelMaxThreads ?? row.RecommendedMaxThreads ?? 4, 1),
-            DatabaseType = row.CurrentDatabase ?? PerfEnvironmentInspector.GetDatabaseDisplayName(this),
-            InstanceName = row.CurrentInstance ?? PerfEnvironmentInspector.GetInstanceName(),
+            NumberOfRecords = Math.Max(row.NumberOfRecords ?? PerfCampaignConstants.CoreRecords, 1),
+            Iterations = Math.Max(row.Iterations ?? PerfCampaignConstants.CoreMeasuredPasses, 1),
+            BatchSize = Math.Max(row.ParallelBatchSize ?? PerfCampaignConstants.CoreChunkSize, 1),
+            DatabaseType = PerfDatabaseEngines.Detect(),
+            InstanceName = PerfRuntimeInfo.InstanceName,
             RequestedAtUtc = GetUtcStorageTimestamp(),
-            RequestedBy = PXAccess.GetUserName()
+            RequestedBy = SafeUserName(),
+            CampaignID = row.CampaignID,
+            RepetitionNo = row.RepetitionNo,
+            IsWarmup = row.IsWarmup == true,
+            RunBlock = string.IsNullOrWhiteSpace(row.RunBlock) ? null : row.RunBlock.Trim(),
+            OrderPosition = row.OrderPosition,
+            WorkScale = workScale,
+            PassesOverride = row.PassesOverride is int p && p > 0 ? p : (int?)null,
+            WarmUpPassesOverride = row.WarmUpPassesOverride is int w && w >= 0 ? w : (int?)null,
+            RunBudgetSec = row.RunBudgetSec is int b && b > 0 ? b : (int?)null
         };
     }
 
-    public void ExecuteBenchmark(PerfBenchmarkRunRequest request)
+    /// <summary>Long-operation body: runs the test, writes the result row (not for Failed runs) and the control-row status.</summary>
+    public void ExecuteBenchmark(PerfRunRequest request)
     {
-        var descriptor = PerfBenchmarkCatalog.Get(request.TestCode);
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        PerfTestDescriptor descriptor = null;
         var timer = Stopwatch.StartNew();
+        PerfRunMetrics metrics;
+        string snapshotError;
+
         try
         {
-            string notes;
-
-            switch (request.TestCode)
+            PerfScenarioRegistry.TryGet(request.TestCode, out descriptor);
+            using (PerfRunControl.Begin(request.RequestID))
             {
-                case PerfBenchmarkTestCodes.SequentialRead:
-                    notes = RunSequentialReadBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.SequentialWrite:
-                    notes = RunSequentialWriteBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.SequentialUpdate:
-                    notes = RunSequentialUpdateBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.SequentialDelete:
-                    notes = RunSequentialDeleteBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.SequentialComplexJoin:
-                    notes = RunSequentialComplexJoinBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.SequentialProjection:
-                    notes = RunSequentialProjectionBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.ParallelRead:
-                    notes = RunParallelReadBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.ParallelWrite:
-                    notes = RunParallelWriteBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.ParallelUpdate:
-                    notes = RunParallelUpdateBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.ParallelDelete:
-                    notes = RunParallelDeleteBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.ParallelComplexJoin:
-                    notes = RunParallelComplexJoinBenchmark(request);
-                    break;
-                case PerfBenchmarkTestCodes.ParallelProjection:
-                    notes = RunParallelProjectionBenchmark(request);
-                    break;
-                default:
-                    throw new PXException($"Unsupported benchmark test code: {request.TestCode}.");
+                descriptor ??= PerfScenarioRegistry.Get(request.TestCode);
+                metrics = PerfScenarioRunner.Run(request);
+                PerfResultWriter.Persist(this, request, descriptor, metrics);
+                snapshotError = PerfResultWriter.LastSnapshotError;
             }
-
-            timer.Stop();
-            PersistResult(request, descriptor, timer.Elapsed, notes);
-            MarkRequestCompleted(request, descriptor, timer.Elapsed, notes);
         }
         catch (Exception ex)
         {
             timer.Stop();
-            MarkRequestFailed(request, descriptor, ex, timer.Elapsed);
+            try
+            {
+                MarkRequestFailed(request, descriptor, ex, timer.Elapsed);
+            }
+            catch (Exception markEx)
+            {
+                PXTrace.WriteError(markEx);
+            }
+
+            throw;
+        }
+
+        timer.Stop();
+        MarkRequestCompleted(request, descriptor, metrics, timer.Elapsed, snapshotError);
+    }
+
+    private void MarkRequestRunning(PerfRunRequest request, PerfTestDescriptor descriptor)
+    {
+        UpdateControlRowFresh(row =>
+        {
+            row.LastRequestID = request.RequestID;
+            row.LastRequestedTestCode = request.TestCode;
+            row.LastRequestedBenchmark = Trim(descriptor.DisplayName, 128);
+            row.LastRequestStatus = PerfBenchmarkRequestStatuses.Running;
+            row.LastRequestStartedAtUtc = request.RequestedAtUtc;
+            row.LastRequestCompletedAtUtc = null;
+            row.LastRequestElapsedMs = null;
+            row.LastRequestMessage = Trim($"Running {descriptor.DisplayName} ({descriptor.TestCode}) on {request.InstanceName}.", 1024);
+        }, preserveCachedInputs: true);
+    }
+
+    private void MarkRequestCompleted(PerfRunRequest request, PerfTestDescriptor descriptor, PerfRunMetrics metrics, TimeSpan elapsed, string snapshotError)
+    {
+        UpdateControlRowFresh(row =>
+        {
+            row.LastRequestID = request.RequestID;
+            row.LastRequestedTestCode = request.TestCode;
+            row.LastRequestedBenchmark = Trim(descriptor?.DisplayName ?? request.TestCode, 128);
+            row.LastRequestStatus = PerfBenchmarkRequestStatuses.Completed;   // also for Invalid and Capped; the message carries Status/InvalidReason
+            row.LastRequestStartedAtUtc = request.RequestedAtUtc;
+            row.LastRequestCompletedAtUtc = GetUtcStorageTimestamp();
+            row.LastRequestElapsedMs = ToIntMs(elapsed);
+            row.LastRequestMessage = Trim(CompletionMessage(descriptor, metrics, elapsed, snapshotError), 1024);
+            ApplySnapshotStatus(row);
+        });
+    }
+
+    private void MarkRequestFailed(PerfRunRequest request, PerfTestDescriptor descriptor, Exception exception, TimeSpan elapsed)
+    {
+        UpdateControlRowFresh(row =>
+        {
+            row.LastRequestID = request.RequestID;
+            row.LastRequestedTestCode = request.TestCode;
+            row.LastRequestedBenchmark = Trim(descriptor?.DisplayName ?? request.TestCode, 128);
+            row.LastRequestStatus = PerfBenchmarkRequestStatuses.Failed;
+            row.LastRequestStartedAtUtc = request.RequestedAtUtc;
+            row.LastRequestCompletedAtUtc = GetUtcStorageTimestamp();
+            row.LastRequestElapsedMs = ToIntMs(elapsed);
+            row.LastRequestMessage = Trim($"{descriptor?.DisplayName ?? request.TestCode} failed: {exception.Message}", 1024);
+        });
+    }
+
+    private static string CompletionMessage(PerfTestDescriptor descriptor, PerfRunMetrics metrics, TimeSpan elapsed, string snapshotError)
+    {
+        var name = descriptor?.DisplayName ?? "Benchmark";
+        var status = metrics.Status ?? PerfRunStatuses.Completed;
+        var text = $"{name} finished in {FormatElapsed(elapsed)}. Status: {status}";
+        if (!string.IsNullOrEmpty(metrics.InvalidReason)) text += $" ({metrics.InvalidReason})";
+        text += ".";
+        if (descriptor != null && descriptor.HeadlineKind != PerfHeadlineKinds.None)
+        {
+            var hv = PerfResultWriter.Dec(metrics.HeadlineValue, 3);
+            text += hv.HasValue
+                ? $" Headline {hv.Value.ToString("0.###", CultureInfo.InvariantCulture)} {descriptor.HeadlineUnit}."
+                : " Headline n/a.";
+            text += $" Errors {metrics.ErrorCount.ToString(CultureInfo.InvariantCulture)}.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(metrics.Notes)) text += " " + metrics.Notes.Trim();
+        if (!string.IsNullOrEmpty(snapshotError)) text += " Snapshot not written: " + snapshotError;
+        return text;
+    }
+
+    #endregion
+
+    #region Maintenance actions (ClearTestData, ClearTestRecords)
+
+    /// <summary>Runs a maintenance job as a long operation while holding the run slot, so no benchmark can start meanwhile.
+    /// The control row shows Running while it works and is reset to Idle (LastRequestID empty) when it is done.</summary>
+    private void StartMaintenance(PXAdapter adapter, string code, string runningText, Action<PerfDBBenchmarkGraph> work)
+    {
+        if (PerfRunControl.IsRunning)
+        {
+            throw new PXException("A benchmark run is already in progress on this instance.");
+        }
+
+        var id = Guid.NewGuid();
+        if (!PerfRunControl.TryReserve(id))
+        {
+            throw new PXException("A benchmark run is already in progress on this instance.");
+        }
+
+        try
+        {
+            var started = GetUtcStorageTimestamp();
+            UpdateControlRowFresh(row =>
+            {
+                row.LastRequestID = id;
+                row.LastRequestedTestCode = code;
+                row.LastRequestedBenchmark = code;
+                row.LastRequestStatus = PerfBenchmarkRequestStatuses.Running;
+                row.LastRequestStartedAtUtc = started;
+                row.LastRequestCompletedAtUtc = null;
+                row.LastRequestElapsedMs = null;
+                row.LastRequestMessage = runningText + ".";
+            }, preserveCachedInputs: true);
+
+            PXLongOperation.StartOperation(this, () =>
+            {
+                var graph = CreateInstance<PerfDBBenchmarkGraph>();
+                using (PerfRunControl.Begin(id))
+                {
+                    try
+                    {
+                        work(graph);
+                    }
+                    catch (Exception ex)
+                    {
+                        graph.UpdateControlRowFresh(row =>
+                        {
+                            row.LastRequestStatus = PerfBenchmarkRequestStatuses.Failed;
+                            row.LastRequestCompletedAtUtc = GetUtcStorageTimestamp();
+                            row.LastRequestMessage = Trim(code + " failed: " + ex.Message, 1024);
+                        });
+                        throw;
+                    }
+                }
+            });
+        }
+        catch
+        {
+            PerfRunControl.CancelReservation(id);
             throw;
         }
     }
 
-    private void PersistResult(PerfBenchmarkRunRequest request, PerfBenchmarkDescriptor descriptor, TimeSpan elapsed, string notes)
+    /// <summary>Set-based delete of every PerfTestRecord and PerfTestResult row, then the local snapshot (SPEC §2.1 F21).</summary>
+    private void ClearAllBenchmarkData()
     {
-        var now = GetUtcStorageTimestamp();
-        var row = new PerfTestResult
-        {
-            InstanceName = request.InstanceName,
-            DatabaseType = request.DatabaseType,
-            TestCode = descriptor.TestCode,
-            TestCategory = descriptor.Category,
-            ExecutionMode = descriptor.ExecutionMode,
-            DisplayName = descriptor.DisplayName,
-            RunID = request.RequestID,
-            RequestedAtUtc = request.RequestedAtUtc,
-            RecordsCount = request.NumberOfRecords,
-            Iterations = request.Iterations,
-            BatchSize = request.BatchSize,
-            MaxThreads = request.MaxThreads,
-            ElapsedMs = elapsed.TotalMilliseconds > int.MaxValue ? int.MaxValue : (int)elapsed.TotalMilliseconds,
-            Notes = $"Created by AcuPower LTD (acupowererp.com). {notes}",
-            CapturedAtUtc = now
-        };
+        var sw = Stopwatch.StartNew();
+        var records = CountRows<PerfTestRecord>();
+        var results = CountRows<PerfTestResult>();
+        var fallback = false;
 
-        LocalResults.Cache.Insert(row);
-        Save.Press();
+        try
+        {
+            PXDatabase.Delete<PerfTestRecord>(new PXDataFieldRestrict<PerfTestRecord.recordID>(PXDbType.Int, 4, 0, PXComp.GT));
+            PXDatabase.Delete<PerfTestResult>(new PXDataFieldRestrict<PerfTestResult.resultID>(PXDbType.Int, 4, 0, PXComp.GT));
+        }
+        catch (Exception ex)
+        {
+            // SPEC §8 R18: fall back to row-by-row deletes through the cache.
+            PXTrace.WriteWarning("PerfDBBenchmark: set-based delete failed, deleting row by row: " + ex.Message);
+            fallback = true;
+            DeleteRowByRow();
+        }
+
+        PerfSnapshotService.ClearLocalSnapshot();
+        Records.Cache.Clear();
         LocalResults.Cache.Clear();
+        Records.Cache.ClearQueryCache();
         LocalResults.Cache.ClearQueryCache();
 
-        var latestRows = GetLatestLocalResults();
-        PerfSnapshotService.WriteLocalSnapshot(latestRows, request.InstanceName, request.DatabaseType);
-    }
-
-    private List<PerfTestResult> GetLatestLocalResults()
-    {
-        return SelectFrom<PerfTestResult>.View.ReadOnly.Select(this)
-            .RowCast<PerfTestResult>()
-            .GroupBy(x => x.TestCode)
-            .Select(g => g.OrderByDescending(x => x.CapturedAtUtc).First())
-            .OrderBy(x => PerfBenchmarkCatalog.Get(x.TestCode).SortOrder)
-            .ToList();
-    }
-
-    private string RunSequentialReadBenchmark(PerfBenchmarkRunRequest request)
-    {
-        EnsureSeedData(request.NumberOfRecords);
-        var checksum = 0;
-
-        for (var iteration = 1; iteration <= request.Iterations; iteration++)
+        var message = $"Test data cleared: {records} record(s) and {results} result(s) removed{(fallback ? " (row by row)" : string.Empty)} in {FormatElapsed(sw.Elapsed)}.";
+        UpdateControlRowFresh(row =>
         {
-            checksum += ReadRecordRange(ReadSeedBatch, 1, request.NumberOfRecords);
+            ResetRequestState(row);
+            row.LastRequestMessage = Trim(message, 1024);
+            ApplySnapshotStatus(row);
+        });
+    }
+
+    private void DeleteRowByRow()
+    {
+        Clear(PXClearOption.ClearAll);
+        SelectTimeStamp();
+        foreach (PerfTestResult result in SelectFrom<PerfTestResult>.View.Select(this))
+        {
+            LocalResults.Cache.Delete(result);
         }
 
-        return $"Sequential Acumatica BQL reads completed with checksum {checksum}.";
-    }
-
-    private string RunSequentialWriteBenchmark(PerfBenchmarkRunRequest request)
-    {
-        for (var iteration = 1; iteration <= request.Iterations; iteration++)
+        foreach (PerfTestRecord record in SelectFrom<PerfTestRecord>.View.Select(this))
         {
-            var batchId = BuildBatchId(request.TestCode, iteration);
-            InsertRecords(batchId, "WRITE", iteration, 1, request.NumberOfRecords);
+            Records.Cache.Delete(record);
         }
 
-        return $"Sequential Acumatica cache inserts completed for {request.Iterations} batch(es).";
+        Actions.PressSave();
     }
 
-    private string RunSequentialUpdateBenchmark(PerfBenchmarkRunRequest request)
+    /// <summary>Deletes PerfTestRecord rows other than READ-SEED and UPDATE-SEED (set-based) and runs every
+    /// IPerfLeftoverCleaner. Results are kept (SPEC §2.1 F21).</summary>
+    private void ClearTestRecordsCore()
     {
-        EnsureSeedData(request.NumberOfRecords);
-        var checksum = 0;
+        var sw = Stopwatch.StartNew();
+        var before = CountRows<PerfTestRecord>();
+        var seeds = CountRows<PerfTestRecord>(new PXDataFieldValue<PerfTestRecord.batchID>(PXDbType.NVarChar, 64, PerfCampaignConstants.ReadSeedBatch)) +
+                    CountRows<PerfTestRecord>(new PXDataFieldValue<PerfTestRecord.batchID>(PXDbType.NVarChar, 64, PerfCampaignConstants.UpdateSeedBatch));
+        var problems = new List<string>();
 
-        for (var iteration = 1; iteration <= request.Iterations; iteration++)
+        try
         {
-            checksum += UpdateRecordRange(ReadSeedBatch, 1, request.NumberOfRecords, iteration);
+            PXDatabase.Delete<PerfTestRecord>(
+                new PXDataFieldRestrict<PerfTestRecord.batchID>(PXDbType.NVarChar, 64, PerfCampaignConstants.ReadSeedBatch, PXComp.NE),
+                new PXDataFieldRestrict<PerfTestRecord.batchID>(PXDbType.NVarChar, 64, PerfCampaignConstants.UpdateSeedBatch, PXComp.NE));
         }
-
-        return $"Sequential update benchmark completed with checksum {checksum}.";
-    }
-
-    private string RunSequentialDeleteBenchmark(PerfBenchmarkRunRequest request)
-    {
-        var batches = PrepareDeleteBatches(request, "SEQ_DELETE_PREP");
-        var checksum = 0;
-
-        foreach (var batch in batches)
+        catch (Exception ex)
         {
-            checksum += DeleteRecordRange(batch, 1, request.NumberOfRecords);
-        }
-
-        return $"Sequential delete benchmark removed {batches.Count * request.NumberOfRecords:N0} rows with checksum {checksum}.";
-    }
-
-    private string RunSequentialComplexJoinBenchmark(PerfBenchmarkRunRequest request)
-    {
-        var checksum = 0;
-        var batchSize = Math.Max(1, request.BatchSize);
-
-        for (var iteration = 1; iteration <= request.Iterations; iteration++)
-        {
-            for (var offset = 0; offset < request.NumberOfRecords; offset += batchSize)
+            PXTrace.WriteWarning("PerfDBBenchmark: set-based delete of test records failed, deleting row by row: " + ex.Message);
+            Clear(PXClearOption.ClearAll);
+            SelectTimeStamp();
+            foreach (PerfTestRecord record in SelectFrom<PerfTestRecord>.View.Select(this))
             {
-                checksum += ExecuteComplexJoinWindow(offset, Math.Min(batchSize, request.NumberOfRecords - offset));
+                if (record.BatchID == PerfCampaignConstants.ReadSeedBatch || record.BatchID == PerfCampaignConstants.UpdateSeedBatch) continue;
+                Records.Cache.Delete(record);
+            }
+
+            Actions.PressSave();
+        }
+
+        var after = CountRows<PerfTestRecord>();
+        var removedRecords = Math.Max(0, before - after);
+
+        var removedDocuments = 0;
+        foreach (var cleaner in PerfScenarioRegistry.LeftoverCleaners)
+        {
+            string name;
+            try { name = cleaner.Name ?? cleaner.GetType().Name; }
+            catch { name = cleaner.GetType().Name; }
+
+            try
+            {
+                removedDocuments += cleaner.Clean(CreateInstance<PerfWorkerGraph>());
+            }
+            catch (Exception ex)
+            {
+                problems.Add(name + ": " + ex.Message);
             }
         }
 
-        return $"Sequential complex BQL join benchmark completed with analytical checksum {checksum}.";
-    }
-
-    private string RunSequentialProjectionBenchmark(PerfBenchmarkRunRequest request)
-    {
-        var checksum = 0;
-        var batchSize = Math.Max(1, request.BatchSize);
-
-        for (var iteration = 1; iteration <= request.Iterations; iteration++)
-        {
-            for (var offset = 0; offset < request.NumberOfRecords; offset += batchSize)
-            {
-                checksum += ExecuteProjectionWindow(offset, Math.Min(batchSize, request.NumberOfRecords - offset));
-            }
-        }
-
-        return $"Sequential PXProjection benchmark completed with analytical checksum {checksum}.";
-    }
-
-    private string RunParallelReadBenchmark(PerfBenchmarkRunRequest request)
-    {
-        EnsureSeedData(request.NumberOfRecords);
-        var tasks = BuildRecordTasks(request, ReadSeedBatch);
-        ExecuteParallelTasks(request, tasks);
-        return $"Parallel read benchmark completed with {tasks.Count} Acumatica processing task(s).";
-    }
-
-    private string RunParallelWriteBenchmark(PerfBenchmarkRunRequest request)
-    {
-        var tasks = BuildRecordTasks(request);
-        ExecuteParallelTasks(request, tasks);
-        return $"Parallel write benchmark completed with {tasks.Count} Acumatica processing task(s).";
-    }
-
-    private string RunParallelUpdateBenchmark(PerfBenchmarkRunRequest request)
-    {
-        EnsureSeedData(request.NumberOfRecords);
-        var tasks = BuildRecordTasks(request, ReadSeedBatch);
-        ExecuteParallelTasks(request, tasks);
-        return $"Parallel update benchmark completed with {tasks.Count} Acumatica processing task(s).";
-    }
-
-    private string RunParallelDeleteBenchmark(PerfBenchmarkRunRequest request)
-    {
-        var deleteBatches = PrepareDeleteBatches(request, "PAR_DELETE_PREP");
-        var tasks = BuildRecordTasks(request, deleteBatchesByIteration: deleteBatches);
-        ExecuteParallelTasks(request, tasks);
-        return $"Parallel delete benchmark completed with {tasks.Count} Acumatica processing task(s).";
-    }
-
-    private string RunParallelComplexJoinBenchmark(PerfBenchmarkRunRequest request)
-    {
-        var tasks = BuildWindowTasks(request);
-        ExecuteParallelTasks(request, tasks);
-        return $"Parallel complex BQL join benchmark completed with {tasks.Count} Acumatica processing task(s).";
-    }
-
-    private string RunParallelProjectionBenchmark(PerfBenchmarkRunRequest request)
-    {
-        var tasks = BuildWindowTasks(request);
-        ExecuteParallelTasks(request, tasks);
-        return $"Parallel PXProjection benchmark completed with {tasks.Count} Acumatica processing task(s).";
-    }
-
-    private void ExecuteParallelTasks(PerfBenchmarkRunRequest request, List<PerfBenchmarkTask> tasks)
-    {
-        var options = new PXParallelProcessingOptions
-        {
-            IsEnabled = true,
-            AutoBatchSize = false,
-            BatchSize = Math.Max(1, request.BatchSize)
-        };
-
-        TrySetParallelThreads(options, request.MaxThreads);
-
-        var hadErrors = PXProcessing.ProcessItemsParallel<PerfDBBenchmarkGraph, PerfBenchmarkTask>(
-            tasks,
-            (graph, task, token) => graph.ProcessParallelTask(task, token),
-            CreateInstance<PerfDBBenchmarkGraph>,
-            options,
-            ReducedModeThrottler ?? NoOpReducedModeThrottler.Instance,
-            CancellationToken.None);
-
-        if (hadErrors)
-        {
-            throw new PXException("The parallel benchmark operation did not complete successfully.");
-        }
-    }
-
-    private void ProcessParallelTask(PerfBenchmarkTask task, CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
-
-        switch (task.TestCode)
-        {
-            case PerfBenchmarkTestCodes.ParallelRead:
-                ReadRecordRange(task.BatchID, task.StartIndex ?? 0, task.EndIndex ?? 0);
-                break;
-            case PerfBenchmarkTestCodes.ParallelWrite:
-                InsertRecords(task.BatchID, "PAR_WRITE", task.Iteration ?? 0, task.StartIndex ?? 0, task.EndIndex ?? 0);
-                break;
-            case PerfBenchmarkTestCodes.ParallelUpdate:
-                UpdateRecordRange(task.BatchID, task.StartIndex ?? 0, task.EndIndex ?? 0, task.Iteration ?? 0);
-                break;
-            case PerfBenchmarkTestCodes.ParallelDelete:
-                DeleteRecordRange(task.BatchID, task.StartIndex ?? 0, task.EndIndex ?? 0);
-                break;
-            case PerfBenchmarkTestCodes.ParallelComplexJoin:
-                ExecuteComplexJoinWindow(task.WindowOffset ?? 0, task.WindowSize ?? 0);
-                break;
-            case PerfBenchmarkTestCodes.ParallelProjection:
-                ExecuteProjectionWindow(task.WindowOffset ?? 0, task.WindowSize ?? 0);
-                break;
-            default:
-                throw new PXException($"Unsupported parallel task code: {task.TestCode}.");
-        }
-    }
-
-    private void EnsureSeedData(int count)
-    {
-        var existingCount = SelectFrom<PerfTestRecord>
-            .Where<PerfTestRecord.batchID.IsEqual<@P.AsString>>
-            .View
-            .SelectWindowed(this, 0, count, ReadSeedBatch)
-            .RowCast<PerfTestRecord>()
-            .Count();
-
-        if (existingCount >= count)
-        {
-            return;
-        }
-
-        ClearBatch(ReadSeedBatch);
-        InsertRecords(ReadSeedBatch, "SEED", 0, 1, count);
-    }
-
-    private List<string> PrepareDeleteBatches(PerfBenchmarkRunRequest request, string operationType)
-    {
-        var result = new List<string>();
-        for (var iteration = 1; iteration <= request.Iterations; iteration++)
-        {
-            var batchId = BuildBatchId(request.TestCode, iteration);
-            InsertRecords(batchId, operationType, iteration, 1, request.NumberOfRecords);
-            result.Add(batchId);
-        }
-
-        return result;
-    }
-
-    private List<PerfBenchmarkTask> BuildRecordTasks(PerfBenchmarkRunRequest request, string sharedBatchId = null, List<string> deleteBatchesByIteration = null)
-    {
-        var tasks = new List<PerfBenchmarkTask>();
-        var taskId = 1;
-        for (var iteration = 1; iteration <= request.Iterations; iteration++)
-        {
-            var batchId = sharedBatchId
-                ?? deleteBatchesByIteration?.ElementAtOrDefault(iteration - 1)
-                ?? BuildBatchId(request.TestCode, iteration);
-
-            for (var start = 1; start <= request.NumberOfRecords; start += request.BatchSize)
-            {
-                tasks.Add(new PerfBenchmarkTask
-                {
-                    TaskID = taskId++,
-                    Selected = true,
-                    TestCode = request.TestCode,
-                    BatchID = batchId,
-                    Iteration = iteration,
-                    StartIndex = start,
-                    EndIndex = Math.Min(start + request.BatchSize - 1, request.NumberOfRecords)
-                });
-            }
-        }
-
-        return tasks;
-    }
-
-    private List<PerfBenchmarkTask> BuildWindowTasks(PerfBenchmarkRunRequest request)
-    {
-        var tasks = new List<PerfBenchmarkTask>();
-        var taskId = 1;
-        for (var iteration = 1; iteration <= request.Iterations; iteration++)
-        {
-            for (var offset = 0; offset < request.NumberOfRecords; offset += request.BatchSize)
-            {
-                tasks.Add(new PerfBenchmarkTask
-                {
-                    TaskID = taskId++,
-                    Selected = true,
-                    TestCode = request.TestCode,
-                    Iteration = iteration,
-                    WindowOffset = offset,
-                    WindowSize = Math.Min(request.BatchSize, request.NumberOfRecords - offset)
-                });
-            }
-        }
-
-        return tasks;
-    }
-
-    private string BuildBatchId(string testCode, int iteration) =>
-        $"{testCode}-{PerfEnvironmentInspector.GetInstanceName()}-{iteration:000}-{Guid.NewGuid():N}".ToUpperInvariant();
-
-    private void InsertRecords(string batchId, string operationType, int iteration, int startIndex, int endIndex)
-    {
-        var cache = Caches[typeof(PerfTestRecord)];
-        var inserted = 0;
-
-        for (var index = startIndex; index <= endIndex; index++)
-        {
-            cache.Insert(new PerfTestRecord
-            {
-                BatchID = batchId,
-                OperationType = operationType,
-                Iteration = iteration,
-                Sequence = index,
-                PayloadText = $"AcuPower LTD benchmark payload {batchId}-{index}",
-                PayloadValue = index * 17
-            });
-
-            inserted++;
-            if (inserted % 200 == 0)
-            {
-                Save.Press();
-                cache.Clear();
-            }
-        }
-
-        Save.Press();
-        cache.Clear();
-        cache.ClearQueryCache();
-    }
-
-    private int ReadRecordRange(string batchId, int startIndex, int endIndex)
-    {
-        var checksum = 0;
-        foreach (PerfTestRecord row in SelectFrom<PerfTestRecord>
-                     .Where<PerfTestRecord.batchID.IsEqual<@P.AsString>
-                         .And<PerfTestRecord.sequence.IsGreaterEqual<@P.AsInt>>
-                         .And<PerfTestRecord.sequence.IsLessEqual<@P.AsInt>>>
-                     .OrderBy<PerfTestRecord.sequence.Asc>
-                     .View
-                     .ReadOnly
-                     .Select(this, batchId, startIndex, endIndex))
-        {
-            checksum += row.PayloadValue ?? 0;
-        }
-
-        return checksum;
-    }
-
-    private int UpdateRecordRange(string batchId, int startIndex, int endIndex, int iteration)
-    {
-        var checksum = 0;
-        var updated = 0;
-
-        foreach (PerfTestRecord row in SelectFrom<PerfTestRecord>
-                     .Where<PerfTestRecord.batchID.IsEqual<@P.AsString>
-                         .And<PerfTestRecord.sequence.IsGreaterEqual<@P.AsInt>>
-                         .And<PerfTestRecord.sequence.IsLessEqual<@P.AsInt>>>
-                     .OrderBy<PerfTestRecord.sequence.Asc>
-                     .View
-                     .Select(this, batchId, startIndex, endIndex))
-        {
-            row.PayloadText = $"Updated iteration {iteration} seq {row.Sequence}";
-            row.PayloadValue = (row.PayloadValue ?? 0) + iteration;
-            Records.Cache.Update(row);
-            checksum += row.PayloadValue ?? 0;
-
-            updated++;
-            if (updated % 200 == 0)
-            {
-                Save.Press();
-                Records.Cache.Clear();
-                Records.Cache.ClearQueryCache();
-            }
-        }
-
-        Save.Press();
         Records.Cache.Clear();
         Records.Cache.ClearQueryCache();
-        return checksum;
+
+        var message = $"Test records cleared: {removedRecords} work record(s) removed ({seeds} seed rows kept), {removedDocuments} leftover document(s) removed by {PerfScenarioRegistry.LeftoverCleaners.Count} cleaner(s) in {FormatElapsed(sw.Elapsed)}.";
+        if (problems.Count > 0) message += " Problems: " + string.Join("; ", problems);
+        // Never throws for a cleaner problem: the suite waits for Idle; gate G3 re-checks the leftovers.
+        UpdateControlRowFresh(row =>
+        {
+            ResetRequestState(row);
+            row.LastRequestMessage = Trim(message, 1024);
+        });
     }
 
-    private int DeleteRecordRange(string batchId, int startIndex, int endIndex)
+    private static long CountRows<T>(params PXDataField[] restrictions) where T : IBqlTable
     {
-        var checksum = 0;
-        foreach (PerfTestRecord row in SelectFrom<PerfTestRecord>
-                     .Where<PerfTestRecord.batchID.IsEqual<@P.AsString>
-                         .And<PerfTestRecord.sequence.IsGreaterEqual<@P.AsInt>>
-                         .And<PerfTestRecord.sequence.IsLessEqual<@P.AsInt>>>
-                     .OrderBy<PerfTestRecord.sequence.Asc>
-                     .View
-                     .Select(this, batchId, startIndex, endIndex))
+        try
         {
-            checksum += row.PayloadValue ?? 0;
-            Records.Cache.Delete(row);
-        }
-
-        Save.Press();
-        Records.Cache.Clear();
-        Records.Cache.ClearQueryCache();
-        return checksum;
-    }
-
-    private void ClearBatch(string batchId)
-    {
-        foreach (PerfTestRecord row in SelectFrom<PerfTestRecord>
-                     .Where<PerfTestRecord.batchID.IsEqual<@P.AsString>>
-                     .View
-                     .Select(this, batchId))
-        {
-            Records.Cache.Delete(row);
-        }
-
-        Save.Press();
-        Records.Cache.Clear();
-        Records.Cache.ClearQueryCache();
-    }
-
-    private int ExecuteComplexJoinWindow(int offset, int windowSize)
-    {
-        var checksum = 0m;
-        var inventoryIds = new HashSet<int>();
-
-        var rows = SelectFrom<InventoryItem>
-            .InnerJoin<INItemClass>.On<INItemClass.itemClassID.IsEqual<InventoryItem.itemClassID>>
-            .LeftJoin<INSiteStatus>.On<INSiteStatus.inventoryID.IsEqual<InventoryItem.inventoryID>>
-            .LeftJoin<INSite>.On<INSite.siteID.IsEqual<INSiteStatus.siteID>>
-            .LeftJoin<GLBranch>.On<GLBranch.branchID.IsEqual<INSite.branchID>>
-            .Where<InventoryItem.stkItem.IsEqual<True>.And<INSite.siteID.IsNotNull>>
-            .OrderBy<InventoryItem.inventoryCD.Asc, INSite.siteCD.Asc>
-            .View
-            .ReadOnly
-            .SelectWindowed(this, offset, windowSize);
-
-        foreach (PXResult<InventoryItem, INItemClass, INSiteStatus, INSite, GLBranch> row in rows)
-        {
-            var item = (InventoryItem)row;
-            var status = (INSiteStatus)row;
-
-            if (item?.InventoryID != null)
+            var fields = new List<PXDataField> { new PXDataField(PX.Data.SQLTree.SQLExpression.Count()) };
+            fields.AddRange(restrictions);
+            using (PXDataRecord rec = PXDatabase.SelectSingle<T>(fields.ToArray()))
             {
-                inventoryIds.Add(item.InventoryID.Value);
+                var raw = rec?.GetValue(0);
+                return raw == null || raw is DBNull ? 0L : Convert.ToInt64(raw, CultureInfo.InvariantCulture);
             }
-
-            checksum += (status?.QtyOnHand ?? 0m) + (status?.QtyAvail ?? 0m) + (item?.InventoryCD?.Length ?? 0);
         }
-
-        foreach (var inventoryId in inventoryIds.Take(10))
+        catch
         {
-            checksum += SelectFrom<INSiteStatus>
-                .Where<INSiteStatus.inventoryID.IsEqual<@P.AsInt>>
-                .View
-                .ReadOnly
-                .SelectWindowed(this, 0, 25, inventoryId)
-                .RowCast<INSiteStatus>()
-                .Count();
+            return 0L;
         }
-
-        return DecimalToChecksum(checksum) + inventoryIds.Count;
     }
 
-    private int ExecuteProjectionWindow(int offset, int windowSize)
-    {
-        var checksum = 0m;
-        var inventoryIds = new HashSet<int>();
+    #endregion
 
-        var rows = SelectFrom<PerfBenchmarkProjection>
-            .Where<PerfBenchmarkProjection.siteID.IsNotNull>
-            .OrderBy<PerfBenchmarkProjection.inventoryCD.Asc, PerfBenchmarkProjection.siteCD.Asc>
-            .View
-            .ReadOnly
-            .SelectWindowed(this, offset, windowSize)
-            .RowCast<PerfBenchmarkProjection>()
-            .ToArray();
-
-        foreach (var row in rows)
-        {
-            if (row.InventoryID != null)
-            {
-                inventoryIds.Add(row.InventoryID.Value);
-            }
-
-            checksum += (row.QtyOnHand ?? 0m) + (row.QtyAvail ?? 0m) + (row.InventoryCD?.Length ?? 0);
-        }
-
-        foreach (var inventoryId in inventoryIds.Take(10))
-        {
-            checksum += SelectFrom<PerfBenchmarkProjection>
-                .Where<PerfBenchmarkProjection.inventoryID.IsEqual<@P.AsInt>>
-                .View
-                .ReadOnly
-                .SelectWindowed(this, 0, 20, inventoryId)
-                .RowCast<PerfBenchmarkProjection>()
-                .Sum(x => (x.QtyOnHand ?? 0m) + (x.QtyAvail ?? 0m));
-        }
-
-        return DecimalToChecksum(checksum) + inventoryIds.Count;
-    }
-
-    private static int DecimalToChecksum(decimal value)
-    {
-        if (value > int.MaxValue)
-        {
-            return int.MaxValue;
-        }
-
-        if (value < int.MinValue)
-        {
-            return int.MinValue;
-        }
-
-        return decimal.ToInt32(decimal.Truncate(value));
-    }
-
-    private static void TrySetParallelThreads(PXParallelProcessingOptions options, int maxThreads)
-    {
-        var field = typeof(PXParallelProcessingOptions).GetField("ParallelThreadsCount", BindingFlags.Instance | BindingFlags.NonPublic);
-        field?.SetValue(options, maxThreads);
-    }
+    #region Control row
 
     private PerfBenchmarkFilter GetControlRow()
     {
@@ -846,7 +714,7 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
             row = InitializeControlRow();
         }
 
-        EnsureFilterContext(row);
+        ApplyContext(row);
         Filter.Current = row;
         return row;
     }
@@ -856,6 +724,10 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
         var row = (PerfBenchmarkFilter)Filter.Cache.Insert(new PerfBenchmarkFilter
         {
             SetupID = BenchmarkControlID,
+            NumberOfRecords = PerfCampaignConstants.CoreRecords,
+            Iterations = PerfCampaignConstants.CoreMeasuredPasses,
+            ParallelBatchSize = PerfCampaignConstants.CoreChunkSize,
+            ParallelMaxThreads = PerfCampaignConstants.CoreParallelWorkers,
             LastRequestStatus = PerfBenchmarkRequestStatuses.Idle,
             LastRequestMessage = "Ready to run benchmarks."
         });
@@ -872,60 +744,65 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
                ?? row;
     }
 
+    /// <summary>Persists the cached control row (keeps values the user or REST just entered).</summary>
     private void PersistControlRow(PerfBenchmarkFilter row)
     {
+        StripLoadErrorsNotice(row);
+        SelectTimeStamp();
         Filter.Cache.Update(row);
         Save.Press();
         Filter.Cache.ClearQueryCache();
         Filter.Current = row;
+        ApplyLoadErrorsNotice(row);
     }
 
-    private void MarkRequestRunning(PerfBenchmarkRunRequest request)
+    /// <summary>Re-reads the control row from the database with a fresh graph stamp, applies the change and saves it,
+    /// so a row updated by another thread (long operation, AbortBenchmark) is never overwritten with stale values.</summary>
+    private void UpdateControlRowFresh(Action<PerfBenchmarkFilter> change, bool preserveCachedInputs = false)
     {
-        var descriptor = PerfBenchmarkCatalog.Get(request.TestCode);
-        var row = GetControlRow();
-        row.LastRequestID = request.RequestID;
-        row.LastRequestedTestCode = request.TestCode;
-        row.LastRequestedBenchmark = descriptor.DisplayName;
-        row.LastRequestStatus = PerfBenchmarkRequestStatuses.Running;
-        row.LastRequestStartedAtUtc = request.RequestedAtUtc;
-        row.LastRequestCompletedAtUtc = null;
-        row.LastRequestElapsedMs = null;
-        row.LastRequestMessage = TrimRequestMessage($"Running {descriptor.DisplayName} on {request.InstanceName}.");
-        PersistControlRow(row);
+        PerfBenchmarkFilter cached = preserveCachedInputs ? Filter.Current : null;
+        Exception last = null;
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                Filter.Cache.Clear();
+                Filter.Cache.ClearQueryCache();
+                SelectTimeStamp();
+                var row = GetControlRow();
+                if (cached != null) CopyInputs(cached, row);
+                change(row);
+                PersistControlRow(row);
+                return;
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+            }
+        }
+
+        throw last ?? new PXException("The benchmark control row could not be updated.");
     }
 
-    private void MarkRequestCompleted(PerfBenchmarkRunRequest request, PerfBenchmarkDescriptor descriptor, TimeSpan elapsed, string notes)
+    private static void CopyInputs(PerfBenchmarkFilter from, PerfBenchmarkFilter to)
     {
-        var row = GetControlRow();
-        row.LastRequestID = request.RequestID;
-        row.LastRequestedTestCode = request.TestCode;
-        row.LastRequestedBenchmark = descriptor.DisplayName;
-        row.LastRequestStatus = PerfBenchmarkRequestStatuses.Completed;
-        row.LastRequestStartedAtUtc = request.RequestedAtUtc;
-        row.LastRequestCompletedAtUtc = GetUtcStorageTimestamp();
-        row.LastRequestElapsedMs = elapsed.TotalMilliseconds > int.MaxValue ? int.MaxValue : (int)elapsed.TotalMilliseconds;
-        row.LastRequestMessage = TrimRequestMessage($"{descriptor.DisplayName} completed in {FormatElapsed(elapsed)}. {notes}");
-        EnsureFilterContext(row);
-        PersistControlRow(row);
+        to.NumberOfRecords = from.NumberOfRecords ?? to.NumberOfRecords;
+        to.Iterations = from.Iterations ?? to.Iterations;
+        to.ParallelBatchSize = from.ParallelBatchSize ?? to.ParallelBatchSize;
+        to.ParallelMaxThreads = from.ParallelMaxThreads ?? to.ParallelMaxThreads;
+        to.SelectedTestCode = from.SelectedTestCode;
+        to.CampaignID = from.CampaignID;
+        to.RepetitionNo = from.RepetitionNo;
+        to.IsWarmup = from.IsWarmup;
+        to.RunBlock = from.RunBlock;
+        to.OrderPosition = from.OrderPosition;
+        to.WorkScale = from.WorkScale;
+        to.PassesOverride = from.PassesOverride;
+        to.WarmUpPassesOverride = from.WarmUpPassesOverride;
+        to.RunBudgetSec = from.RunBudgetSec;
     }
 
-    private void MarkRequestFailed(PerfBenchmarkRunRequest request, PerfBenchmarkDescriptor descriptor, Exception exception, TimeSpan elapsed)
-    {
-        var row = GetControlRow();
-        row.LastRequestID = request.RequestID;
-        row.LastRequestedTestCode = request.TestCode;
-        row.LastRequestedBenchmark = descriptor.DisplayName;
-        row.LastRequestStatus = PerfBenchmarkRequestStatuses.Failed;
-        row.LastRequestStartedAtUtc = request.RequestedAtUtc;
-        row.LastRequestCompletedAtUtc = GetUtcStorageTimestamp();
-        row.LastRequestElapsedMs = elapsed.TotalMilliseconds > int.MaxValue ? int.MaxValue : (int)elapsed.TotalMilliseconds;
-        row.LastRequestMessage = TrimRequestMessage($"{descriptor.DisplayName} failed: {exception.Message}");
-        EnsureFilterContext(row);
-        PersistControlRow(row);
-    }
-
-    private void ResetRequestState(PerfBenchmarkFilter row)
+    private static void ResetRequestState(PerfBenchmarkFilter row)
     {
         row.LastRequestID = null;
         row.LastRequestedTestCode = null;
@@ -937,15 +814,287 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
         row.LastRequestMessage = "Ready to run benchmarks.";
     }
 
-    private static string TrimRequestMessage(string message)
+    /// <summary>Light context for every read: engine, instance, server fields, cached hardware, defaults and registry notice.
+    /// No WMI and no snapshot reads (SPEC §2.1 F4).</summary>
+    private void ApplyContext(PerfBenchmarkFilter row)
+    {
+        if (row == null) return;
+        row.CurrentDatabase = PerfDatabaseEngines.Detect();
+        row.CurrentInstance = PerfRuntimeInfo.InstanceName;
+        ApplyServerFields(row);
+        ApplyHardware(row, detect: false);
+        row.LastRequestStatus ??= PerfBenchmarkRequestStatuses.Idle;
+        row.LastRequestMessage ??= "Ready to run benchmarks.";
+        ApplyLoadErrorsNotice(row);
+    }
+
+    private static void ApplyServerFields(PerfBenchmarkFilter row)
+    {
+        row.ServerAppStartUtc = PerfRuntimeInfo.AppDomainStartUtc;
+        row.ServerDllSha256 = PerfRuntimeInfo.DllSha256;
+        row.ServerMethodologyVersion = PerfMethodology.Version;
+    }
+
+    private static void ApplyHardware(PerfBenchmarkFilter row, bool detect)
+    {
+        PerfHardwareRecommendation rec;
+        if (detect)
+        {
+            rec = PerfHardwareInspector.Detect();
+        }
+        else if (!PerfHardwareInspector.TryGetCached(out rec))
+        {
+            rec = PerfHardwareInspector.CampaignDefaults();
+            row.DetectedCpuCores ??= rec.CpuCores;
+            row.RecommendedRecords = rec.RecommendedRecords;
+            row.RecommendedIterations = rec.RecommendedIterations;
+            row.RecommendedBatchSize = rec.RecommendedBatchSize;
+            row.RecommendedMaxThreads = rec.RecommendedMaxThreads;
+            row.HardwareRecommendationSummary ??= rec.Summary;
+            ApplyDefaults(row);
+            return;
+        }
+
+        row.DetectedCpuCores = rec.CpuCores;
+        row.DetectedMemoryGb = rec.MemoryGb;
+        row.RecommendedRecords = rec.RecommendedRecords;
+        row.RecommendedIterations = rec.RecommendedIterations;
+        row.RecommendedBatchSize = rec.RecommendedBatchSize;
+        row.RecommendedMaxThreads = rec.RecommendedMaxThreads;
+        row.HardwareRecommendationSummary = Trim(rec.Summary, 512);
+        ApplyDefaults(row);
+    }
+
+    private static void ApplyDefaults(PerfBenchmarkFilter row)
+    {
+        row.NumberOfRecords ??= PerfCampaignConstants.CoreRecords;
+        row.Iterations ??= PerfCampaignConstants.CoreMeasuredPasses;
+        row.ParallelBatchSize ??= PerfCampaignConstants.CoreChunkSize;
+        row.ParallelMaxThreads ??= PerfCampaignConstants.CoreParallelWorkers;
+    }
+
+    /// <summary>Snapshot and coverage status: only in refreshStatus, comparisonResults() and MarkRequestCompleted (F4).</summary>
+    private static void ApplySnapshotStatus(PerfBenchmarkFilter row)
+    {
+        try
+        {
+            row.SnapshotStatus = Trim(PerfSnapshotService.GetSnapshotStatus(), 512);
+            row.PendingAnalysisStatus = Trim(PerfSnapshotService.GetPendingAnalysisStatus(), 2048);
+        }
+        catch (Exception ex)
+        {
+            row.SnapshotStatus = Trim("Snapshot status unavailable: " + ex.Message, 512);
+        }
+    }
+
+    /// <summary>Fills the SelectedTestCode list from the registry (never throws; SPEC §3.1, review-api M4).</summary>
+    private void ConfigureTestCodeList()
+    {
+        try
+        {
+            var all = PerfScenarioRegistry.All;
+            var values = all.Select(d => d.TestCode).ToArray();
+            var labels = all.Select(d => d.TestCode + " – " + d.DisplayName).ToArray();
+            PXStringListAttribute.SetList<PerfBenchmarkFilter.selectedTestCode>(Filter.Cache, null, values, labels);
+        }
+        catch (Exception ex)
+        {
+            PXTrace.WriteWarning("PerfDBBenchmark: the test list could not be built: " + ex.Message);
+        }
+    }
+
+    /// <summary>Shows PerfScenarioRegistry.LoadErrors in LastRequestMessage (in memory; stripped before saving).</summary>
+    private static void ApplyLoadErrorsNotice(PerfBenchmarkFilter row)
+    {
+        if (row == null) return;
+        StripLoadErrorsNotice(row);
+        IReadOnlyList<string> errors;
+        try
+        {
+            errors = PerfScenarioRegistry.LoadErrors;
+        }
+        catch (Exception ex)
+        {
+            errors = new[] { ex.Message };
+        }
+
+        if (errors == null || errors.Count == 0) return;
+        var notice = LoadErrorsPrefix + errors.Count.ToString(CultureInfo.InvariantCulture) + "; " + string.Join(" | ", errors) ;
+        notice = Trim(notice, 600) + LoadErrorsSeparator;
+        row.LastRequestMessage = Trim(notice + (row.LastRequestMessage ?? string.Empty), 1024);
+    }
+
+    private static void StripLoadErrorsNotice(PerfBenchmarkFilter row)
+    {
+        var message = row?.LastRequestMessage;
+        if (string.IsNullOrEmpty(message) || !message.StartsWith(LoadErrorsPrefix, StringComparison.Ordinal)) return;
+        var cut = message.IndexOf(LoadErrorsSeparator, StringComparison.Ordinal);
+        row.LastRequestMessage = cut >= 0 ? message.Substring(cut + LoadErrorsSeparator.Length) : string.Empty;
+    }
+
+    #endregion
+
+    #region Comparison (in-app, indicative; SPEC §3.4)
+
+    private List<PerfComparisonResult> BuildComparisonRows()
+    {
+        var rows = new List<PerfComparisonResult>();
+        var dllByLine = new Dictionary<int, string>();
+        PerfSnapshotEnvelope[] snapshots;
+        try
+        {
+            snapshots = PerfSnapshotService.LoadAllSnapshots()
+                .Where(e => e.SchemaVersion >= PerfSnapshotService.SchemaVersion)
+                .GroupBy(e => e.InstanceName, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.OrderByDescending(e => e.CapturedAtUtc).First())
+                .ToArray();
+        }
+        catch
+        {
+            snapshots = Array.Empty<PerfSnapshotEnvelope>();
+        }
+
+        var lineNbr = 1;
+        foreach (var envelope in snapshots)
+        {
+            var engine = PerfEnvironmentInspector.NormalizeEngine(envelope.DatabaseType);
+            var latestPerTest = (envelope.Results ?? new List<PerfSnapshotItem>())
+                .Where(i => string.Equals(i.Status, PerfRunStatuses.Completed, StringComparison.OrdinalIgnoreCase) && !i.IsWarmup)
+                .Select(i => (Item: i, Ok: PerfScenarioRegistry.TryGet(i.TestCode, out var d), Descriptor: d))
+                .Where(x => x.Ok && !x.Descriptor.ExcludeFromComparison)
+                .GroupBy(x => x.Descriptor.TestCode, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.OrderByDescending(x => x.Item.ResultID).ThenByDescending(x => x.Item.CapturedAtUtc).First());
+
+            foreach (var x in latestPerTest)
+            {
+                var item = x.Item;
+                var d = x.Descriptor;
+                rows.Add(new PerfComparisonResult
+                {
+                    LineNbr = lineNbr++,
+                    TestCode = d.TestCode,
+                    TestDisplayName = d.DisplayName,
+                    TestCategory = d.Category,
+                    ExecutionMode = d.ExecutionMode,
+                    DatabaseType = engine != PerfDatabaseEngines.Unknown ? engine : envelope.DatabaseType,
+                    InstanceName = envelope.InstanceName,
+                    ElapsedMs = item.ElapsedMs,
+                    RecordsCount = item.RecordsCount,
+                    Iterations = item.Iterations,
+                    BatchSize = item.BatchSize,
+                    MaxThreads = item.MaxThreads,
+                    CapturedAtUtc = item.CapturedAtUtc,
+                    Notes = Trim(item.Notes, 1024),
+                    Family = d.Family,
+                    ShortLabel = d.ShortLabel,
+                    SortOrder = d.SortOrder,
+                    UserCount = item.UserCount > 0 ? item.UserCount : d.Users,
+                    HeadlineValue = item.HeadlineValue,
+                    HeadlineUnit = item.HeadlineUnit ?? d.HeadlineUnit,
+                    HigherIsBetter = item.HigherIsBetter || d.HigherIsBetter,
+                    P95Ms = item.P95Ms,
+                    OpsPerSec = item.OpsPerSec,
+                    ErrorCount = item.ErrorCount,
+                    Status = item.Status,
+                    ParamsHash = item.ParamsHash,
+                    IsComparable = false,
+                    IsWinner = false
+                });
+
+                // Remember the DLL hash for the verdict gate.
+                dllByLine[rows[rows.Count - 1].LineNbr ?? 0] = item.DllSha256 ?? envelope.DllSha256;
+            }
+        }
+
+        foreach (var group in rows.GroupBy(r => r.TestCode, StringComparer.OrdinalIgnoreCase))
+        {
+            ApplyVerdict(group.ToList(), dllByLine);
+        }
+
+        return rows
+            .OrderBy(r => r.SortOrder ?? int.MaxValue)
+            .ThenBy(r => PerfChartBuilder.GetDatabaseColorIndex(r.DatabaseType))
+            .ThenBy(r => r.InstanceName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>Indicative verdict: only when every instance has the same ParamsHash and DllSha256 and a Completed latest
+    /// row; 5% band; labels "≈ tie", "x.xx× slower", "fastest (indicative)". The README never uses these labels.</summary>
+    private static void ApplyVerdict(List<PerfComparisonResult> group, IReadOnlyDictionary<int, string> dllByLine)
+    {
+        string reason = null;
+        if (group.Count < 2)
+        {
+            reason = "n/a: only one instance";
+        }
+        else if (group.Select(r => r.ParamsHash ?? string.Empty).Distinct(StringComparer.Ordinal).Count() != 1 ||
+                 string.IsNullOrEmpty(group[0].ParamsHash) ||
+                 group.Select(r => dllByLine.TryGetValue(r.LineNbr ?? 0, out var h) ? h ?? string.Empty : string.Empty).Distinct(StringComparer.OrdinalIgnoreCase).Count() != 1)
+        {
+            reason = "n/a: parameters differ";
+        }
+        else if (group.Any(r => !string.Equals(r.Status, PerfRunStatuses.Completed, StringComparison.OrdinalIgnoreCase) || !(r.HeadlineValue > 0m)))
+        {
+            reason = "n/a: parameters differ";
+        }
+
+        if (reason != null)
+        {
+            foreach (var r in group)
+            {
+                r.IsComparable = false;
+                r.Verdict = reason;
+                r.RelToFastest = null;
+                r.IsWinner = false;
+                r.WinnerDisplay = reason;
+            }
+
+            return;
+        }
+
+        // Time per unit: lower is better (OpsPerMin is inverted).
+        decimal TimePerUnit(PerfComparisonResult r) => r.HigherIsBetter == true ? 1m / r.HeadlineValue.Value : r.HeadlineValue.Value;
+        var fastest = group.Min(TimePerUnit);
+        var ties = group.Count(r => TimePerUnit(r) / fastest <= 1m + VerdictBand);
+        var leaders = group.Where(r => TimePerUnit(r) == fastest).Select(r => r.DatabaseType).ToArray();
+
+        foreach (var r in group)
+        {
+            var rel = Math.Round(TimePerUnit(r) / fastest, 4, MidpointRounding.AwayFromZero);
+            r.IsComparable = true;
+            r.RelToFastest = rel;
+            r.IsWinner = TimePerUnit(r) == fastest;
+            if (rel <= 1m + VerdictBand)
+            {
+                r.Verdict = ties > 1 ? "≈ tie" : "fastest (indicative)";
+            }
+            else
+            {
+                r.Verdict = rel.ToString("0.00", CultureInfo.InvariantCulture) + "× slower";
+            }
+
+            r.WinnerDisplay = ties > 1
+                ? "≈ tie (indicative)"
+                : string.Join(", ", leaders) + " is fastest (indicative)";
+        }
+    }
+
+    #endregion
+
+    #region Helpers
+
+    private static string Trim(string message, int max)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
             return string.Empty;
         }
 
-        return message.Length <= 1024 ? message : message.Substring(0, 1024);
+        return message.Length <= max ? message : message.Substring(0, max);
     }
+
+    private static int ToIntMs(TimeSpan elapsed) =>
+        elapsed.TotalMilliseconds >= int.MaxValue ? int.MaxValue : (int)Math.Round(elapsed.TotalMilliseconds, MidpointRounding.AwayFromZero);
 
     private static string FormatElapsed(TimeSpan elapsed)
     {
@@ -954,7 +1103,7 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
             return elapsed.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
         }
 
-        return $"{elapsed.TotalSeconds:0.##} sec";
+        return elapsed.TotalSeconds.ToString("0.##", CultureInfo.InvariantCulture) + " sec";
     }
 
     private static DateTime GetUtcStorageTimestamp()
@@ -962,114 +1111,19 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
         return DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
     }
 
-    private void ClearAllBenchmarkData()
+    private static string SafeUserName()
     {
-        foreach (PerfTestResult result in SelectFrom<PerfTestResult>.View.Select(this))
+        try
         {
-            LocalResults.Cache.Delete(result);
+#pragma warning disable CS0618 // PXAccess.GetUserName is obsolete in 26 R2 but still the simplest accessor here.
+            return PXAccess.GetUserName();
+#pragma warning restore CS0618
         }
-
-        foreach (PerfTestRecord record in SelectFrom<PerfTestRecord>.View.Select(this))
+        catch
         {
-            Records.Cache.Delete(record);
+            return null;
         }
-
-        Save.Press();
-        PerfSnapshotService.ClearLocalSnapshot();
-        var row = GetControlRow();
-        ResetRequestState(row);
-        EnsureFilterContext(row);
-        PersistControlRow(row);
-        LocalResults.Cache.Clear();
-        Records.Cache.Clear();
-        LocalResults.Cache.ClearQueryCache();
-        Records.Cache.ClearQueryCache();
     }
 
-    private List<PerfComparisonResult> BuildComparisonRows()
-    {
-        var rows = new List<PerfComparisonResult>();
-        var snapshots = PerfSnapshotService.LoadAllSnapshots().ToArray();
-        var lineNbr = 1;
-
-        foreach (var envelope in snapshots)
-        {
-            foreach (var item in envelope.Results.OrderBy(x => PerfBenchmarkCatalog.Get(x.TestCode).SortOrder))
-            {
-                rows.Add(new PerfComparisonResult
-                {
-                    LineNbr = lineNbr++,
-                    TestCode = item.TestCode,
-                    TestDisplayName = item.DisplayName,
-                    TestCategory = item.TestCategory,
-                    ExecutionMode = item.ExecutionMode,
-                    DatabaseType = envelope.DatabaseType,
-                    InstanceName = envelope.InstanceName,
-                    ElapsedMs = item.ElapsedMs,
-                    RecordsCount = item.RecordsCount,
-                    Iterations = item.Iterations,
-                    BatchSize = item.BatchSize,
-                    MaxThreads = item.MaxThreads,
-                    CapturedAtUtc = item.CapturedAtUtc,
-                    Notes = item.Notes
-                });
-            }
-        }
-
-        foreach (var group in rows.GroupBy(x => x.TestCode))
-        {
-            var minElapsed = group.Min(x => x.ElapsedMs ?? int.MaxValue);
-            var winners = group.Where(x => (x.ElapsedMs ?? int.MaxValue) == minElapsed).ToArray();
-            var winnerLabel = string.Join(", ", winners.Select(x => x.DatabaseType));
-
-            foreach (var row in group)
-            {
-                row.IsWinner = (row.ElapsedMs ?? int.MaxValue) == minElapsed;
-                row.WinnerDisplay = row.IsWinner == true ? $"{row.DatabaseType} is fastest" : $"{winnerLabel} is fastest";
-            }
-        }
-
-        return rows
-            .OrderBy(x => PerfBenchmarkCatalog.Get(x.TestCode).SortOrder)
-            .ThenBy(x => x.DatabaseType)
-            .ToList();
-    }
-
-    private void EnsureFilterContext(PerfBenchmarkFilter row)
-    {
-        row ??= new PerfBenchmarkFilter { SetupID = BenchmarkControlID };
-        var recommendation = PerfHardwareInspector.Detect();
-
-        row.CurrentDatabase = PerfEnvironmentInspector.GetDatabaseDisplayName(this);
-        row.CurrentInstance = PerfEnvironmentInspector.GetInstanceName();
-        row.DetectedCpuCores = recommendation.CpuCores;
-        row.DetectedMemoryGb = recommendation.MemoryGb;
-        row.RecommendedRecords = recommendation.RecommendedRecords;
-        row.RecommendedIterations = recommendation.RecommendedIterations;
-        row.RecommendedBatchSize = recommendation.RecommendedBatchSize;
-        row.RecommendedMaxThreads = recommendation.RecommendedMaxThreads;
-        row.HardwareRecommendationSummary = recommendation.Summary;
-        row.SnapshotStatus = PerfSnapshotService.GetSnapshotStatus();
-        row.PendingAnalysisStatus = PerfSnapshotService.GetPendingAnalysisStatus();
-
-        row.NumberOfRecords ??= recommendation.RecommendedRecords;
-        row.Iterations ??= recommendation.RecommendedIterations;
-        row.ParallelBatchSize ??= recommendation.RecommendedBatchSize;
-        row.ParallelMaxThreads ??= recommendation.RecommendedMaxThreads;
-        row.LastRequestStatus ??= PerfBenchmarkRequestStatuses.Idle;
-        row.LastRequestMessage ??= "Ready to run benchmarks.";
-    }
-
-    // ProcessItemsParallel calls Reduce() after every item without a null check, so never pass null.
-    private sealed class NoOpReducedModeThrottler : IReducedModeThrottler
-    {
-        public static readonly NoOpReducedModeThrottler Instance = new();
-
-        public System.Threading.Tasks.Task ReduceAsync(TimeSpan requestDuration, CancellationToken cancellationToken) =>
-            System.Threading.Tasks.Task.CompletedTask;
-
-        public void Reduce(TimeSpan requestDuration, CancellationToken cancellationToken)
-        {
-        }
-    }
+    #endregion
 }
