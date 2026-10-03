@@ -8,7 +8,7 @@ using PX.Common;
 using PX.Web.UI;
 using PerfDBBenchmark.Core.DAC;
 using PerfDBBenchmark.Core.Graphs;
-using PerfDBBenchmark.Core.Support;
+using PerfDBBenchmark.Core.Scenarios;
 
 namespace PerfDBBenchmark.Core.Pages;
 
@@ -17,8 +17,33 @@ namespace PerfDBBenchmark.Core.Pages;
 /// Created by AcuPower LTD for performance analysis.
 /// Company website: https://acupowererp.com
 /// </summary>
+/// <remarks>
+/// Uses only the P0 contracts (PerfScenarioRegistry, PerfLegacyAliases, PerfFamilies) and the graph methods whose
+/// signatures stay stable (GetComparisonResults, GetChartPoints, GetChartDatabaseOrder; SPEC §2.3).
+/// Charts are grouped by the server-side Family of each test, never by hard-coded categories (SPEC §5.5).
+/// </remarks>
 public class AC301000 : PXPage
 {
+    /// <summary>Chart control ID prefix; the rest of the ID is the Family (for example "chartFamilyScreens").</summary>
+    private const string FamilyChartPrefix = "chartFamily";
+
+    /// <summary>The 12 legacy buttons keep their IDs and start the matching CORE_* test (PerfLegacyAliases).</summary>
+    private static readonly KeyValuePair<string, string>[] LegacyButtons =
+    {
+        new KeyValuePair<string, string>("btnSeqRead", "SEQ_READ"),
+        new KeyValuePair<string, string>("btnSeqWrite", "SEQ_WRITE"),
+        new KeyValuePair<string, string>("btnSeqUpdate", "SEQ_UPDATE"),
+        new KeyValuePair<string, string>("btnSeqDelete", "SEQ_DELETE"),
+        new KeyValuePair<string, string>("btnSeqComplex", "SEQ_COMPLEX"),
+        new KeyValuePair<string, string>("btnSeqProjection", "SEQ_PROJECTION"),
+        new KeyValuePair<string, string>("btnParRead", "PAR_READ"),
+        new KeyValuePair<string, string>("btnParWrite", "PAR_WRITE"),
+        new KeyValuePair<string, string>("btnParUpdate", "PAR_UPDATE"),
+        new KeyValuePair<string, string>("btnParDelete", "PAR_DELETE"),
+        new KeyValuePair<string, string>("btnParComplex", "PAR_COMPLEX"),
+        new KeyValuePair<string, string>("btnParProjection", "PAR_PROJECTION")
+    };
+
     protected void Page_Load(object sender, EventArgs e)
     {
         RegisterBenchmarkStyles();
@@ -50,27 +75,57 @@ public class AC301000 : PXPage
             e.Row.Style.CssClass = "perfWinnerRow";
         }
 
-        if (string.Equals(row.TestCategory, "Complex BQL Join", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(row.TestCategory, "PXProjection", StringComparison.OrdinalIgnoreCase))
+        // The in-app verdict is indicative only; rows that cannot be compared (parameters, DLL or status differ) are muted.
+        if (row.IsComparable == false && e.Row.Cells["Verdict"] != null)
+        {
+            e.Row.Cells["Verdict"].Style.CssClass = "perfMutedNote";
+        }
+
+        if (string.Equals(row.Family, PerfFamilies.Reports, StringComparison.OrdinalIgnoreCase) && e.Row.Cells["TestDisplayName"] != null)
         {
             e.Row.Cells["TestDisplayName"].Style.CssClass = "perfFocusCell";
         }
     }
 
+    /// <summary>All comparable tests in one chart.</summary>
     protected void OverviewChart_OnLoad(object sender, EventArgs e) =>
-        BindChart((PXSerialChart)sender, row => true);
+        BindChart((PXSerialChart)sender, row => !IsExcludedFamily(row.Family));
 
-    protected void ComplexChart_OnLoad(object sender, EventArgs e) =>
-        BindChart((PXSerialChart)sender, row =>
-            string.Equals(row.TestCategory, "Complex BQL Join", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(row.TestCategory, "PXProjection", StringComparison.OrdinalIgnoreCase));
+    /// <summary>One chart per Family; the Family is taken from the control ID (chartFamily&lt;Family&gt;).</summary>
+    protected void FamilyChart_OnLoad(object sender, EventArgs e)
+    {
+        if (sender is not PXSerialChart chart)
+        {
+            return;
+        }
 
-    protected void DmlChart_OnLoad(object sender, EventArgs e) =>
-        BindChart((PXSerialChart)sender, row =>
-            string.Equals(row.TestCategory, "Read", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(row.TestCategory, "Write", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(row.TestCategory, "Update", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(row.TestCategory, "Delete", StringComparison.OrdinalIgnoreCase));
+        var family = FamilyFromControlId(chart.ID);
+        BindChart(chart, row => string.Equals(ResolveFamily(row), family, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string FamilyFromControlId(string id)
+    {
+        if (string.IsNullOrEmpty(id) || !id.StartsWith(FamilyChartPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return id.Substring(FamilyChartPrefix.Length);
+    }
+
+    /// <summary>The row's Family, or the descriptor's Family when an older snapshot row has none.</summary>
+    private static string ResolveFamily(PerfComparisonResult row)
+    {
+        if (!string.IsNullOrWhiteSpace(row.Family))
+        {
+            return row.Family;
+        }
+
+        return TryGetDescriptor(row.TestCode, out var d) ? d.Family : string.Empty;
+    }
+
+    private static bool IsExcludedFamily(string family) =>
+        string.Equals(family, PerfFamilies.Environment, StringComparison.OrdinalIgnoreCase);
 
     private void BindChart(PXSerialChart chart, Func<PerfComparisonResult, bool> predicate)
     {
@@ -80,7 +135,6 @@ public class AC301000 : PXPage
         }
 
         var graph = GetGraph();
-        var rows = graph.GetComparisonResults();
         var databaseOrder = graph.GetChartDatabaseOrder();
         var points = graph.GetChartPoints(predicate);
 
@@ -146,26 +200,38 @@ public class AC301000 : PXPage
 
     private void ConfigureButtonTooltips()
     {
-        SetBenchmarkButtonTooltip("btnSeqRead", PerfBenchmarkTestCodes.SequentialRead);
-        SetBenchmarkButtonTooltip("btnSeqWrite", PerfBenchmarkTestCodes.SequentialWrite);
-        SetBenchmarkButtonTooltip("btnSeqUpdate", PerfBenchmarkTestCodes.SequentialUpdate);
-        SetBenchmarkButtonTooltip("btnSeqDelete", PerfBenchmarkTestCodes.SequentialDelete);
-        SetBenchmarkButtonTooltip("btnSeqComplex", PerfBenchmarkTestCodes.SequentialComplexJoin);
-        SetBenchmarkButtonTooltip("btnSeqProjection", PerfBenchmarkTestCodes.SequentialProjection);
-        SetBenchmarkButtonTooltip("btnParRead", PerfBenchmarkTestCodes.ParallelRead);
-        SetBenchmarkButtonTooltip("btnParWrite", PerfBenchmarkTestCodes.ParallelWrite);
-        SetBenchmarkButtonTooltip("btnParUpdate", PerfBenchmarkTestCodes.ParallelUpdate);
-        SetBenchmarkButtonTooltip("btnParDelete", PerfBenchmarkTestCodes.ParallelDelete);
-        SetBenchmarkButtonTooltip("btnParComplex", PerfBenchmarkTestCodes.ParallelComplexJoin);
-        SetBenchmarkButtonTooltip("btnParProjection", PerfBenchmarkTestCodes.ParallelProjection);
-        SetStaticButtonTooltip("btnRefreshStatus", PerfBenchmarkDescriptions.RefreshStatus);
+        foreach (var button in LegacyButtons)
+        {
+            SetBenchmarkButtonTooltip(button.Key, button.Value);
+        }
+
+        SetStaticButtonTooltip("btnRunBenchmark", "Runs the test selected in 'Test to Run' with the parameters on this form (work scale, passes, warm-up passes, run budget).");
+        SetStaticButtonTooltip("btnAbortBenchmark", "Asks the run in progress on this instance to stop after its current operation; the run is stored as Invalid (Aborted).");
+        SetStaticButtonTooltip("btnClearTestRecords", "Deletes benchmark work records other than the READ-SEED and UPDATE-SEED batches and removes documents left by interrupted runs. Results are kept.");
+        SetStaticButtonTooltip("btnRefreshStatus", "Reloads the snapshot and pending-analysis status so you can check which tests have comparable results on all instances.");
     }
 
-    private void SetBenchmarkButtonTooltip(string buttonId, string testCode)
+    private void SetBenchmarkButtonTooltip(string buttonId, string legacyTestCode)
     {
         if (FindControlRecursive(this, buttonId) is PXButton button)
         {
-            button.ToolTip = PerfBenchmarkCatalog.Get(testCode).ShortDescription;
+            button.ToolTip = TryGetDescriptor(legacyTestCode, out var d)
+                ? d.ShortDescription ?? d.WhatItSimulates ?? string.Empty
+                : string.Empty;
+        }
+    }
+
+    private static bool TryGetDescriptor(string testCode, out PerfTestDescriptor descriptor)
+    {
+        descriptor = null;
+        try
+        {
+            return PerfScenarioRegistry.TryGet(PerfLegacyAliases.Map(testCode), out descriptor);
+        }
+        catch
+        {
+            // The registry never throws by contract; a tooltip must never break the page.
+            return false;
         }
     }
 
