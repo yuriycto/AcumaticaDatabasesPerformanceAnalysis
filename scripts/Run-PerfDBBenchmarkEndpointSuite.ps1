@@ -2012,9 +2012,22 @@ function Save-CampaignState {
     if ($script:State.Contains("diagnostics")) { $doc["diagnostics"] = $script:State["diagnostics"] }
     $doc["suiteState"] = $script:State.suiteState
     $json = $doc | ConvertTo-Json -Depth 40
-    $tmp = $path + ".tmp"
+    $tmp = $path + "." + [Guid]::NewGuid().ToString("N").Substring(0, 8) + ".tmp"
     [System.IO.File]::WriteAllText($tmp, $json, (New-Object System.Text.UTF8Encoding($false)))
-    Move-Item -LiteralPath $tmp -Destination $path -Force
+    # Atomic replace, retried while a reader (a status poller, a watcher, a virus scanner) holds the file open: a plain
+    # Move-Item -Force then fails with "Cannot create a file when that file already exists", and that used to turn the
+    # run being recorded into a SuiteError. [NullString]::Value: PowerShell would pass $null to File.Replace as "".
+    $last = $null
+    for ($a = 1; $a -le 40; $a++) {
+        try {
+            if ([System.IO.File]::Exists($path)) { [System.IO.File]::Replace($tmp, $path, [NullString]::Value, $true) }
+            else { [System.IO.File]::Move($tmp, $path) }
+            return
+        }
+        catch { $last = $_.Exception.Message; Start-Sleep -Milliseconds 250 }
+    }
+    if ([System.IO.File]::Exists($tmp)) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+    throw ("could not replace {0} after 40 attempts (10 s): {1}" -f $path, $last)
 }
 
 function Add-SuiteEvent {
