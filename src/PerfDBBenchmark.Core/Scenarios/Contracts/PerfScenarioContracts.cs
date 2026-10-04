@@ -207,6 +207,8 @@ public sealed class PerfScenarioContext
     public Guid RunId => Request.RequestID;
     public string DocumentTag => PerfCampaignConstants.DocumentTag(Request.RequestID);
     public PerfRunPlan Plan { get; internal set; }
+    /// <summary>What the engine's Request Profiler guard found and did before Prepare (ENV_CAPTURE reports it).</summary>
+    internal PerfProfilerGuardResult ProfilerGuard { get; set; }
     public IReadOnlyList<PerfWorkerContext> Workers => WorkersInternal;
     internal List<PerfWorkerContext> WorkersInternal { get; } = new List<PerfWorkerContext>();
 

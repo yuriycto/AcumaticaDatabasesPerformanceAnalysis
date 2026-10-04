@@ -289,6 +289,10 @@ internal sealed class PerfRunEngine
 
     public PerfRunMetrics Execute()
     {
+        // Request Profiler guard: before the run's stopwatch and every timed region; never throws (failures go to the notes).
+        var profilerGuard = PerfProfilerGuard.Apply();
+        profilerGuard.WriteNotes(Detail.Notes);
+
         var total = Stopwatch.StartNew();
         var m = _metrics;
         m.UserCount = _users;
@@ -318,7 +322,7 @@ internal sealed class PerfRunEngine
 
         BuildAssignment();
 
-        _ctx = new PerfScenarioContext(_request, _d, PXGraph.CreateInstance<PerfWorkerGraph>()) { Plan = _plan };
+        _ctx = new PerfScenarioContext(_request, _d, PXGraph.CreateInstance<PerfWorkerGraph>()) { Plan = _plan, ProfilerGuard = profilerGuard };
         var mainGraph = _ctx.MainGraph;
         _ctx.UntimedParallelRunner = (slots, count, body) => PerfScenarioRunner.RunUntimedParallel(mainGraph, slots, count, body);
 
@@ -465,6 +469,9 @@ internal sealed class PerfRunEngine
 
             Detail.CleanupMs = m.CleanupMs = Ms(sw);
         }
+
+        // Read-only and untimed: shows whether the Request Profiler was switched on again while the run was in progress.
+        Detail.Notes["profilerAtEnd"] = PerfProfilerGuard.Read().ToNote();
 
         if (failure != null)
         {

@@ -153,7 +153,7 @@ internal sealed class EnvCaptureScenario : PerfScenarioBase
 
     public override void Prepare(PerfScenarioContext context)
     {
-        context.Set(EnvKey, EnvCaptureCollector.Collect(context.MainGraph));
+        context.Set(EnvKey, EnvCaptureCollector.Collect(context.MainGraph, context.ProfilerGuard));
     }
 
     public override void ExecuteOperation(PerfWorkerContext worker, PerfOpInfo op)
@@ -199,7 +199,8 @@ internal static class EnvCaptureCollector
         "sum.GLTran.DebitAmt", "sum.GLTran.CreditAmt", "sum.ARTran.TranAmt"
     };
 
-    public static Dictionary<string, object> Collect(PXGraph graph)
+    /// <param name="profilerGuard">What the engine's Request Profiler guard found and did before Prepare (null: it did not run).</param>
+    public static Dictionary<string, object> Collect(PXGraph graph, PerfProfilerGuardResult profilerGuard = null)
     {
         var env = new Dictionary<string, object>(StringComparer.Ordinal)
         {
@@ -209,7 +210,7 @@ internal static class EnvCaptureCollector
         var engine = PerfDatabaseEngines.Detect();
         env["app"] = App(engine);
         env["webConfig"] = PerfRuntimeInfo.WebConfigFacts.ToJson();
-        env["db"] = Db(engine);
+        env["db"] = Db(engine, profilerGuard);
 
         var data = DataFingerprint(graph);
         env["dataFingerprint"] = data;
@@ -270,7 +271,7 @@ internal static class EnvCaptureCollector
 
     // ------------------------------------------------------------------ db
 
-    private static Dictionary<string, object> Db(string engine)
+    private static Dictionary<string, object> Db(string engine, PerfProfilerGuardResult profilerGuard)
     {
         var errors = new Dictionary<string, object>(StringComparer.Ordinal);
         var settings = new Dictionary<string, object>(StringComparer.Ordinal);
@@ -322,7 +323,9 @@ internal static class EnvCaptureCollector
             ["dbmsVersionLabel"] = PerfRuntimeInfo.DbmsVersionLabel,
             ["settings"] = settings,
             ["connection"] = connection,
-            ["requestProfiler"] = RequestProfiler()
+            // Effective state, read after the engine's profiler guard; requestProfilerFound is the state the guard found.
+            ["requestProfiler"] = RequestProfiler(),
+            ["requestProfilerFound"] = PerfProfilerGuard.FoundJson(profilerGuard)
         };
         if (database.Count > 0) db["database"] = database;
         if (errors.Count > 0) db["errors"] = errors;
