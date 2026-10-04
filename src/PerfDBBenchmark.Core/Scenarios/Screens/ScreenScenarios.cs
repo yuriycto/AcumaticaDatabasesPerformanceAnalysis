@@ -499,8 +499,9 @@ internal sealed class ScreenCustomerSearchScenario : ReadScenarioBase<ScreenCust
         "Wid", "FOOD", "tech", "supply", "dev", "ltd", "serv", "agri", "bake", "xyzq"
     };
 
-    /// <summary>Accent probe values: quebec, Québec, QUÉBEC (escaped so the source stays ASCII).</summary>
-    internal static readonly string[] AccentProbes = { "quebec", "Québec", "QUÉBEC" };
+    /// <summary>Accent probe values: quebec, Québec, QUÉBEC. The literals use \u escapes (U+00E9, U+00C9) so the compiled
+    /// strings do not depend on how the source file is decoded (this file is UTF-8 without a BOM).</summary>
+    internal static readonly string[] AccentProbes = { "quebec", "Qu\u00e9bec", "QU\u00c9BEC" };
 
     public ScreenCustomerSearchScenario(PerfTestDescriptor descriptor) : base(descriptor) { }
 

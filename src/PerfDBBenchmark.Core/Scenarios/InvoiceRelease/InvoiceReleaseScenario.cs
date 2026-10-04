@@ -41,7 +41,7 @@ internal sealed class InvoiceReleaseBaseline
 }
 
 /// <summary>
-/// INV_RELEASE_TO_GL_U01 / _U04 (SPEC §1.7): every operation creates a 350.00 AR invoice with two non-stock lines through
+/// INV_RELEASE_TO_GL_U01 / _U04 (SPEC §1.7): every operation creates a 350.00 AR invoice without retainage, with two non-stock lines through
 /// ARInvoiceEntry and releases it with ReleaseProcess (ARDocumentRelease.ReleaseDoc + AutoPost; never the Release button, never
 /// PXLongOperation, never an outer transaction). Released invoices are permanent; Verify checks the exact GL and AR deltas.
 /// </summary>
@@ -82,7 +82,9 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
             ["ledgerCD"] = PerfCampaignConstants.ActualLedgerCD,
             ["customerPool"] = "Customers20[w]",
             ["itemPool"] = "NonStockPool (no kits)",
-            ["release"] = "ARInvoiceEntry.ReleaseProcess (AutoPost)"
+            ["release"] = "ARInvoiceEntry.ReleaseProcess (AutoPost)",
+            ["retainage"] = "off: ARInvoice.retainageApply = false after the header Update",
+            ["paymentsByLines"] = "not cleared: ARInvoice.paymentsByLinesAllowed as defaulted from the customer"
         };
         return DefaultPlan(request, extraParams: extra);
     }
@@ -116,6 +118,8 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
         context.Set(PerfBusinessPools.NonStockPoolKey, (IReadOnlyList<int>)nonStock.Select(m => m.ID).ToArray());
         context.Notes["pool.customers"] = customers.Count.ToString(CultureInfo.InvariantCulture);
         context.Notes["pool.nonStock"] = nonStock.Count.ToString(CultureInfo.InvariantCulture);
+        // 1c. per-engine evidence of the flags each worker's customer brings (retainage cleared, pay-by-line kept by decision)
+        context.Notes["customersInSlice"] = DescribeCustomerSlice(g, customers, users);
 
         // 2. sweep unreleased PERFBENCH invoices of earlier runs (coordinating thread, FreshForWrite before each delete)
         var leftovers = BusinessDocuments.ReadUnreleasedPerfBenchInvoices(g);
@@ -171,6 +175,16 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
         ie.Document.Cache.SetValueExt<ARInvoice.docDate>(inv, PerfCampaignConstants.PinnedDocDate);   // period 202606
         ie.Document.Cache.SetValue<ARInvoice.docDesc>(inv, worker.Run.DocumentTag);                    // no ctx in ExecuteOperation (review-api C3)
         inv = ie.Document.Update(inv);
+        // v3: no retainage. ARInvoiceEntryRetainage defaults RetainageApply from Customer.RetainageApply (PXFormula on customerID)
+        // and each line's RetainagePct from this flag; 6 of Customers20 have 10 % retainage (BNRCONTRAC = worker 2 of U04).
+        // Cleared AFTER Update (Update on the same instance replays customerID, whose formula would set it back) and BEFORE the
+        // first line (no lines yet, so the FieldVerifying handler asks nothing; the first line insert then refreshes the header
+        // snapshot with the flag false). Like manualDisc: every invoice stays 350.00 with 3 GL lines. Unconditional; for
+        // customers without retainage it does no database work.
+        // Not cleared, by decision: ARInvoice.PaymentsByLinesAllowed. BNRCONTRAC (U04 worker 2) keeps PaymentsByLinesAllowed = 1
+        // from the customer, so its invoices take the pay-by-line release path (ARTran line balances maintained): same amounts
+        // and GL lines, identical on all engines; disclosed in the SPEC and README.
+        ie.Document.Cache.SetValueExt<ARInvoice.retainageApply>(inv, false);
         var pool = worker.Run.Get<IReadOnlyList<int>>(PerfBusinessPools.NonStockPoolKey);           // 72 items, no kits (review-api B2)
         AddLine(ie, pool[(2 * i + 37 * w) % pool.Count], FirstLinePrice);       // qty 1
         AddLine(ie, pool[(2 * i + 1 + 37 * w) % pool.Count], SecondLinePrice);  // qty 1
@@ -233,6 +247,8 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
         var tagged = 0;
         var good = 0;
         var goodAmount = 0m;
+        var goodRetainage = 0m;
+        var goodPayByLine = 0;
         var goodBatches = new HashSet<string>(StringComparer.Ordinal);
         var releasedUnposted = 0;
         var releasedUnpostedRefs = new List<string>();
@@ -252,6 +268,8 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
             {
                 good++;
                 goodAmount += inv.CuryOrigDocAmt ?? 0m;
+                goodRetainage += inv.CuryRetainageTotal ?? 0m;
+                if (inv.PaymentsByLinesAllowed == true) goodPayByLine++;
                 goodBatches.Add(batch.BatchNbr.TrimEnd());
             }
             else if (inv.Released == true && batch?.BatchNbr != null && batch.Posted != true)
@@ -271,7 +289,14 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
         context.CheckInvariant("releasedUnpostedWithinErrors", Math.Min(releasedUnposted, metrics?.ErrorCount ?? 0), releasedUnposted);
         context.CheckInvariant("invoicesTagged", n + releasedUnposted, tagged);
         context.CheckInvariant("invoicesReleasedPosted", n, good);
+        // 2a (v3). Σ CuryRetainageTotal of those n = 0: retainage is cleared on every header (names the cause if it ever returns)
+        context.CheckInvariant("retainageTotal", 0m, goodRetainage);
         context.CheckInvariant("invoiceAmountSum", expectedAmount, goodAmount);
+        // 2b. pay-by-line is left as defaulted (decision): record how many of those n (warm-up included) took that release path.
+        //     A note, not a parity key: U04 allows failed (contention) operations, which change n per engine.
+        context.Notes["payByLineInvoices"] = goodPayByLine.ToString(CultureInfo.InvariantCulture) + " of "
+                                             + good.ToString(CultureInfo.InvariantCulture)
+                                             + " released and posted (ARInvoice.PaymentsByLinesAllowed as defaulted, not cleared)";
 
         // 3. across those batches: Σ Debit = Σ Credit = n × 350.00; L = GL lines per batch
         g.Clear(PXClearOption.ClearQueriesOnly);
@@ -351,6 +376,41 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
         ie.Transactions.Cache.SetValueExt<ARTran.manualDisc>(t, true);
         ie.Transactions.Update(t);
     }
+
+    /// <summary>
+    /// Untimed (Prepare), never throws: "w0 AACUSTOMER r0/p0; ...; w2 BNRCONTRAC r1/p1; ..." for Customers20[w], w &lt; users, where
+    /// r = Customer.RetainageApply (cleared on every invoice header) and p = Customer.PaymentsByLinesAllowed (kept, by decision),
+    /// plus the Retainage and Pay by Line feature switches. ARInvoiceEntry defaults ARInvoice.PaymentsByLinesAllowed to
+    /// "feature on and p = 1". One read of 1-4 Customer rows on the coordinating thread, the same on every engine.
+    /// </summary>
+    private static string DescribeCustomerSlice(PXGraph g, IReadOnlyList<BusinessPoolMember> customers, int users)
+    {
+        try
+        {
+            var parts = new List<string>();
+            var count = Math.Min(users, customers.Count);
+            for (var w = 0; w < count; w++)
+            {
+                var member = customers[w];
+                Customer c = SelectFrom<Customer>
+                    .Where<Customer.bAccountID.IsEqual<@P.AsInt>>
+                    .View.ReadOnly.Select(g, member.ID);
+                parts.Add("w" + w.ToString(CultureInfo.InvariantCulture) + " " + member.CD + " "
+                          + (c == null ? "not found" : "r" + Flag(c.RetainageApply) + "/p" + Flag(c.PaymentsByLinesAllowed)));
+            }
+
+            return string.Join("; ", parts)
+                   + " (r = Customer.RetainageApply, cleared on every invoice; p = Customer.PaymentsByLinesAllowed, kept; features: retainage="
+                   + Flag(PXAccess.FeatureInstalled<PX.Objects.CS.FeaturesSet.retainage>())
+                   + ", paymentsByLines=" + Flag(PXAccess.FeatureInstalled<PX.Objects.CS.FeaturesSet.paymentsByLines>()) + ")";
+        }
+        catch (Exception ex)
+        {
+            return "error: " + BusinessDocuments.Describe(ex);
+        }
+    }
+
+    private static string Flag(bool? value) => value == null ? "?" : value.Value ? "1" : "0";
 
     /// <summary>Untimed: Σ FinPtdDebit of GLHistory (ACTUAL, 202606, all accounts) and the GLTran / ARTran / ARRegister row counts.</summary>
     private InvoiceReleaseBaseline ReadBaseline(PXGraph g)

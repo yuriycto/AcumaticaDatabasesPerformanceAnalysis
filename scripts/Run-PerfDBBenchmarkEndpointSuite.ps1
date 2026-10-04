@@ -23,6 +23,10 @@
     Profiles: Full = 6 repetitions + R0; Quick = 2 repetitions + R0 at WorkScale 0.5 (preliminary, not publishable);
     DryRun = 1 full-size repetition, no R0 (with -WriteCalibration, -Diagnostics and -ApiReadCheck);
     Smoke = 1 repetition at WorkScale 0.1, PassesOverride 1, WarmUpPassesOverride 0, no R0.
+    -ApiReadCheck (DryRun, after Block A; SPEC 6.6 step 3l): one untimed GET SalesOrder per instance on each version of
+    -ApiReadEndpoints in turn (default Default/26.200.001, then Default/25.200.001); the first version that answers 200
+    on every instance is measured on every instance (5 untimed + 50 timed GETs). diagnostics.apiReadMs holds only the
+    measurement fields; diagnostics.apiReadProbe holds the probe (endpoint, status, exception type and message).
     Block D is refused unless -BackupsVerified is given and the SPEC 6.5 backup artefacts exist.
     -EnvironmentScript none disables the pre-flight and the environment captures (default: Get-PerfEnvironment.ps1
     next to this script). List parameters also accept one comma-separated string (powershell -File callers);
@@ -85,6 +89,9 @@ param(
     [double]$SettleOtherDbCpuPctOfCore = 3,
     [double]$SettleOtherDbIoMBps = 5,
     [int]$SettleTimeoutSecBCD = 90,
+    # No run starts earlier than this after an instance's ServerAppStartUtc: an unlicensed site's new w3wp runs on
+    # every CPU until Acumatica's ResourceGovernor pins it to 2 cores at its first tick, 2 minutes after the start.
+    [int]$AppStartSettleSec = 150,
     [int]$CoolDownSecAfterMultiUser = 20,
     [int]$PollFastSec = 1,
     [int]$PollFastForSec = 10,
@@ -95,6 +102,7 @@ param(
     [switch]$NoRerun,
     [switch]$Diagnostics,
     [switch]$ApiReadCheck,
+    [string[]]$ApiReadEndpoints = @("Default/26.200.001", "Default/25.200.001"),
     [string]$ApiReadEndpoint = "Default/26.200.001",
     [int]$ApiReadWarmUp = 5,
     [int]$ApiReadCount = 50,
@@ -165,6 +173,11 @@ $ExcludeTests = [string[]](Split-ListParameter -Values $ExcludeTests)
 $InputJson = [string[]](Split-ListParameter -Values $InputJson -Separators ';')
 # Pre-flight allow patterns are regular expressions (they may contain commas): only ";" separates them.
 $PreflightAllow = [string[]](Split-ListParameter -Values $PreflightAllow -Separators ';')
+# API read (dry-run step 3l): the Default endpoint versions to probe, in order. -ApiReadEndpoint (one version, kept
+# for older callers) replaces the list only when -ApiReadEndpoints itself was not given.
+$ApiReadEndpoints = [string[]](Split-ListParameter -Values $ApiReadEndpoints)
+if ($PSBoundParameters.ContainsKey("ApiReadEndpoint") -and -not $PSBoundParameters.ContainsKey("ApiReadEndpoints") -and -not [string]::IsNullOrWhiteSpace($ApiReadEndpoint)) { $ApiReadEndpoints = [string[]]@($ApiReadEndpoint.Trim()) }
+if (@($ApiReadEndpoints).Count -eq 0) { $ApiReadEndpoints = [string[]]@("Default/26.200.001", "Default/25.200.001") }
 # Rotation entries: "PerfPG>PerfMySQL>PerfSQL"; several entries are separated by "," or "|".
 $Rotation = [string[]]@(foreach ($entry in @($Rotation)) { if ([string]$entry -match '>') { foreach ($piece in (Split-ListParameter -Values @($entry) -Separators ',|')) { $piece } } elseif (-not [string]::IsNullOrWhiteSpace([string]$entry)) { [string]$entry } })
 # -ExcludeOptional: the same as -IncludeOptional:$false (which powershell -File cannot pass).
@@ -1227,7 +1240,7 @@ function Convert-BenchmarkCatalog {
 function New-OfflineTest {
     param([string]$Code, [int]$Sort, [string]$Label, [string]$Category, [string]$Family, [string]$Block, [int]$Users, [string]$Kind,
         [string]$ReaderUnit, [string]$OpsUnit, [int]$Ops, [int]$Passes, [int]$WarmUpPasses, [int]$WarmUpOps, [bool]$Destructive, [bool]$Optional,
-        [bool]$ErrorsInvalidate, [string]$Legacy, [string]$DisplayName)
+        [bool]$ErrorsInvalidate, [string]$Legacy, [string]$DisplayName, [int]$Version = 1)
     $higher = ($Kind -eq "OpsPerMin")
     return [pscustomobject][ordered]@{
         TestCode = $Code
@@ -1254,7 +1267,7 @@ function New-OfflineTest {
         IsOptional = $Optional
         ExcludeFromComparison = ($Family -eq "Environment")
         LegacyTestCode = $Legacy
-        ScenarioVersion = 1
+        ScenarioVersion = $Version
         DefaultOpsPerPass = $Ops
         DefaultPasses = $Passes
         DefaultWarmUpPasses = $WarmUpPasses
@@ -1264,7 +1277,10 @@ function New-OfflineTest {
 }
 
 function Get-DefaultBenchmarkCatalog {
-    # Offline copy of SPEC section 1.1-1.2, used by -PlanOnly only. A live campaign always uses the server catalog.
+    # Offline copy of SPEC section 1.1-1.2, used by -PlanOnly only (and read by the dry run's step 3a). A live campaign
+    # always uses the server catalog. ScenarioVersion (last argument, default 1): ORD 3 (SPEC rev 2.2, order cleanup /
+    # orderState), INV 3 (SPEC rev 2.3, RetainageApply cleared on the invoice header). ORD multi-user sizes stay
+    # 80/160/320 (the SPEC 6.6 3d 2x rule was waived; deviation recorded).
     $d = [string][char]0x2013
     $one = "one job shared by 8 parallel workers"
     $list = @(
@@ -1276,15 +1292,15 @@ function Get-DefaultBenchmarkCatalog {
         (New-OfflineTest RPT_TRIAL_BALANCE 220 "Trial bal." Report Reports A 1 MedianOpMs "ms per period" reports 12 3 1 0 $false $false $true $null "Trial balance"),
         (New-OfflineTest RPT_GL_ACCOUNT_DETAILS 230 "Acct details" Report Reports A 1 MedianOpMs "ms per account" reports 56 2 1 0 $false $false $true $null "GL account details for a year"),
         (New-OfflineTest RPT_LARGE_LIST_PAGING 240 "Paging+count" Report Reports A 1 MedianPassMs "s per pass of 12 requests" requests 12 3 1 0 $false $false $true $null "Deep paging and counting in a 300,000-line journal"),
-        (New-OfflineTest ORD_SO_ENTRY_U01 310 "SO 1u" Order OrderEntry C 1 MedianOpMs "ms per order saved" orders 60 1 0 10 $false $false $true $null "Enter sales orders $d 1 clerk"),
-        (New-OfflineTest ORD_SO_ENTRY_U04 320 "SO 4u" Order ManyUsers C 4 OpsPerMin "orders per minute" orders 80 1 0 5 $false $false $false $null "Enter sales orders $d 4 clerks working non-stop"),
-        (New-OfflineTest ORD_SO_ENTRY_U08 330 "SO 8u" Order ManyUsers C 8 OpsPerMin "orders per minute" orders 160 1 0 5 $false $false $false $null "Enter sales orders $d 8 clerks working non-stop"),
-        (New-OfflineTest ORD_SO_ENTRY_U16 340 "SO 16u" Order ManyUsers C 16 OpsPerMin "orders per minute" orders 320 1 0 5 $false $false $false $null "Enter sales orders $d 16 clerks working non-stop"),
-        (New-OfflineTest ORD_SO_HOTITEM_U04 350 "Hot 4u" Order ManyUsers C 4 OpsPerMin "orders per minute" orders 80 1 0 5 $false $false $false $null "Everyone sells the best-seller $d 4 clerks working non-stop"),
-        (New-OfflineTest ORD_SO_HOTITEM_U08 360 "Hot 8u" Order ManyUsers C 8 OpsPerMin "orders per minute" orders 160 1 0 5 $false $false $false $null "Everyone sells the best-seller $d 8 clerks working non-stop"),
-        (New-OfflineTest ORD_SO_HOTITEM_U16 370 "Hot 16u" Order ManyUsers C 16 OpsPerMin "orders per minute" orders 320 1 0 5 $false $false $false $null "Everyone sells the best-seller $d 16 clerks working non-stop"),
-        (New-OfflineTest INV_RELEASE_TO_GL_U01 410 "Invoice 1u" Invoice InvoiceRelease D 1 MedianOpMs "ms per invoice" invoices 40 1 0 10 $true $false $true $null "Create and release invoices to the GL $d 1 person"),
-        (New-OfflineTest INV_RELEASE_TO_GL_U04 420 "Invoice 4u" Invoice InvoiceRelease D 4 OpsPerMin "invoices per minute" invoices 60 1 0 3 $true $true $false $null "Create and release invoices to the GL $d 4 people working non-stop"),
+        (New-OfflineTest ORD_SO_ENTRY_U01 310 "SO 1u" Order OrderEntry C 1 MedianOpMs "ms per order saved" orders 60 1 0 10 $false $false $true $null "Enter sales orders $d 1 clerk" 3),
+        (New-OfflineTest ORD_SO_ENTRY_U04 320 "SO 4u" Order ManyUsers C 4 OpsPerMin "orders per minute" orders 80 1 0 5 $false $false $false $null "Enter sales orders $d 4 clerks working non-stop" 3),
+        (New-OfflineTest ORD_SO_ENTRY_U08 330 "SO 8u" Order ManyUsers C 8 OpsPerMin "orders per minute" orders 160 1 0 5 $false $false $false $null "Enter sales orders $d 8 clerks working non-stop" 3),
+        (New-OfflineTest ORD_SO_ENTRY_U16 340 "SO 16u" Order ManyUsers C 16 OpsPerMin "orders per minute" orders 320 1 0 5 $false $false $false $null "Enter sales orders $d 16 clerks working non-stop" 3),
+        (New-OfflineTest ORD_SO_HOTITEM_U04 350 "Hot 4u" Order ManyUsers C 4 OpsPerMin "orders per minute" orders 80 1 0 5 $false $false $false $null "Everyone sells the best-seller $d 4 clerks working non-stop" 3),
+        (New-OfflineTest ORD_SO_HOTITEM_U08 360 "Hot 8u" Order ManyUsers C 8 OpsPerMin "orders per minute" orders 160 1 0 5 $false $false $false $null "Everyone sells the best-seller $d 8 clerks working non-stop" 3),
+        (New-OfflineTest ORD_SO_HOTITEM_U16 370 "Hot 16u" Order ManyUsers C 16 OpsPerMin "orders per minute" orders 320 1 0 5 $false $false $false $null "Everyone sells the best-seller $d 16 clerks working non-stop" 3),
+        (New-OfflineTest INV_RELEASE_TO_GL_U01 410 "Invoice 1u" Invoice InvoiceRelease D 1 MedianOpMs "ms per invoice" invoices 40 1 0 10 $true $false $true $null "Create and release invoices to the GL $d 1 person" 3),
+        (New-OfflineTest INV_RELEASE_TO_GL_U04 420 "Invoice 4u" Invoice InvoiceRelease D 4 OpsPerMin "invoices per minute" invoices 60 1 0 3 $true $true $false $null "Create and release invoices to the GL $d 4 people working non-stop" 3),
         (New-OfflineTest CORE_READ_1U 510 "Load 1u" Read Core B 1 MedianPassMs "s per 10,000-record job" chunks 40 3 1 0 $false $false $true "SEQ_READ" "Load 10,000 records $d 1 worker"),
         (New-OfflineTest CORE_READ_8U 515 "Load 8u" Read Core B 8 MedianPassMs "s per 10,000-record job" chunks 40 3 1 0 $false $false $true "PAR_READ" "Load 10,000 records $d $one"),
         (New-OfflineTest CORE_INSERT_1U 520 "Insert 1u" Write Core B 1 MedianPassMs "s per 10,000-record job" chunks 40 3 1 0 $false $false $true "SEQ_WRITE" "Save 10,000 new records $d 1 worker"),
@@ -2299,11 +2315,24 @@ function Get-SiteNames {
     return , @($script:SuiteInstances | ForEach-Object { $_.Name })
 }
 
+function Get-JsonMember {
+    # Get-Prop for ConvertFrom-Json objects and for the Dictionary<string,object> of JavaScriptSerializer (case-sensitive
+    # keys; Windows PowerShell 5.1 cannot call IDictionary.Contains on it).
+    param([AllowNull()]$Object, [string]$Name)
+    if ($Object -is [System.Collections.Generic.IDictionary[string, object]]) {
+        if ($Object.ContainsKey($Name)) { Write-Output -NoEnumerate $Object[$Name] }
+        return
+    }
+    Write-Output -NoEnumerate (Get-Prop $Object $Name)
+}
+
 function Add-TableCountsToState {
     # SPEC 5.4 item 19 and 6.9 step 1: embed the table-count captures found in the campaign folder
     # (Get-PerfEnvironment -TableCounts -> table-counts-<label>.json) under environment.tableCounts, in compact form:
-    # the tables whose row count changed against the capture's baseline, and the soft-deleted ARRegister/Batch rows.
-    # The report lists them as residue tables.
+    # the capture mode (contract C2: exact / metadata / legacy), the tables whose row count changed against the
+    # capture's baseline, the soft-deleted ARRegister/Batch rows, the engines whose counts were unavailable and the
+    # capture errors. The report lists them as residue tables; for the campaign residue (campaign end against the
+    # campaign baseline, exact counts per engine) it reads the full files next to the campaign JSON.
     param([string]$Folder)
     if ([string]::IsNullOrWhiteSpace($Folder) -or -not (Test-Path -LiteralPath $Folder)) { return }
     $files = @(Get-ChildItem -LiteralPath $Folder -Filter "table-counts-*.json" -File -ErrorAction SilentlyContinue | Sort-Object Name)
@@ -2311,18 +2340,40 @@ function Add-TableCountsToState {
     $map = [ordered]@{}
     foreach ($file in $files) {
         try {
-            $doc = [System.IO.File]::ReadAllText($file.FullName) | ConvertFrom-Json
-            $soft = [ordered]@{}
-            $engines = Get-Prop $doc "engines"
-            if ($null -ne $engines) {
-                foreach ($p in $engines.PSObject.Properties) { $soft[$p.Name] = Get-Prop $p.Value "softDeleted" }
+            $text = [System.IO.File]::ReadAllText($file.FullName)
+            $doc = $null
+            try { $doc = $text | ConvertFrom-Json }
+            catch {
+                # ConvertFrom-Json of Windows PowerShell 5.1 rejects keys that differ only in case (PostgreSQL tables
+                # such as DistributedCache and distributedcache); the case-sensitive reader keeps them apart.
+                Add-Type -AssemblyName System.Web.Extensions
+                $serializer = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+                $serializer.MaxJsonLength = [int]::MaxValue
+                $serializer.RecursionLimit = 1000
+                $doc = $serializer.DeserializeObject($text)
             }
+            $soft = [ordered]@{}
+            $unavailable = [ordered]@{}
+            $engines = Get-JsonMember $doc "engines"
+            if ($null -ne $engines) {
+                $engineNames = if ($engines -is [System.Collections.IDictionary]) { @($engines.Keys) } else { @($engines.PSObject.Properties | ForEach-Object { $_.Name }) }
+                foreach ($name in $engineNames) {
+                    $engineEntry = Get-JsonMember $engines ([string]$name)
+                    $soft[[string]$name] = Get-JsonMember $engineEntry "softDeleted"
+                    $reason = Get-JsonMember $engineEntry "unavailable"
+                    if ($null -ne $reason -and [string]$reason -ne "") { $unavailable[[string]$name] = [string]$reason }
+                }
+            }
+            $errors = Get-JsonMember $doc "errors"
             $map[$file.Name] = [ordered]@{
-                label = Get-Prop $doc "label"
-                capturedAtUtc = Get-Prop $doc "capturedAtUtc"
-                baselineFile = Get-Prop $doc "baselineFile"
-                changedTables = Get-Prop $doc "changedTables"
+                label = Get-JsonMember $doc "label"
+                mode = Get-JsonMember $doc "mode"
+                capturedAtUtc = Get-JsonMember $doc "capturedAtUtc"
+                baselineFile = Get-JsonMember $doc "baselineFile"
+                changedTables = Get-JsonMember $doc "changedTables"
                 softDeleted = $soft
+                unavailable = $unavailable
+                errors = @(foreach ($e in @($errors)) { if ($null -ne $e) { $e } })
             }
         }
         catch {
@@ -2700,6 +2751,23 @@ function Test-RestartBetweenRuns {
     Save-InstanceState -Inst $Inst
 }
 
+function Wait-AppStartSettled {
+    # Acumatica's unlicensed default (kept as installed) pins each w3wp to 2 random cores, but only from the
+    # ResourceGovernor's first tick, 2 minutes after the process starts; until then a new process runs on every CPU.
+    # So no run starts within $AppStartSettleSec of the instance's ServerAppStartUtc (after a recycle, an equal restart
+    # or an unexpected restart), which would give one engine's run more cores than the others get.
+    param([Parameter(Mandatory = $true)]$Inst)
+    if ($AppStartSettleSec -le 0 -or [string]::IsNullOrWhiteSpace($Inst.LastAppStartUtc)) { return }
+    $start = [DateTime]::MinValue
+    $styles = [System.Globalization.DateTimeStyles]::AdjustToUniversal -bor [System.Globalization.DateTimeStyles]::AssumeUniversal
+    if (-not [DateTime]::TryParse([string]$Inst.LastAppStartUtc, [System.Globalization.CultureInfo]::InvariantCulture, $styles, [ref]$start)) { return }
+    $remaining = ($start.AddSeconds($AppStartSettleSec) - [DateTime]::UtcNow).TotalSeconds
+    if ($remaining -le 0) { return }
+    $sec = [int][Math]::Ceiling($remaining)
+    Add-SuiteEvent -Kind "AppStartWait" -Instance $Inst.Name -Detail ("waited {0} s before the next run: ServerAppStartUtc {1} + {2} s (a new worker process uses every CPU until Acumatica pins it to its cores)" -f $sec, $Inst.LastAppStartUtc, $AppStartSettleSec)
+    Start-Sleep -Seconds $sec
+}
+
 function Invoke-SuiteRun {
     # One run on one instance: restart check, idle check, re-warm, cool-down + settle gate, counters,
     # PUT + verify, POST RunBenchmark, wait, fetch the result row, restart check, ParamsHash check, append.
@@ -2745,6 +2813,9 @@ function Invoke-SuiteRun {
             $preFields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst -FactsWaitSec 30)
         }
     }
+
+    # Every run except ENV_CAPTURE (which measures nothing): not inside the first minutes of a new worker process.
+    if (-not $isEnv) { Wait-AppStartSettled -Inst $Inst }
 
     $runParams = Get-RunParameters -Test $Test -Block $Block -ParamProfile $ParamProfile -ProfileSettings $ProfileSettings
     $budget = if ($isEnv) { $null } else { Get-RunBudgetSec -TestCode $Test.TestCode }
@@ -3740,50 +3811,239 @@ function Invoke-Block {
     return "completed"
 }
 
+function Get-ApiErrorShortText {
+    # One line of at most $Max characters without a stack trace (the API read probe keeps the exception type and the
+    # message only; SPEC 6.6 3l, contract C4).
+    param([AllowNull()][string]$Text, [int]$Max = 300)
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+    $t = [regex]::Replace($Text, '(?is)<(script|style)[^>]*>.*?</\1>', ' ')
+    $t = [regex]::Replace($t, '<[^>]+>', ' ')
+    $t = [System.Net.WebUtility]::HtmlDecode($t)
+    foreach ($cut in @('(?i)stack\s*trace\s*:', '(?m)^\s*at\s+\S', '\s+at\s+[\w\.`<>\[\],]+\(', '(?i)---\s*end of')) {
+        $m = [regex]::Match($t, $cut)
+        if ($m.Success -and $m.Index -gt 0) { $t = $t.Substring(0, $m.Index) }
+    }
+    $t = ([regex]::Replace($t, '\s+', ' ')).Trim()
+    if ($t.Length -gt $Max) { $t = $t.Substring(0, $Max - 3).TrimEnd() + "..." }
+    if ($t -eq "") { return $null }
+    return $t
+}
+
+function Get-ApiErrorInfo {
+    # HTTP status, exception type and message of a failed contract-based API call. Acumatica answers an unhandled
+    # exception with HTTP 500 and an HttpError body { message, exceptionMessage, exceptionType, stackTrace,
+    # innerException }; the stack trace is never kept. Without a response (time-out, connection error) the client-side
+    # exception is recorded with status 0.
+    param([AllowNull()]$ErrorRecord)
+    $ex = $ErrorRecord
+    if ($ErrorRecord -is [System.Management.Automation.ErrorRecord]) { $ex = $ErrorRecord.Exception }
+    $web = $ex
+    while ($null -ne $web -and -not ($web -is [System.Net.WebException])) { $web = $web.InnerException }
+    $status = 0
+    if ($null -ne $web -and $null -ne $web.Response) {
+        try { $status = [int]$web.Response.StatusCode } catch { $status = 0 }
+    }
+    # Windows PowerShell 5.1 reads the error body into ErrorDetails.Message; the response stream is the fallback.
+    $body = $null
+    if ($ErrorRecord -is [System.Management.Automation.ErrorRecord] -and $null -ne $ErrorRecord.ErrorDetails -and -not [string]::IsNullOrWhiteSpace([string]$ErrorRecord.ErrorDetails.Message)) {
+        $body = [string]$ErrorRecord.ErrorDetails.Message
+    }
+    elseif ($null -ne $web -and $null -ne $web.Response) {
+        try { $body = [string](Get-ResponseContentText -Exception $web) } catch { $body = $null }
+    }
+    $type = $null
+    $message = $null
+    if (-not [string]::IsNullOrWhiteSpace($body)) {
+        if ($body.TrimStart().StartsWith("{")) {
+            try {
+                $json = $body | ConvertFrom-Json
+                $type = [string](Get-Prop $json "exceptionType")
+                $message = [string](Get-Prop $json "exceptionMessage")
+                if ([string]::IsNullOrWhiteSpace($message)) { $message = [string](Get-Prop $json "message") }
+                # the innermost exception names the cause when the outer one is a wrapper
+                $inner = Get-Prop $json "innerException"
+                $innerType = $null; $innerMessage = $null; $depth = 0
+                while ($null -ne $inner -and $depth -lt 10) {
+                    $it = [string](Get-Prop $inner "exceptionType")
+                    if (-not [string]::IsNullOrWhiteSpace($it)) { $innerType = $it; $innerMessage = [string](Get-Prop $inner "exceptionMessage") }
+                    $inner = Get-Prop $inner "innerException"
+                    $depth++
+                }
+                # each part is shortened on its own, so the stack-trace cut of the outer message keeps the inner one
+                if (-not [string]::IsNullOrWhiteSpace($innerType) -and $innerType -ne $type) { $message = ("{0} | innermost {1}: {2}" -f (Get-ApiErrorShortText -Text $message -Max 150), $innerType, (Get-ApiErrorShortText -Text $innerMessage -Max 150)) }
+            }
+            catch {
+                $type = $null; $message = $null
+            }
+            if ([string]::IsNullOrWhiteSpace($type)) {
+                $m = [regex]::Match($body, '"exceptionType"\s*:\s*"((?:[^"\\]|\\.)*)"')
+                if ($m.Success) { try { $type = [regex]::Unescape($m.Groups[1].Value) } catch { $type = $m.Groups[1].Value } }
+            }
+            if ([string]::IsNullOrWhiteSpace($message)) {
+                $m = [regex]::Match($body, '"(?:exceptionMessage|message)"\s*:\s*"((?:[^"\\]|\\.)*)"')
+                if ($m.Success) { try { $message = [regex]::Unescape($m.Groups[1].Value) } catch { $message = $m.Groups[1].Value } }
+            }
+        }
+        else {
+            # an HTML error page (ASP.NET): "Exception Details: <type>: <message>" (Windows PowerShell 5.1 hands over the
+            # page as text without the tags)
+            $m = [regex]::Match($body, '(?is)Exception Details:\s*(?:</b>)?\s*([\w\.`]+)\s*:\s*(.*?)(?:<br|\r?\n|Source Error:|Stack Trace:|$)')
+            if ($m.Success) { $type = $m.Groups[1].Value; $message = $m.Groups[2].Value }
+            else { $message = $body }
+        }
+    }
+    elseif ($null -ne $ex) {
+        $type = $ex.GetType().FullName
+        $message = $ex.Message
+    }
+    if ([string]::IsNullOrWhiteSpace($type)) { $type = $null } else { $type = Get-ApiErrorShortText -Text $type -Max 200 }
+    return [pscustomobject]@{ status = $status; exceptionType = $type; exceptionMessage = (Get-ApiErrorShortText -Text $message -Max 300) }
+}
+
+function Invoke-ApiReadGet {
+    # One GET SalesOrder/SO/<nbr>?$expand=Details on a Default endpoint version with the suite's API session. Only the
+    # request itself is timed.
+    param([Parameter(Mandatory = $true)]$Inst, [Parameter(Mandatory = $true)][string]$Endpoint, [Parameter(Mandatory = $true)][string]$OrderNbr)
+    $uri = $Inst.BaseUrl + "/entity/" + $Endpoint + "/SalesOrder/SO/" + [Uri]::EscapeDataString($OrderNbr) + '?$expand=Details'
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+        $response = Invoke-WebRequest -Uri $uri -WebSession $Inst.Session -Headers @{ Accept = "application/json" } -UseBasicParsing -TimeoutSec 120 -ErrorAction Stop
+        $sw.Stop()
+        $code = 0
+        try { $code = [int]$response.StatusCode } catch { $code = 0 }
+        return [pscustomobject]@{ ok = ($code -ge 200 -and $code -lt 300); ms = $sw.Elapsed.TotalMilliseconds; status = $code; exceptionType = $null; exceptionMessage = $null }
+    }
+    catch {
+        $sw.Stop()
+        $info = Get-ApiErrorInfo -ErrorRecord $_
+        return [pscustomobject]@{ ok = $false; ms = $null; status = [int]$info.status; exceptionType = $info.exceptionType; exceptionMessage = $info.exceptionMessage }
+    }
+}
+
 function Invoke-ApiReadCheck {
-    # Dry-run step 3l (informational, never ranked): with the suite's API session, 5 untimed warm-up calls, then
-    # 50 timed GET SalesOrder/SO/<nbr>?$expand=Details on the Default endpoint, for the order numbers in the
-    # SCR_OPEN_SALES_ORDER run's notes.sampleOrderNbrs. Stored in diagnostics.apiReadMs of the campaign JSON.
-    $results = [ordered]@{}
-    foreach ($inst in $script:SuiteInstances) {
-        $entry = [ordered]@{ endpoint = $ApiReadEndpoint; warmUp = $ApiReadWarmUp; n = 0; p50Ms = $null; p95Ms = $null; meanMs = $null; minMs = $null; maxMs = $null; errors = 0; orderNbrs = 0; note = $null }
+    # Dry-run step 3l (SPEC 6.6; informational, never ranked), right after Block A, with the suite's API session:
+    #  1. probe: for each version in -ApiReadEndpoints, in order, ONE untimed GET SalesOrder/SO/<first sample order>
+    #     ?$expand=Details per instance; the first version that answers HTTP 200 on EVERY instance is used on all of
+    #     them (one endpoint for every engine; nothing is measured when no version answers everywhere);
+    #  2. measure on that version, instance by instance in the rotated order of Block A's last repetition:
+    #     -ApiReadWarmUp untimed calls, then -ApiReadCount timed calls over the SCR_OPEN_SALES_ORDER run's
+    #     notes.sampleOrderNbrs; when every warm-up call fails, the timed calls are skipped.
+    # diagnostics.apiReadMs.<instance> keeps only the published measurement fields (endpoint, n, p50Ms, p95Ms, meanMs,
+    # minMs, maxMs, errors). diagnostics.apiReadProbe (never published) keeps chosenEndpoint and tried[] (endpoint,
+    # instance, status, exceptionType, exceptionMessage of at most 300 characters without a stack trace), plus the
+    # first error of the measurement per instance. Other keys of diagnostics are kept: the two keys are merged in.
+    param([string[]]$Order = @())
+    $names = @($Order | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+    foreach ($inst in $script:SuiteInstances) { if ($names -notcontains $inst.Name) { $names += $inst.Name } }
+    $instances = @(foreach ($n in $names) { if ($script:InstancesByName.ContainsKey($n)) { $script:InstancesByName[$n] } })
+
+    $diag = $null
+    if ($script:State.Contains("diagnostics")) { $diag = $script:State["diagnostics"] }
+    $existing = Get-Prop $diag "apiReadMs"
+    if ($null -ne $existing -and @($instances | Where-Object { $e = Get-Prop $existing $_.Name; $null -eq $e -or $e -is [ValueType] -or [int](Get-Prop $e "n") -lt 1 }).Count -eq 0) {
+        Write-SuiteLog "API read (dry-run step 3l): already measured on every instance in this campaign; kept." "DarkGray"
+        return
+    }
+
+    Write-SuiteLog ("API read (dry-run step 3l): endpoint versions {0}; order {1}" -f ($ApiReadEndpoints -join ", "), (@($instances | ForEach-Object { $_.Name }) -join " > ")) "Cyan"
+    $numbersByInstance = @{}
+    $notes = [ordered]@{}
+    foreach ($inst in $instances) {
         $source = @($script:State.runs | Where-Object { $_.instance -eq $inst.Name -and $_.testCode -eq "SCR_OPEN_SALES_ORDER" -and (Test-RecordActive $_) -and $null -ne $_.result } | Select-Object -Last 1)
         $raw = if ($source.Count -gt 0) { Get-Prop (Get-Prop $source[0].result "notes") "sampleOrderNbrs" } else { $null }
         $numbers = @(foreach ($item in @($raw)) { foreach ($part in ([string]$item -split '[,;\s]+')) { if ($part.Trim() -ne "") { $part.Trim() } } })
-        $entry.orderNbrs = $numbers.Count
-        if ($numbers.Count -eq 0) {
-            $entry.note = "no notes.sampleOrderNbrs in this campaign's SCR_OPEN_SALES_ORDER run on this instance"
-            $results[$inst.Name] = $entry
-            continue
-        }
-        $root = $inst.BaseUrl + "/entity/" + $ApiReadEndpoint + "/SalesOrder/SO/"
-        $times = New-Object System.Collections.Generic.List[double]
-        for ($i = 0; $i -lt ($ApiReadWarmUp + $ApiReadCount); $i++) {
-            $uri = $root + [Uri]::EscapeDataString($numbers[$i % $numbers.Count]) + '?$expand=Details'
-            $sw = [System.Diagnostics.Stopwatch]::StartNew()
-            try {
-                [void](Invoke-WebRequest -Uri $uri -WebSession $inst.Session -Headers @{ Accept = "application/json" } -UseBasicParsing -TimeoutSec 120 -ErrorAction Stop)
-                $sw.Stop()
-                if ($i -ge $ApiReadWarmUp) { $times.Add($sw.Elapsed.TotalMilliseconds) }
-            }
-            catch {
-                $entry.errors++
-                if ($null -eq $entry.note) { $entry.note = "first error: " + $_.Exception.Message }
-            }
-        }
-        if ($times.Count -gt 0) {
-            $sorted = @($times.ToArray() | Sort-Object)
-            $entry.n = $sorted.Count
-            $entry.p50Ms = [Math]::Round((Get-Median -Values ([double[]]$sorted)), 2)
-            $entry.p95Ms = [Math]::Round([double]$sorted[[Math]::Min($sorted.Count - 1, [int][Math]::Ceiling(0.95 * $sorted.Count) - 1)], 2)
-            $entry.meanMs = [Math]::Round((($sorted | Measure-Object -Average).Average), 2)
-            $entry.minMs = [Math]::Round([double]$sorted[0], 2)
-            $entry.maxMs = [Math]::Round([double]$sorted[-1], 2)
-        }
-        Write-SuiteLog ("  API read {0}: n={1}, p50 {2} ms, p95 {3} ms, errors {4}" -f $inst.Name, $entry.n, $entry.p50Ms, $entry.p95Ms, $entry.errors) "DarkGray"
-        $results[$inst.Name] = $entry
+        $numbersByInstance[$inst.Name] = $numbers
+        if ($numbers.Count -eq 0) { $notes[$inst.Name] = "no notes.sampleOrderNbrs in this campaign's SCR_OPEN_SALES_ORDER run on this instance" }
     }
-    $script:State["diagnostics"] = [ordered]@{ apiReadMs = $results }
+
+    $tried = New-Object System.Collections.Generic.List[object]
+    $measureErrors = New-Object System.Collections.Generic.List[object]
+    $results = [ordered]@{}
+    $chosen = $null
+    $failure = $null
+    try {
+        # 1. probe (no endpoint is probed when an instance has no sample orders: the read is all three or none)
+        if ($notes.Count -eq 0) {
+            foreach ($endpoint in $ApiReadEndpoints) {
+                $answeredEverywhere = $true
+                foreach ($inst in $instances) {
+                    $r = Invoke-ApiReadGet -Inst $inst -Endpoint $endpoint -OrderNbr $numbersByInstance[$inst.Name][0]
+                    if ($r.status -eq 401) {
+                        Write-SuiteLog ("  {0}: session expired (401); logging in again" -f $inst.Name) "DarkYellow"
+                        Connect-SuiteInstance -Inst $inst
+                        $r = Invoke-ApiReadGet -Inst $inst -Endpoint $endpoint -OrderNbr $numbersByInstance[$inst.Name][0]
+                    }
+                    $tried.Add([pscustomobject][ordered]@{ endpoint = $endpoint; instance = $inst.Name; status = [int]$r.status; exceptionType = $r.exceptionType; exceptionMessage = $r.exceptionMessage })
+                    if ($r.status -ne 200) { $answeredEverywhere = $false }
+                    Write-SuiteLog ("  API read probe {0} on {1}: HTTP {2}{3}" -f $endpoint, $inst.Name, $r.status, $(if ($r.exceptionType) { " " + $r.exceptionType } else { "" })) "DarkGray"
+                }
+                if ($answeredEverywhere) { $chosen = $endpoint; break }
+            }
+        }
+        else {
+            Write-SuiteLog ("  API read: no sample order numbers for {0}; nothing probed or measured" -f (@($notes.Keys) -join ", ")) "Yellow"
+        }
+        if ($null -eq $chosen -and $notes.Count -eq 0) { Write-SuiteLog ("  API read: no version of {0} answered HTTP 200 on every instance; nothing measured" -f ($ApiReadEndpoints -join ", ")) "Yellow" }
+
+        # 2. measurement on the chosen version
+        foreach ($inst in $instances) {
+            $entry = [ordered]@{ endpoint = $chosen; n = 0; p50Ms = $null; p95Ms = $null; meanMs = $null; minMs = $null; maxMs = $null; errors = 0 }
+            $results[$inst.Name] = $entry
+            if ($null -eq $chosen) { continue }
+            $numbers = @($numbersByInstance[$inst.Name])
+            $times = New-Object System.Collections.Generic.List[double]
+            $first = $null
+            $stopped = $false
+            for ($i = 0; $i -lt ($ApiReadWarmUp + $ApiReadCount); $i++) {
+                $r = Invoke-ApiReadGet -Inst $inst -Endpoint $chosen -OrderNbr $numbers[$i % $numbers.Count]
+                if ($r.ok) {
+                    if ($i -ge $ApiReadWarmUp) { $times.Add([double]$r.ms) }
+                    continue
+                }
+                $entry.errors++
+                if ($null -eq $first) { $first = $r }
+                if ($ApiReadWarmUp -gt 0 -and $i -eq ($ApiReadWarmUp - 1) -and $entry.errors -eq $ApiReadWarmUp) { $stopped = $true; break }
+            }
+            if ($times.Count -gt 0) {
+                $sorted = @($times.ToArray() | Sort-Object)
+                $entry.n = $sorted.Count
+                $entry.p50Ms = [Math]::Round((Get-Median -Values ([double[]]$sorted)), 2)
+                $entry.p95Ms = [Math]::Round([double]$sorted[[Math]::Min($sorted.Count - 1, [int][Math]::Ceiling(0.95 * $sorted.Count) - 1)], 2)
+                $entry.meanMs = [Math]::Round((($sorted | Measure-Object -Average).Average), 2)
+                $entry.minMs = [Math]::Round([double]$sorted[0], 2)
+                $entry.maxMs = [Math]::Round([double]$sorted[-1], 2)
+            }
+            if ($null -ne $first) {
+                $measureErrors.Add([pscustomobject][ordered]@{ endpoint = $chosen; instance = $inst.Name; errors = $entry.errors; status = [int]$first.status; exceptionType = $first.exceptionType; exceptionMessage = $first.exceptionMessage; stoppedAfterWarmUp = $stopped })
+            }
+            $errText = if ($null -ne $first) { "; first error HTTP {0}{1}{2}" -f $first.status, $(if ($first.exceptionType) { " " + $first.exceptionType } else { "" }), $(if ($stopped) { " (every warm-up call failed; timed calls skipped)" } else { "" }) } else { "" }
+            Write-SuiteLog ("  API read {0} ({1}): n={2}, p50 {3} ms, p95 {4} ms, errors {5}{6}" -f $inst.Name, $chosen, $entry.n, $entry.p50Ms, $entry.p95Ms, $entry.errors, $errText) "DarkGray"
+        }
+    }
+    catch {
+        # informational step: an unexpected error (for example a failed re-login) is recorded, never fatal
+        $failure = Get-ApiErrorShortText -Text $_.Exception.Message -Max 300
+        Write-SuiteLog ("  API read stopped: " + $failure) "Yellow"
+        foreach ($inst in $instances) {
+            if (-not $results.Contains($inst.Name)) { $results[$inst.Name] = [ordered]@{ endpoint = $chosen; n = 0; p50Ms = $null; p95Ms = $null; meanMs = $null; minMs = $null; maxMs = $null; errors = 0 } }
+        }
+    }
+
+    $probe = [ordered]@{
+        chosenEndpoint = $chosen
+        tried = $tried.ToArray()
+        measureErrors = $measureErrors.ToArray()
+        endpoints = @($ApiReadEndpoints)
+        order = @($instances | ForEach-Object { $_.Name })
+        warmUp = $ApiReadWarmUp
+        count = $ApiReadCount
+        notes = $notes
+        failure = $failure
+    }
+    if (-not ($diag -is [System.Collections.IDictionary])) { $diag = ConvertTo-OrderedMap $diag }
+    $diag["apiReadMs"] = $results
+    $diag["apiReadProbe"] = $probe
+    $script:State["diagnostics"] = $diag
     Save-CampaignState
 }
 
@@ -4068,7 +4328,8 @@ function Invoke-Campaign {
         if (@($script:SuiteInstances | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.StuckBlock) }).Count -gt 0) { $previousProblem = "an instance was Stuck in Block $($blockPlan.Block)" }
         $firstBlock = $false
         if ($blockPlan.Block -eq "A" -and $ApiReadCheck) {
-            if ($script:ProfileName -eq "DryRun") { Invoke-ApiReadCheck }
+            # instance order: the rotated order of Block A's last repetition (the order the suite has just used)
+            if ($script:ProfileName -eq "DryRun") { Invoke-ApiReadCheck -Order @(@($blockPlan.Reps)[-1].Order) }
             else { Write-SuiteLog "-ApiReadCheck only applies to the DryRun profile (SPEC 6.6 step 3l); skipped." "Yellow" }
         }
         if ($i -lt $plan.Count - 1) { Invoke-BetweenBlocks -NextBlock $plan[$i + 1].Block }

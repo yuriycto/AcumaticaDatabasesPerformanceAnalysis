@@ -260,8 +260,31 @@ internal static class EnvCaptureCollector
             ["instance"] = PerfRuntimeInfo.InstanceName,
             ["methodologyVersion"] = PerfMethodology.Version,
             ["registry"] = registry,
-            ["registryLoadErrors"] = SafeLoadErrors()
+            ["registryLoadErrors"] = SafeLoadErrors(),
+            // Contract C1 (E14): the SQL throttle setting in effect in this app domain. The campaign and dry-run checks take
+            // optionsEnabled == false on all three sites as the runtime proof that the unlicensed throttle is off.
+            ["sqlThrottling"] = SafeProbe(EnvRuntimeProbes.SqlThrottling, "configValue", "optionsEnabled", "started", "source"),
+            // Contract C1, informational: this w3wp's affinity at capture time (kept as shipped, disclosed only). A snapshot, not a
+            // run's core count: 2 bits steady, 4 bits for up to 60 s (licence observer), all CPUs in the first 2 min of a new w3wp
+            // (see EnvRuntimeProbes.ProcessAffinity; read with appDomainStartUtc above and env.capturedAtUtc).
+            ["processAffinity"] = SafeProbe(EnvRuntimeProbes.ProcessAffinity, "maskHex", "bits", "processorCount")
         };
+    }
+
+    /// <summary>Runs a C1 probe; the probes never throw, but a failure here must not lose the rest of env.app either.</summary>
+    private static Dictionary<string, object> SafeProbe(Func<Dictionary<string, object>> probe, params string[] keys)
+    {
+        try
+        {
+            return probe();
+        }
+        catch (Exception ex)
+        {
+            var map = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (var k in keys) map[k] = null;
+            map["error"] = ex.GetType().Name + ": " + ex.Message;
+            return map;
+        }
     }
 
     private static List<object> SafeLoadErrors()

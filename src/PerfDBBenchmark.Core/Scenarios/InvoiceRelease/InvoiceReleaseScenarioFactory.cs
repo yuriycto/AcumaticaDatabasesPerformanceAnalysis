@@ -67,7 +67,10 @@ public sealed class InvoiceReleaseScenarioFactory : IPerfScenarioFactory
             IsDestructive = true,
             IsOptional = isOptional,
             ExcludeFromComparison = false,
-            ScenarioVersion = 2,   // 2: runs in the PRODWHOLE session-branch context (PerfBranchContext)
+            // 2: runs in the PRODWHOLE session-branch context (PerfBranchContext).
+            // 3: the invoice header clears RetainageApply (v2: Customers20[2] BNRCONTRAC got 10 % retainage, 315.00 + 35.00 on the
+            //    retainage receivable account, 4 GL lines; U04 invoiceAmountSum/glTranDelta failed identically on all engines).
+            ScenarioVersion = 3,
             DefaultOpsPerPass = opsPerPass,
             DefaultPasses = 1,
             DefaultWarmUpPasses = 0,

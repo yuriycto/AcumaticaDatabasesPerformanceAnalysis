@@ -122,6 +122,11 @@ $script:EngineInfo = [ordered]@{
     'PostgreSQL' = [ordered]@{ name = 'PostgreSQL'; color = '#CC79A7'; process = 'postgres' }
 }
 
+# Dry run 3f(b): the per-run engine counter divided by the run's operations. The three counters count different
+# things (and include driver and session statements), so the label names no cause and compares tests within one engine.
+$script:StatementCounterHead = 'Engine statement counter per operation'
+$script:StatementCounterTail = '(whole run incl. warm-up, Prepare, Verify, polling): SQL Server Batch Requests, MySQL Questions, PostgreSQL pg_stat_statements calls; the counters count different things, so compare tests within one engine, not engines.'
+
 # Family order, reader names and texts (SPEC 5.5, 7.1, 7.3). Family introductions are verbatim from SPEC 7.3.
 $script:FamilyOrder = @('Screens', 'Reports', 'OrderEntry', 'ManyUsers', 'InvoiceRelease', 'Core')
 $script:FamilyInfo = [ordered]@{
@@ -749,7 +754,7 @@ function Import-Campaign {
     $warnings = New-Object System.Collections.ArrayList
     $campaigns = @(); $runs = New-Object System.Collections.ArrayList; $events = New-Object System.Collections.ArrayList
     $tests = [ordered]@{}; $instances = [ordered]@{}; $envCaptures = New-Object System.Collections.ArrayList
-    $starts = @(); $ends = @(); $diag = [ordered]@{}; $seen = @{}; $tableCounts = New-Object System.Collections.ArrayList; $tcSeen = @{}
+    $starts = @(); $ends = @(); $diag = [ordered]@{}; $seen = @{}; $tableCounts = New-Object System.Collections.ArrayList; $tcSeen = @{}; $dryRun = $null
     foreach ($d in $docs) {
         $c = Get-Field $d 'campaign'
         if ($c) { $campaigns += , $c }
@@ -797,6 +802,9 @@ function Import-Campaign {
         $dg = Get-Field $d 'diagnostics'
         if ($dg) { foreach ($k in (Get-Keys $dg)) { $diag[$k] = Get-Field $dg $k } }
         if ($c) { $cd = Get-Field $c 'diagnostics'; if ($cd) { foreach ($k in (Get-Keys $cd)) { $diag[$k] = Get-Field $cd $k } } }
+        # dryrun-diagnostics.json names the dry run (dryRun.folder, dryRun.dryCampaignId): where the API-read probe is
+        $dr = Get-Field $d 'dryRun'
+        if ($null -eq $dryRun -and (Test-IsMap $dr)) { $dryRun = $dr }
     }
     if ($campaigns.Count -eq 0) { throw 'No campaign object found in the input JSON.' }
     if ($starts.Count -eq 0) { $s = Get-SideFile $dirs 'environment-start.json'; if ($s) { $starts += , $s } }
@@ -805,12 +813,33 @@ function Import-Campaign {
     foreach ($ec in $envCaptures) { Add-EnvShapeAliases (Get-Field $ec 'env') -EnvCapture }
     $decisions = Get-SideFile $dirs 'decisions.json'
     $calibration = Get-SideFile $dirs 'calibration.json'
-    # table-counts-<label>.json written by Get-PerfEnvironment -TableCounts next to an input (SPEC 5.4 item 19, 6.6 3n)
+    # Run-Campaign's state (sqlLogChain: the SQL Server log chain checked live before the campaign; throttleReadings: a
+    # summary of the E14 licence-telemetry gates) and the full records of those gates (throttle-readings.json)
+    $runCampaignState = Get-SideFile $dirs 'run-campaign-state.json'
+    $throttleReadings = Get-SideFile $dirs 'throttle-readings.json'
+    # Contract C4: diagnostics.apiReadProbe (never published). Run-Campaign passes only the campaign JSON and
+    # dryrun-diagnostics.json, and the dry run keeps the probe out of dryrun-diagnostics.json (3l writes it to
+    # dryrun\3l-api-read-probe.json), so it is loaded here at run time. Get-Diagnostics never copies this key.
+    if (-not $diag.Contains('apiReadProbe')) {
+        $arm = $(if ($diag.Contains('apiReadMs')) { $diag['apiReadMs'] } else { $null })
+        $probe = Find-ApiReadProbe -Dirs $dirs -DryRun $dryRun -ApiReadMs $arm
+        if ($null -ne $probe) { $diag['apiReadProbe'] = $probe }
+    }
+    # table-counts-<label>.json written by Get-PerfEnvironment -TableCounts next to an input (SPEC 5.4 item 19, 6.6 3n).
+    # The full file replaces the suite's compact embedded copy of the same name: the campaign residue (contract C2)
+    # needs its per-engine exact counts.
     foreach ($dir in $dirs) {
         foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter 'table-counts-*.json' -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
-            if ($tcSeen.ContainsKey($f.Name)) { continue }
+            $at = -1
+            if ($tcSeen.ContainsKey($f.Name)) {
+                for ($j = 0; $j -lt $tableCounts.Count; $j++) { if ([string](Get-Field $tableCounts[$j] 'source') -eq $f.Name -and -not (Test-IsMap (Get-Field $tableCounts[$j] 'engines'))) { $at = $j; break } }
+                if ($at -lt 0) { continue }
+            }
             $tcSeen[$f.Name] = $true
-            try { $doc = Read-PerfJson $f.FullName; if (Test-IsMap $doc) { $doc['source'] = $f.Name; [void]$tableCounts.Add($doc) } }
+            try {
+                $doc = Read-PerfJson $f.FullName
+                if (Test-IsMap $doc) { $doc['source'] = $f.Name; if ($at -ge 0) { $tableCounts[$at] = $doc } else { [void]$tableCounts.Add($doc) } }
+            }
             catch { Write-Warning ("Could not read {0}: {1}" -f $f.FullName, $_.Exception.Message) }
         }
     }
@@ -821,8 +850,63 @@ function Import-Campaign {
         meta = $meta; campaignIds = $ids; runs = $runs; events = $events; tests = $tests; instances = $instances
         start = $(if ($starts.Count) { $starts[0] } else { $null }); end = $(if ($ends.Count) { $ends[-1] } else { $null })
         envCaptures = $envCaptures; diagnosticsIn = $diag; decisions = $decisions; calibration = $calibration
-        tableCounts = $tableCounts; warnings = $warnings; inputDirs = $dirs
+        tableCounts = $tableCounts; warnings = $warnings; inputDirs = $dirs; runCampaignState = $runCampaignState
+        throttleReadings = $throttleReadings
     }
+}
+
+function Find-ApiReadProbe {
+    # Contract C4: the API-read probe of the dry run's 3d campaign (diagnostics.apiReadProbe), runtime only: the report
+    # uses its endpoint versions, engines and exception types, never its messages, and never writes it out. Looked up
+    # in the dry-run folder named by dryrun-diagnostics.json (dryRun.folder), then in <input folder>\dryrun:
+    #  - 3l-api-read-probe.json (Invoke-PerfDryRun 3l: chosenEndpoint and tried[]);
+    #  - the 3d campaign JSON <folder>\<id>\PerfDBBenchmark-<id>.json, whose probe also has measureErrors, notes,
+    #    warmUp, count and failure. It is read only when the 3l file is missing or when an engine has no timed call
+    #    or failed calls (diagnostics.apiReadMs), because only then are those fields needed.
+    # A probe of another dry-run campaign, or one whose chosen endpoint is not the measured one, is not used.
+    param([string[]]$Dirs, $DryRun, $ApiReadMs)
+    $folders = @()
+    $f = [string](Get-Field $DryRun 'folder')
+    if ($f -and (Test-Path -LiteralPath $f -PathType Container)) { $folders += (Resolve-Path -LiteralPath $f).ProviderPath }
+    foreach ($d in @($Dirs)) {
+        $p = Join-Path $d 'dryrun'
+        if ((Test-Path -LiteralPath $p -PathType Container) -and $folders -notcontains $p) { $folders += $p }
+    }
+    $wantId = [string](Get-Field $DryRun 'dryCampaignId')
+    $measured = @()
+    $needFull = $true
+    if (Test-IsMap $ApiReadMs) {
+        $vals = @((Get-Keys $ApiReadMs) | ForEach-Object { Get-Field $ApiReadMs $_ } | Where-Object { Test-IsMap $_ })
+        $measured = @($vals | ForEach-Object { [string](Get-Field $_ 'endpoint') } | Where-Object { $_ } | Select-Object -Unique)
+        $needFull = @($vals | Where-Object { (0 + (ConvertTo-Num (Get-Field $_ 'n'))) -lt 1 -or (0 + (ConvertTo-Num (Get-Field $_ 'errors'))) -gt 0 }).Count -gt 0
+    }
+    foreach ($folder in $folders) {
+        $probe = $null
+        $p3l = Join-Path $folder '3l-api-read-probe.json'
+        if (Test-Path -LiteralPath $p3l) {
+            try { $probe = Read-PerfJson $p3l } catch { Write-Warning ("Could not read {0}: {1}" -f $p3l, $_.Exception.Message) }
+            $fileId = [string](Get-Field $probe 'dryCampaignId')
+            if ($wantId -and $fileId -and $fileId -ne $wantId) { Write-Warning ("{0} belongs to dry-run campaign {1}, not {2}: not used." -f $p3l, $fileId, $wantId); $probe = $null }
+        }
+        $id = $wantId
+        if (-not $id) { $id = [string](Get-Field $probe 'dryCampaignId') }
+        if (($needFull -or -not (Test-IsMap $probe)) -and $id) {
+            $full = Join-Path (Join-Path $folder $id) ('PerfDBBenchmark-' + $id + '.json')
+            if (Test-Path -LiteralPath $full) {
+                try { $doc = Read-PerfJson $full; $fp = Get-PathValue $doc 'diagnostics.apiReadProbe'; if (Test-IsMap $fp) { $probe = $fp } }
+                catch { Write-Warning ("Could not read the API-read probe from {0}: {1}" -f $full, $_.Exception.Message) }
+                $doc = $null
+            }
+        }
+        if (-not (Test-IsMap $probe)) { continue }
+        $chosen = [string](Get-Field $probe 'chosenEndpoint')
+        if ($chosen -and $measured.Count -and ($measured.Count -gt 1 -or $measured[0] -ne $chosen)) {
+            Write-Warning ("The API-read probe in {0} chose {1}, but diagnostics.apiReadMs was measured on {2}: the probe is not used." -f $folder, $chosen, ($measured -join ', '))
+            continue
+        }
+        return , $probe
+    }
+    return $null
 }
 
 function New-TestModel {
@@ -2116,10 +2200,32 @@ function Get-Derived {
     return [ordered]@{ scaling = $scaling; hotItemPenalty = $hot; speedup1Uto8U = $speed; steadyState = $steady }
 }
 
+function Get-TableCountsGap {
+    # Why one engine has no row counts in one table-count capture (contract C2), or $null when it has them.
+    param($Tc, [string]$Engine)
+    $short = { param($s) $t = [string]$s; if ($t.Length -gt 160) { $t = $t.Substring(0, 157) + '...' }; return $t }
+    $engs = Get-Field $Tc 'engines'
+    if (-not (Test-IsMap $engs)) {
+        # the suite's compact copy (campaign JSON environment.tableCounts): unavailable engines are listed under
+        # "unavailable"; an engine with changed tables or soft-deleted counts was captured
+        $un = Get-Field (Get-Field $Tc 'unavailable') $Engine
+        if ($un) { return ('unavailable: ' + (& $short $un)) }
+        if ((Test-MapHasKey (Get-Field $Tc 'changedTables') $Engine) -or $null -ne (Get-Field (Get-Field $Tc 'softDeleted') $Engine)) { return $null }
+        return 'not in this capture'
+    }
+    $en = Get-Field $engs $Engine
+    if (-not (Test-IsMap $en)) { return 'not in this capture' }
+    $un = Get-Field $en 'unavailable'
+    if ($un) { return ('unavailable: ' + (& $short $un)) }
+    if (-not (Test-IsMap (Get-Field $en 'exactCounts')) -and -not (Test-IsMap (Get-Field $en 'counts'))) { return 'no row counts' }
+    return $null
+}
+
 function Get-ResidueTables {
     # Residue tables (SPEC 5.4 item 19, 6.6 3n): per table-count capture, the tables whose row count changed against
-    # its baseline (Get-PerfEnvironment -TableCounts -BaselineFile) and the soft-deleted ARRegister/Batch rows.
-    param($Data)
+    # its baseline (Get-PerfEnvironment -TableCounts -BaselineFile), the soft-deleted ARRegister/Batch rows, and the
+    # engines without row counts in that capture (contract C2: engines.<e>.unavailable; they are named, never skipped).
+    param($Data, [string[]]$Engines)
     $out = @()
     foreach ($tc in @($Data.tableCounts)) {
         if (-not $tc) { continue }
@@ -2137,12 +2243,750 @@ function Get-ResidueTables {
                 } | Sort-Object { - [Math]::Abs([double](0 + $_.delta)) })
             $byEngine[$e] = $rows
         }
+        $notCaptured = [ordered]@{}
+        foreach ($e in @($Engines)) { $gap = Get-TableCountsGap $tc $e; if ($gap) { $notCaptured[$e] = $gap } }
         $out += [ordered]@{
             source = [string](Get-Field $tc 'source'); label = [string](Get-Field $tc 'label'); capturedAtUtc = [string](Get-Field $tc 'capturedAtUtc')
-            baselineFile = [string](Get-Field $tc 'baselineFile'); changedTables = $byEngine; softDeleted = $soft
+            mode = [string](Get-Field $tc 'mode'); baselineFile = [string](Get-Field $tc 'baselineFile'); changedTables = $byEngine; softDeleted = $soft
+            notCaptured = $notCaptured
         }
     }
     return , $out
+}
+
+function Test-MapHasKey {
+    # Exact (case-sensitive where the map is) key test: PostgreSQL can hold two tables whose names differ only in case.
+    param($Map, [string]$Key)
+    if ($null -eq $Map) { return $false }
+    if ($Map -is [System.Collections.Specialized.OrderedDictionary]) { return $Map.Contains($Key) }
+    if ($Map -is [System.Collections.IDictionary]) { return $Map.ContainsKey($Key) }
+    return $null -ne $Map.PSObject.Properties[$Key]
+}
+
+function Get-MapValue {
+    param($Map, [string]$Key)
+    if ($Map -is [System.Collections.IDictionary]) { return $Map[$Key] }
+    $p = $Map.PSObject.Properties[$Key]
+    if ($p) { return $p.Value }
+    return $null
+}
+
+function Get-ExactCountMap {
+    # Exact row counts of one engine in one table-count capture (contract C2): engines.<e>.exactCounts (mode "exact":
+    # every base table; older "legacy" files: the key and changed tables only), or SQL Server's counts in an older file
+    # (sys.dm_db_partition_stats, exact). A metadata-only capture has estimates and is never compared.
+    param($Tc, [string]$Engine)
+    $gap = Get-TableCountsGap $Tc $Engine
+    if ($gap) { return [ordered]@{ counts = $null; reason = $gap; full = $false } }
+    if (-not (Test-IsMap (Get-Field $Tc 'engines'))) { return [ordered]@{ counts = $null; reason = 'only the compact copy in the campaign JSON was found (the full file was not next to the input)'; full = $false } }
+    $mode = [string](Get-Field $Tc 'mode')
+    if ($mode -eq 'metadata') { return [ordered]@{ counts = $null; reason = 'metadata-only capture (no exact counts)'; full = $false } }
+    $en = Get-Field (Get-Field $Tc 'engines') $Engine
+    $ex = Get-Field $en 'exactCounts'
+    if (Test-IsMap $ex) { return [ordered]@{ counts = $ex; reason = $null; full = ($mode -eq 'exact') } }
+    $cn = Get-Field $en 'counts'
+    if ($Engine -eq 'SQLServer' -and (Test-IsMap $cn)) { return [ordered]@{ counts = $cn; reason = $null; full = $true } }
+    return [ordered]@{ counts = $null; reason = 'no exact row counts'; full = $false }
+}
+
+function Get-TableDisplayName { param([string]$Name) return (($Name -replace '^(?i)(dbo|public)\.', '').Replace('"', '')) }
+
+function Get-CaptureErrorTexts {
+    param($Tc)
+    $out = @()
+    if (-not $Tc) { return , $out }
+    foreach ($er in @(Get-Field $Tc 'errors')) {
+        if (-not $er) { continue }
+        $t = if (Test-IsMap $er) { ([string](Get-Field $er 'section') + ': ' + [string](Get-Field $er 'message')).Trim(': ') } else { [string]$er }
+        if ($t.Length -gt 200) { $t = $t.Substring(0, 197) + '...' }
+        $out += ([string](Get-Field $Tc 'source') + ': ' + $t)
+    }
+    return , $out
+}
+
+function Get-CampaignResidue {
+    # Contract C2: the campaign's residue = exact row counts at the campaign end (table-counts-campaign-end.json) against
+    # the campaign baseline (table-counts-campaign-baseline.json: dry-run step 3p, after the clear and before the equal
+    # restart), engine by engine, exact against exact. An engine without exact counts in either file is listed as not
+    # captured (its residue is unknown); it is never compared with estimates. $null when neither file exists.
+    param($Data, [string[]]$Engines)
+    $pick = {
+        param([string]$Label)
+        $hit = $null
+        foreach ($tc in @($Data.tableCounts)) {
+            if (-not $tc) { continue }
+            if ([string](Get-Field $tc 'source') -ieq ('table-counts-' + $Label + '.json') -or [string](Get-Field $tc 'label') -ieq $Label) { $hit = $tc }
+        }
+        return , $hit
+    }
+    $base = & $pick 'campaign-baseline'
+    $end = & $pick 'campaign-end'
+    if ($null -eq $base -and $null -eq $end) { return $null }
+    $res = [ordered]@{
+        baseline = $(if ($base) { [string](Get-Field $base 'source') } else { $null }); baselineMode = $(if ($base) { [string](Get-Field $base 'mode') } else { $null })
+        baselineCapturedAtUtc = $(if ($base) { [string](Get-Field $base 'capturedAtUtc') } else { $null })
+        end = $(if ($end) { [string](Get-Field $end 'source') } else { $null }); endMode = $(if ($end) { [string](Get-Field $end 'mode') } else { $null })
+        endCapturedAtUtc = $(if ($end) { [string](Get-Field $end 'capturedAtUtc') } else { $null })
+        engines = [ordered]@{}; errors = @((Get-CaptureErrorTexts $base) + (Get-CaptureErrorTexts $end))
+    }
+    foreach ($e in @($Engines)) {
+        $b = if ($base) { Get-ExactCountMap $base $e } else { [ordered]@{ counts = $null; reason = 'no table-counts-campaign-baseline.json'; full = $false } }
+        $x = if ($end) { Get-ExactCountMap $end $e } else { [ordered]@{ counts = $null; reason = 'no table-counts-campaign-end.json'; full = $false } }
+        if ($null -eq $b.counts -or $null -eq $x.counts) {
+            $why = @()
+            if ($null -eq $b.counts) { $why += ('baseline ' + $b.reason) }
+            if ($null -eq $x.counts) { $why += ('end ' + $x.reason) }
+            $res.engines[$e] = [ordered]@{ captured = $false; reason = ($why -join '; ') }
+            continue
+        }
+        $rows = New-Object System.Collections.ArrayList
+        $compared = 0; $onlyEnd = 0; $onlyBase = 0
+        foreach ($k in (Get-Keys $x.counts)) {
+            if (-not (Test-MapHasKey $b.counts $k)) { $onlyEnd++; continue }
+            $before = ConvertTo-Num (Get-MapValue $b.counts $k); $after = ConvertTo-Num (Get-MapValue $x.counts $k)
+            $compared++
+            if ($null -ne $before -and $null -ne $after -and $before -ne $after) { [void]$rows.Add([ordered]@{ table = (Get-TableDisplayName $k); before = $before; after = $after; delta = ($after - $before) }) }
+        }
+        foreach ($k in (Get-Keys $b.counts)) { if (-not (Test-MapHasKey $x.counts $k)) { $onlyBase++ } }
+        $sorted = @($rows | Sort-Object @{ Expression = { [Math]::Abs([double]$_.delta) }; Descending = $true }, @{ Expression = { $_.table } })
+        $sb = Get-Field (Get-Field (Get-Field $base 'engines') $e) 'softDeleted'
+        $sx = Get-Field (Get-Field (Get-Field $end 'engines') $e) 'softDeleted'
+        $soft = [ordered]@{}
+        foreach ($k in @(@(Get-Keys $sb) + @(Get-Keys $sx) | Select-Object -Unique)) { $soft[$k] = [ordered]@{ before = ConvertTo-Num (Get-Field $sb $k); after = ConvertTo-Num (Get-Field $sx $k) } }
+        $res.engines[$e] = [ordered]@{ captured = $true; everyTable = ($b.full -and $x.full); tablesCompared = $compared; onlyInBaseline = $onlyBase; onlyAtEnd = $onlyEnd; changed = $sorted; softDeleted = $soft }
+    }
+    return $res
+}
+
+function Format-ResidueRow {
+    param($Row)
+    $dlt = 0 + $Row.delta
+    return ($Row.table + ' ' + ('{0:N0}' -f (0 + $Row.before)) + ' ' + $script:ARROW + ' ' + ('{0:N0}' -f (0 + $Row.after)) + ' (' + $(if ($dlt -ge 0) { '+' } else { '' }) + ('{0:N0}' -f $dlt) + ')')
+}
+
+function Get-CampaignResidueText {
+    # Appendix text of Get-CampaignResidue: per engine the changed tables (largest change first), or "not captured".
+    param($R)
+    $parts = @()
+    foreach ($e in @($R.engines.Keys)) {
+        $x = $R.engines[$e]
+        if (-not $x.captured) { $parts += ((Get-EngineName $e) + ': not captured (' + $x.reason + '), so its residue is not known'); continue }
+        $rows = @($x.changed)
+        $shown = @($rows | Select-Object -First 15 | ForEach-Object { Format-ResidueRow $_ })
+        $more = if ($rows.Count -gt 15) { ' and ' + ($rows.Count - 15) + ' more' } else { '' }
+        $txt = (Get-EngineName $e) + ': ' + $(if ($rows.Count) { ($shown -join ', ') + $more } else { 'no table changed' })
+        $txt += ' (' + ('{0:N0}' -f $x.tablesCompared) + ' tables compared' + $(if (-not $x.everyTable) { '; not every table was counted exactly in both files' } else { '' }) + $(if ($x.onlyAtEnd -or $x.onlyInBaseline) { '; ' + $x.onlyAtEnd + ' only at the end, ' + $x.onlyInBaseline + ' only in the baseline' } else { '' }) + ')'
+        $parts += $txt
+    }
+    $soft = @(foreach ($e in @($R.engines.Keys)) {
+            $x = $R.engines[$e]
+            if (-not $x.captured -or -not $x.softDeleted -or $x.softDeleted.Count -eq 0) { continue }
+            (Get-EngineName $e) + ' ' + ((@($x.softDeleted.Keys) | ForEach-Object { $_ + ' ' + (Format-EnvValue $x.softDeleted[$_].before) + ' ' + $script:ARROW + ' ' + (Format-EnvValue $x.softDeleted[$_].after) }) -join ', ')
+        })
+    if ($soft.Count) { $parts += ('soft-deleted / archived rows (baseline ' + $script:ARROW + ' end): ' + ($soft -join '; ')) }
+    if (@($R.errors).Count) { $parts += ('capture errors: ' + (@($R.errors) -join ' | ')) }
+    return ($parts -join '. ')
+}
+
+# ---- dry-run 3l / 3f texts, collation, SQL throttle, CPU affinity and SQL log chain disclosures
+
+function Get-InstanceEngine {
+    param($Data, [string]$Instance)
+    if ($Data.instanceEngines -and $Data.instanceEngines.ContainsKey($Instance)) { return $Data.instanceEngines[$Instance] }
+    return (Resolve-Engine '' $Instance)
+}
+
+function Get-ApiReadPublished {
+    # Contract C4: diagnostics.apiReadMs.<instance> = { endpoint, n, p50Ms, p95Ms, meanMs, minMs, maxMs, errors } and
+    # nothing else is published (older files also carried warmUp, orderNbrs and a note with the raw error text; the
+    # probe with exception messages, diagnostics.apiReadProbe, is never published). A plain number (hand-entered,
+    # older sample files) is read as p50Ms with n unknown. Entries that are not measurements are dropped.
+    param($Raw)
+    if ($null -eq $Raw -or $Raw -is [string]) { return $Raw }
+    if (-not (Test-IsMap $Raw)) { return 'not provided' }
+    $out = [ordered]@{}
+    foreach ($inst in (Get-Keys $Raw)) {
+        $v = Get-Field $Raw $inst
+        if (Test-IsMap $v) {
+            if (-not (Test-MapHasKey $v 'n') -and -not (Test-MapHasKey $v 'p50Ms')) { continue }
+            $ep = Get-Field $v 'endpoint'
+            $out[$inst] = [ordered]@{
+                endpoint = $(if ($null -ne $ep -and [string]$ep -ne '') { [string]$ep } else { $null })
+                n = ConvertTo-Num (Get-Field $v 'n'); p50Ms = ConvertTo-Num (Get-Field $v 'p50Ms'); p95Ms = ConvertTo-Num (Get-Field $v 'p95Ms')
+                meanMs = ConvertTo-Num (Get-Field $v 'meanMs'); minMs = ConvertTo-Num (Get-Field $v 'minMs'); maxMs = ConvertTo-Num (Get-Field $v 'maxMs')
+                errors = ConvertTo-Num (Get-Field $v 'errors')
+            }
+        }
+        elseif ($null -ne (ConvertTo-Num $v)) {
+            $out[$inst] = [ordered]@{ endpoint = $null; n = $null; p50Ms = (ConvertTo-Num $v); p95Ms = $null; meanMs = $null; minMs = $null; maxMs = $null; errors = $null }
+        }
+    }
+    return $out
+}
+
+function Get-OpenSalesOrderP50 {
+    # "Open a sales order" per-operation p50 of one engine: the cell median of the analysis set (each run's headline is
+    # its median ms per order opened); without a cell, the median of the engine's valid measured runs.
+    param([string]$Engine, $Cells, [object[]]$Runs)
+    $c = $null
+    if ($Cells -and $Cells.Contains('SCR_OPEN_SALES_ORDER')) { $c = @($Cells['SCR_OPEN_SALES_ORDER'] | Where-Object { $_.engine -eq $Engine })[0] }
+    if ($c -and $null -ne $c.median -and -not (Test-Inf $c.median)) { return [double]$c.median }
+    $v = @($Runs | Where-Object { $_.testCode -eq 'SCR_OPEN_SALES_ORDER' -and $_.engine -eq $Engine -and $_.valid -and -not $_.capped -and -not $_.isWarmup -and $null -ne $_.headlineValue } | ForEach-Object { [double]$_.headlineValue })
+    if ($v.Count) { return (Get-Median ([double[]]$v)) }
+    return $null
+}
+
+function Get-ApiFailLabel {
+    param($Entry)
+    $t = [string](Get-Field $Entry 'exceptionType')
+    if ($t) { return $t }
+    $st = ConvertTo-Num (Get-Field $Entry 'status')
+    if ($st -and $st -gt 0) { return ('HTTP ' + [int]$st + ', exception type not recorded') }
+    return 'no response'
+}
+
+function Format-ApiFailedVersion {
+    # One endpoint version of the API-read probe that did not answer on every engine:
+    # "<endpoint>: <exception type> on <engines>[; <other type> on <engines>][ (answered on <engines>)]".
+    # Only the exception type (or the HTTP status) is used, never the exception message.
+    param($Data, [string]$Endpoint, [object[]]$Rows)
+    $groups = [ordered]@{}; $okEngines = @()
+    foreach ($t in @($Rows)) {
+        $eng = Get-InstanceEngine $Data ([string](Get-Field $t 'instance'))
+        if ((ConvertTo-Num (Get-Field $t 'status')) -eq 200) { if ($okEngines -notcontains $eng) { $okEngines += $eng }; continue }
+        $label = Get-ApiFailLabel $t
+        if (-not $groups.Contains($label)) { $groups[$label] = @() }
+        if ($groups[$label] -notcontains $eng) { $groups[$label] = @($groups[$label]) + $eng }
+    }
+    if ($groups.Count -eq 0) { return $null }
+    $order = { param([string[]]$E) @($E | Sort-Object { $i = [array]::IndexOf([string[]]$script:EngineOrder, $_); if ($i -lt 0) { 99 } else { $i } }) }
+    $txt = $Endpoint + ': ' + ((@($groups.Keys) | ForEach-Object { $_ + ' on ' + (Join-EngineNames (& $order $groups[$_])) }) -join '; ')
+    if ($okEngines.Count) { $txt += ' (answered on ' + (Join-EngineNames (& $order $okEngines)) + ')' }
+    return $txt
+}
+
+function Get-ApiReadSummary {
+    # SPEC FR-M11 / 6.6 3l: per engine the end-to-end API read (median of the timed GETs) next to the database-dependent
+    # part measured by "Open a sales order" (SCR_OPEN_SALES_ORDER per-operation p50). Available only when every engine
+    # has n > 0; failed calls of an engine are stated next to its figures. The endpoint versions that did not answer on
+    # every engine, and the reason when the read is not available, come from diagnostics.apiReadProbe (loaded by
+    # Import-Campaign from the dry-run folder; never published): only endpoint versions, engines and exception types
+    # are used, never an exception message or the probe's failure text.
+    param($Data, $Published, $Cells, [object[]]$Runs, [string[]]$Engines)
+    $s = [ordered]@{ available = $false; endpoint = $null; n = $null; warmUp = $null; callsPerEngine = $null; perEngine = [ordered]@{}; endpointsThatFailed = @(); reason = $null }
+    if (-not (Test-IsMap $Published)) { $s.reason = 'not provided: the dry-run diagnostics were not passed to the report'; return $s }
+    $probe = $null
+    if ($Data.diagnosticsIn -and $Data.diagnosticsIn.Contains('apiReadProbe')) { $probe = $Data.diagnosticsIn['apiReadProbe'] }
+    if (-not (Test-IsMap $probe)) { $probe = $null }
+    $wu = ConvertTo-Num (Get-Field $probe 'warmUp'); $cnt = ConvertTo-Num (Get-Field $probe 'count')
+    if ($null -ne $wu) { $s.warmUp = [int]$wu }
+    if ($null -ne $wu -and $null -ne $cnt) { $s.callsPerEngine = [int]($wu + $cnt) }
+    $byEngine = @{}
+    foreach ($inst in (Get-Keys $Published)) { $byEngine[(Get-InstanceEngine $Data $inst)] = $inst }
+    $missing = @()
+    foreach ($e in @($Engines)) {
+        $y = Get-OpenSalesOrderP50 $e $Cells $Runs
+        $inst = $byEngine[$e]
+        if (-not $inst) { $missing += $e; $s.perEngine[$e] = [ordered]@{ instance = $null; endpoint = $null; n = $null; errors = $null; apiReadP50Ms = $null; apiReadP95Ms = $null; openSalesOrderP50Ms = $y }; continue }
+        $m = $Published[$inst]
+        $ok = ($null -ne $m.p50Ms) -and ($null -eq $m.n -or $m.n -gt 0)
+        if (-not $ok) { $missing += $e }
+        $s.perEngine[$e] = [ordered]@{ instance = $inst; endpoint = $m.endpoint; n = $m.n; errors = $m.errors; apiReadP50Ms = $m.p50Ms; apiReadP95Ms = $m.p95Ms; openSalesOrderP50Ms = $y }
+    }
+    $eps = @($s.perEngine.Values | ForEach-Object { $_.endpoint } | Where-Object { $_ } | Select-Object -Unique)
+    if ($eps.Count) { $s.endpoint = ($eps -join ', ') }
+    $ns = @($s.perEngine.Values | ForEach-Object { $_.n } | Where-Object { $null -ne $_ } | Select-Object -Unique)
+    if ($ns.Count -eq 1) { $s.n = $ns[0] }
+    # the probe: the endpoint versions that did not answer on every engine, with the engines and exception types
+    $chosen = [string](Get-Field $probe 'chosenEndpoint')
+    $epOrder = @(); $rowsByEp = @{}
+    foreach ($t in @(@(Get-Field $probe 'tried') | Where-Object { Test-IsMap $_ })) {
+        $ep = [string](Get-Field $t 'endpoint')
+        if (-not $ep) { continue }
+        if ($epOrder -notcontains $ep) { $epOrder += $ep; $rowsByEp[$ep] = @() }
+        $rowsByEp[$ep] = @($rowsByEp[$ep]) + @(, $t)
+    }
+    $failedEps = @($epOrder | Where-Object { $ep = $_; @($rowsByEp[$ep] | Where-Object { (ConvertTo-Num (Get-Field $_ 'status')) -ne 200 }).Count -gt 0 })
+    $s.endpointsThatFailed = @(foreach ($ep in $failedEps) { if ($ep -eq $chosen) { continue }; $x = Format-ApiFailedVersion $Data $ep $rowsByEp[$ep]; if ($x) { $x } })
+    $s.available = ($missing.Count -eq 0 -and @($Engines).Count -gt 0)
+    if ($s.available) { return $s }
+
+    # not available: why, from the probe
+    $why = @()
+    $noteEngines = @((Get-Keys (Get-Field $probe 'notes')) | ForEach-Object { Get-InstanceEngine $Data $_ })
+    if ($noteEngines.Count) { $why += ('no sample order numbers on ' + (Join-EngineNames $noteEngines) + ', so no endpoint version was probed or measured') }
+    $failure = [string](Get-Field $probe 'failure')
+    if ($chosen) {
+        $me = @(@(Get-Field $probe 'measureErrors') | Where-Object { Test-IsMap $_ })
+        foreach ($e in $missing) {
+            $p = $s.perEngine[$e]
+            $row = @($me | Where-Object { (Get-InstanceEngine $Data ([string](Get-Field $_ 'instance'))) -eq $e })[0]
+            $er = $p.errors
+            if ($null -eq $er -and $row) { $er = ConvertTo-Num (Get-Field $row 'errors') }
+            $stopped = $row -and (ConvertTo-Flag (Get-Field $row 'stoppedAfterWarmUp'))
+            # calls made: warm-up + timed, or only the warm-up calls when they all failed (the timed calls were skipped)
+            $made = $(if ($stopped) { $s.warmUp } else { $s.callsPerEngine })
+            $detail = @()
+            if ($null -ne $er -and $er -gt 0) { $detail += ([string][int]$er + $(if ($made) { ' of ' + $made } else { '' }) + ' calls failed') }
+            if ($row) {
+                $detail += (Get-ApiFailLabel $row)
+                if ($stopped) { $detail += 'every warm-up call failed, so the timed calls were skipped' }
+            }
+            elseif (-not $p.instance) { $detail += 'no result for this engine' }
+            elseif ($null -ne $er -and $er -gt 0) { $detail += 'exception type not recorded' }
+            else { $detail += 'not measured' }
+            $why += ((Get-EngineName $e) + ': no successful timed call on ' + $chosen + ' (' + ($detail -join '; ') + ')')
+        }
+        if ($s.endpointsThatFailed.Count) { $why += ('not used: ' + ($s.endpointsThatFailed -join '; ')) }
+    }
+    elseif ($epOrder.Count) {
+        if ($failedEps.Count -eq $epOrder.Count -and -not $failure) { $why += ('no Default endpoint version answered on every engine: ' + ($s.endpointsThatFailed -join '; ')) }
+        else { $why += ('the endpoint probe did not finish' + $(if ($s.endpointsThatFailed.Count) { ' (' + ($s.endpointsThatFailed -join '; ') + ')' } else { '' })) }
+    }
+    elseif ($probe -and $noteEngines.Count -eq 0 -and -not $failure) {
+        # the dry run's 3l file without the 3d campaign JSON: notes and failure are not in it
+        $why += 'no endpoint version was probed (no sample order numbers, or an early error; details in the unpublished probe)'
+    }
+    # the failure text is a raw exception message: never published (contract C4)
+    if ($failure) { $why += 'the API read stopped with an unexpected error (details in the unpublished probe)' }
+    if ($why.Count) { $s.reason = ($why -join '; '); return $s }
+
+    # no probe at all (an older campaign, or the dry-run folder is not next to the inputs): the published fields only
+    $none = @($missing | Where-Object { $p = $s.perEngine[$_]; $p.instance -and -not $p.endpoint -and (0 + $p.n) -eq 0 -and (0 + $p.errors) -eq 0 })
+    if ($none.Count -eq $missing.Count) {
+        $s.reason = 'no Default endpoint version answered on every engine, or none could be probed (exception type not recorded: the probe was not found)'
+        return $s
+    }
+    $bad = @($missing | ForEach-Object {
+            $p = $s.perEngine[$_]
+            (Get-EngineName $_) + $(if (-not $p.instance) { ': no result' } elseif ($null -ne $p.errors -and $p.errors -gt 0) { ': ' + [int]$p.errors + ' failed calls' + $(if ($p.endpoint) { ' on ' + $p.endpoint } else { '' }) } else { ': not measured' })
+        })
+    $s.reason = 'no successful timed call on every engine (' + ($bad -join '; ') + '; exception type not recorded: the probe was not found)'
+    return $s
+}
+
+function Get-ApiReadText {
+    # The published 3l sentence (SPEC FR-M11, 6.6 3l), or the not-available line. Failed calls of an engine are named
+    # next to its figures (its median then comes from fewer timed calls).
+    param($S)
+    if (-not $S) { return 'End-to-end API read: not available (not provided)' }
+    if (-not $S.available) { return ('End-to-end API read: not available (' + $S.reason + ')') }
+    $parts = @(foreach ($e in @($S.perEngine.Keys)) {
+            $p = $S.perEngine[$e]
+            $extra = @()
+            if ($null -eq $S.n -and $null -ne $p.n) { $extra += ('median of ' + [int]$p.n + ' timed calls') }
+            if ($null -ne $p.errors -and $p.errors -gt 0) { $extra += ([string][int]$p.errors + $(if ($S.callsPerEngine) { ' of ' + $S.callsPerEngine } else { '' }) + ' calls failed') }
+            (Get-EngineName $e) + ': end-to-end API read ' + $script:APPROX + ' ' + (Format-Sig3 $p.apiReadP50Ms) + ' ms' + $(if ($extra.Count) { ' (' + ($extra -join '; ') + ')' } else { '' }) + '; the database-dependent part measured by Open a sales order ' + $script:APPROX + ' ' + $(if ($null -ne $p.openSalesOrderP50Ms) { (Format-Sig3 $p.openSalesOrderP50Ms) + ' ms' } else { '(not measured)' })
+        })
+    $wuTxt = $(if ($null -ne $S.warmUp) { [string][int]$S.warmUp } else { '5' })
+    $how = 'median of ' + $(if ($null -ne $S.n) { [string][int]$S.n + ' timed' } else { 'the timed' }) + ' GET SalesOrder/SO/{order}?$expand=Details calls per engine after ' + $wuTxt + ' untimed warm-up calls, with the suite''s API session, on ' + $(if ($S.endpoint) { $S.endpoint } else { 'the Default endpoint' })
+    if (@($S.endpointsThatFailed).Count) { $how += '; ' + (@($S.endpointsThatFailed) -join '; ') + ' (that version did not answer on every engine, so it was not used)' }
+    return ('End-to-end API read: ' + ($parts -join '; ') + ' (' + $how + '; dry run 3l, informational, never ranked)')
+}
+
+function Get-CacheDefeatText {
+    # Dry run 3f(a), printed as recorded by the dry run: statements executed on PerfSQL (execution_count delta),
+    # operations issued, statements per operation by design, Prepare statements, expected statements and its "equal".
+    param($Probe)
+    if ($null -eq $Probe -or $Probe -is [string] -or -not (Test-IsMap $Probe)) { return [string]$Probe }
+    $parts = @()
+    foreach ($code in (Get-Keys $Probe)) {
+        $p = Get-Field $Probe $code
+        if (-not (Test-IsMap $p)) { $parts += ($code + ' = ' + [string]$p); continue }
+        $hasNew = (Test-MapHasKey $p 'expectedStatements') -or (Test-MapHasKey $p 'operationsIssued')
+        if ($hasNew -or (Test-MapHasKey $p 'queriesIssued')) {
+            $inst = [string](Get-Field $p 'instance')
+            $t = $code + $(if ($inst) { ' on ' + $inst } else { '' }) + ': statements executed ' + (Format-EnvValue (Get-Field $p 'executionCountDelta'))
+            if ($hasNew) {
+                $t += ', operations issued ' + (Format-EnvValue (Get-Field $p 'operationsIssued'))
+                if (Test-MapHasKey $p 'statementsPerOpByDesign') { $t += ', statements per operation by design ' + (Format-EnvValue (Get-Field $p 'statementsPerOpByDesign')) }
+                if (Test-MapHasKey $p 'prepareStatements') { $t += ', Prepare statements ' + (Format-EnvValue (Get-Field $p 'prepareStatements')) }
+                $t += ', expected statements ' + (Format-EnvValue (Get-Field $p 'expectedStatements'))
+            }
+            else { $t += ', operations issued ' + (Format-EnvValue (Get-Field $p 'queriesIssued')) + ' (this dry run compared statements with operations; expected statements were not recorded)' }
+            $t += ', equal ' + (Format-EnvValue (Get-Field $p 'equal'))
+            $note = [string](Get-Field $p 'note'); if ($note) { $t += ' (' + $note + ')' }
+            $parts += $t
+        }
+        else { $m = [ordered]@{}; Get-LeafMap $p $code $m; $parts += ((@($m.Keys) | ForEach-Object { $_ + ' = ' + $m[$_] }) -join '; ') }
+    }
+    return ($parts -join '; ')
+}
+
+function Get-StatementsPerOpValues {
+    param($Spo)
+    if ($null -eq $Spo -or $Spo -is [string] -or -not (Test-IsMap $Spo)) { return [string]$Spo }
+    return (((Get-Keys $Spo) | ForEach-Object { $t = $_; $t + ' ' + (((Get-Keys (Get-Field $Spo $t)) | ForEach-Object { (Get-EngineName $_) + ' ' + [string](Get-Field (Get-Field $Spo $t) $_) }) -join ', ') }) -join '; ')
+}
+
+function Get-CollationCapture {
+    # Contract C3: databases.<Engine>.collation of the environment capture (start, else end).
+    param($Data, [string]$Engine)
+    foreach ($doc in @($Data.start, $Data.end)) {
+        if ($null -eq $doc) { continue }
+        $c = Get-PathValue $doc ('databases.' + $Engine + '.collation')
+        if (Test-IsMap $c) { return , $c }
+    }
+    return $null
+}
+
+function Get-ColumnCollationSummary {
+    # "<collation> (<number of text columns>)" for the three most used column collations.
+    param($Map)
+    if (-not (Test-IsMap $Map)) { return $null }
+    $rows = @((Get-Keys $Map) | ForEach-Object { [pscustomobject]@{ name = $_; n = ConvertTo-Num (Get-MapValue $Map $_) } } | Sort-Object @{ Expression = { 0 + $_.n }; Descending = $true }, name)
+    if ($rows.Count -eq 0) { return $null }
+    $txt = (@($rows | Select-Object -First 3 | ForEach-Object { $_.name + ' (' + ('{0:N0}' -f (0 + $_.n)) + ')' }) -join ', ')
+    if ($rows.Count -gt 3) { $txt += ' (and ' + ($rows.Count - 3) + ' more collations)' }
+    return $txt
+}
+
+function Get-AccentProbeText {
+    # The accent probe of "Find a customer by part of the name" (BAccount.AcctName contains quebec / Qu-e-acute-bec /
+    # QU-E-acute-BEC) on one engine, as hits per search term.
+    param($A, [string]$Engine)
+    $c = $null
+    if ($A.cells -and $A.cells.Contains('SCR_CUSTOMER_SEARCH')) { $c = @($A.cells['SCR_CUSTOMER_SEARCH'] | Where-Object { $_.engine -eq $Engine })[0] }
+    if (-not $c -or -not $c.probes) { return 'accent probe not captured' }
+    $keys = @(@($c.probes.Keys) | Where-Object { $_ -like 'probe.accent.*' })
+    if ($keys.Count -eq 0) { return 'accent probe not captured' }
+    if (@($keys | Where-Object { $_ -notmatch '^probe\.accent\.\d+\.' }).Count -eq 0) { $keys = @($keys | Sort-Object { [int]($_ -replace '^probe\.accent\.(\d+)\..*$', '$1') }) }
+    $short = @($keys | ForEach-Object { $_ -replace '^probe\.accent\.(\d+\.)?', '' })
+    $vals = @($keys | ForEach-Object { $x = $c.probes[$_]; if ($null -eq $x -or [string]$x -eq '') { '?' } else { [string]$x } })
+    return ('observed: hits for ' + ($short -join '/') + ' = ' + ($vals -join '/'))
+}
+
+function Get-SqlServerCollationSense {
+    # "case-insensitive, accent-sensitive" from a SQL Server collation name (_CI_/_CS_, _AI/_AS).
+    param([string]$Name)
+    if (-not $Name) { return $null }
+    $c = if ($Name -match '(?i)_CI(_|$)') { 'case-insensitive' } elseif ($Name -match '(?i)_CS(_|$)') { 'case-sensitive' } else { $null }
+    $a = if ($Name -match '(?i)_AI(_|$)') { 'accent-insensitive' } elseif ($Name -match '(?i)_AS(_|$)') { 'accent-sensitive' } else { $null }
+    $x = @($c, $a | Where-Object { $_ })
+    if ($x.Count) { return ($x -join ', ') }
+    return $null
+}
+
+function Get-CollationCell {
+    # Disclosure Table 2, "Collation / text search", from contract C3 (databases.<Engine>.collation). Both layers are
+    # described: the database default and the collation of Acumatica's text columns, plus how Acumatica's LIKE compares
+    # and the accent probe actually observed. A missing value is printed as "(not captured)", never guessed.
+    param($Data, $A, [object[]]$Src, [string]$Engine)
+    $c = Get-CollationCapture $Data $Engine
+    $probe = Get-AccentProbeText $A $Engine
+    $dbDefault = Get-Field $c 'databaseDefault'
+    $probeCol = [string](Get-Field $c 'probeColumn'); if (-not $probeCol) { $probeCol = 'BAccount.AcctName' }
+    $probeColColl = Get-Field $c 'probeColumnCollation'
+    $colSummary = Get-ColumnCollationSummary (Get-Field $c 'columnCollations')
+    switch ($Engine) {
+        'SQLServer' {
+            if ($null -eq $dbDefault) { $dbDefault = Find-Setting $Src @('collation_name') }
+            $sense = Get-SqlServerCollationSense ([string]$(if ($probeColColl) { $probeColColl } else { $dbDefault }))
+            $cols = if ($colSummary -or $probeColColl) { 'text columns: ' + (Format-EnvValue $colSummary) + '; ' + $probeCol + ' ' + (Format-EnvValue $probeColColl) } else { 'column collation (not captured)' }
+            return ('database default ' + (Format-EnvValue $dbDefault) + '; ' + $cols + '. LIKE compares with the column collation' + $(if ($sense) { ': ' + $sense } else { '' }) + ' (' + $(if ($sense -and -not $probeColColl) { 'read from the database default; ' } else { '' }) + $probe + ')')
+        }
+        'MySQL' {
+            if ($null -eq $dbDefault) { $dbDefault = Find-Setting $Src @('collation_server') }
+            $cols = if ($colSummary -or $probeColColl) { 'Acumatica''s text columns: ' + (Format-EnvValue $colSummary) + '; ' + $probeCol + ' ' + (Format-EnvValue $probeColColl) } else { 'Acumatica''s column collation (not captured)' }
+            return ('server/database default ' + (Format-EnvValue $dbDefault) + '; ' + $cols + '. Acumatica''s LIKE adds COLLATE utf8mb4_unicode_ci: case- and accent-insensitive (' + $probe + ')')
+        }
+        'PostgreSQL' {
+            $lp = Get-Field $c 'localeProvider'
+            if ($null -eq $lp) { $lp = Find-Setting $Src @('datlocprovider') }
+            if ($null -eq $dbDefault) { $dbDefault = Find-Setting $Src @('datcollate') }
+            $lpName = switch -Regex ([string]$lp) { '^(?i)(c|libc)$' { 'libc' } '^(?i)(i|icu)$' { 'ICU' } '^(?i)(b|builtin)$' { 'builtin' } '^$' { $null } default { [string]$lp } }
+            $defTxt = if ($null -eq $dbDefault -or [string]$dbDefault -eq '') { 'database default (not captured)' } else { 'database default ' + $(if ($lpName) { $lpName + ' ' } else { '' }) + [string]$dbDefault + $(if (-not $lpName) { ' (locale provider not captured)' } else { '' }) }
+            # the collation of Acumatica's text columns: the probe column's, else the most used one that is not "default"
+            $colName = [string]$probeColColl
+            if (-not $colName) {
+                $cc = Get-Field $c 'columnCollations'
+                $colName = [string](@((Get-Keys $cc) | Where-Object { $_ -ne 'default' } | Sort-Object @{ Expression = { 0 + (ConvertTo-Num (Get-MapValue $cc $_)) }; Descending = $true }) | Select-Object -First 1)
+            }
+            $icu = @(@(Get-Field $c 'icuCollations') | Where-Object { (Test-IsMap $_) -and [string](Get-Field $_ 'name') -eq $colName })[0]
+            $colTxt = if ($colName -eq 'default') { 'Acumatica''s text columns use the database default' } elseif ($colName) { 'Acumatica''s text columns use ' + $colName } else { 'Acumatica''s column collation (not captured)' }
+            if ($icu) {
+                $prov = [string](Get-Field $icu 'provider'); $provName = switch -Regex ($prov) { '^(?i)(i|icu)$' { 'ICU' } '^(?i)(c|libc)$' { 'libc' } '^(?i)(b|builtin)$' { 'builtin' } default { $prov } }
+                $det = Get-Field $icu 'deterministic'
+                $detTxt = if ($null -eq $det) { 'deterministic: (not captured)' } elseif (ConvertTo-Flag $det) { 'deterministic' } else { 'nondeterministic' }
+                $loc = [string](Get-Field $icu 'locale')
+                $strength = if ($loc -match '(?i)ks-level1') { 'case- and accent-insensitive for =, sorting and grouping' } elseif ($loc -match '(?i)ks-level2') { 'case-insensitive, accent-sensitive for =, sorting and grouping' } else { $null }
+                $colTxt = 'Acumatica''s text columns use its ' + $(if ($provName) { $provName + ' ' } else { '' }) + 'collation ' + $colName + ' (' + $detTxt + '; locale ' + (Format-EnvValue $loc) + ')' + $(if ($strength) { ': ' + $strength } else { '' })
+            }
+            elseif ($colName -and $colName -ne 'default') { $colTxt += ' (collation details not captured)' }
+            return ($defTxt + '; ' + $colTxt + $(if ($colSummary) { ' (text columns: ' + $colSummary + ')' } else { '' }) + '. LIKE becomes ILIKE with COLLATE "default" (the database default): case-insensitive, accent-sensitive (' + $probe + ')')
+        }
+    }
+    return '(not captured)'
+}
+
+function ConvertTo-UtcTime {
+    # An ISO timestamp (or a DateTime) as a UTC DateTime, or $null.
+    param($Value)
+    if ($null -eq $Value) { return $null }
+    if ($Value -is [datetime]) { return $Value.ToUniversalTime() }
+    $d = [datetime]::MinValue
+    $styles = [Globalization.DateTimeStyles]::AdjustToUniversal -bor [Globalization.DateTimeStyles]::AssumeUniversal
+    if ([datetime]::TryParse([string]$Value, $script:Inv, $styles, [ref]$d)) { return $d }
+    return $null
+}
+
+function Format-UtcMinute {
+    param($Value)
+    $d = ConvertTo-UtcTime $Value
+    if ($null -eq $d) { return [string]$Value }
+    return ($d.ToString('yyyy-MM-dd HH:mm', $script:Inv) + 'Z')
+}
+
+function Format-ThrottleFailure {
+    # One failure of a licence-telemetry gate (Get-PcThrottleVerdict text), with the engine's display name. The error
+    # text of an engine whose licence tables could not be read is not published (it stays in the campaign files).
+    param([string]$Text)
+    $t = $Text.Trim()
+    if ($t -match '^(SQLServer|MySQL|PostgreSQL):\s*(.*)$') {
+        $eng = $Matches[1]; $rest = $Matches[2]
+        if ($rest -match '^(?i)(licence monitor not readable)') { $rest = 'licence monitor not readable (the error is in the campaign files)' }
+        $t = (Get-EngineName $eng) + ': ' + $rest
+    }
+    elseif ($t -match '(?i)not readable') { $t = 'licence monitor not readable (the error is in the campaign files)' }
+    # the reading's checkpoint is printed once per gate
+    $t = $t -replace ' since \d{4}-\d\d-\d\dT[0-9:.]+Z?', ''
+    if ($t.Length -gt 220) { $t = $t.Substring(0, 217) + '...' }
+    return $t
+}
+
+function Get-ThrottleGates {
+    # E14 backstop (contract C5): Run-Campaign's licence-telemetry gates (post-part-1, pre-Block-D, after Block D), from
+    # the full records in throttle-readings.json (checkpoints[]) or the summaries in run-campaign-state.json
+    # (throttleReadings[]). Each reading covers its checkpoint (sinceUtc) up to the monitor's write before checkedAtUtc,
+    # so the latest record of a gate counts; earlier records of the same gate are only noted.
+    param($Data)
+    $ids = @($Data.campaignIds | Where-Object { $_ })
+    $list = @()
+    $tr = $Data.throttleReadings
+    if (Test-IsMap $tr) {
+        $trId = [string](Get-Field $tr 'campaignId')
+        if (-not $trId -or $ids.Count -eq 0 -or $ids -contains $trId) { $list = @(@(Get-Field $tr 'checkpoints') | Where-Object { Test-IsMap $_ }) }
+        else { Write-Warning ('throttle-readings.json belongs to campaign ' + $trId + ': not used.') }
+    }
+    if ($list.Count -eq 0 -and (Test-IsMap $Data.runCampaignState)) {
+        $stId = [string](Get-Field $Data.runCampaignState 'campaignId')
+        if (-not $stId -or $ids.Count -eq 0 -or $ids -contains $stId) { $list = @(@(Get-Field $Data.runCampaignState 'throttleReadings') | Where-Object { Test-IsMap $_ }) }
+    }
+    $byName = [ordered]@{}
+    foreach ($r in $list) {
+        $name = [string](Get-Field $r 'name'); if (-not $name) { $name = '(unnamed reading)' }
+        $okRaw = Get-Field $r 'ok'
+        $ok = ($null -ne $okRaw) -and (ConvertTo-Flag $okRaw)
+        $failures = @(@(Get-Field $r 'failures') | Where-Object { $null -ne $_ -and [string]$_ -ne '' } | ForEach-Object { Format-ThrottleFailure ([string]$_) })
+        $waitOk = Get-Field (Get-Field $r 'wait') 'ok'
+        if (($null -ne $waitOk -and -not (ConvertTo-Flag $waitOk)) -or (-not $ok -and $failures.Count -eq 0)) {
+            $failures += 'the licence monitor''s 10-minute write covering the last run was not seen in time, so the reading is incomplete'
+        }
+        $prev = $(if ($byName.Contains($name)) { $byName[$name] } else { $null })
+        $byName[$name] = [pscustomobject]@{
+            name = $name; sinceUtc = [string](Get-Field $r 'sinceUtc'); checkedAtUtc = [string](Get-Field $r 'checkedAtUtc')
+            since = ConvertTo-UtcTime (Get-Field $r 'sinceUtc'); checkedAt = ConvertTo-UtcTime (Get-Field $r 'checkedAtUtc')
+            ok = [bool]$ok; failures = $failures
+            attempts = $(if ($prev) { $prev.attempts + 1 } else { 1 })
+            earlierFailed = $(if ($prev) { $prev.earlierFailed -or -not $prev.ok } else { $false })
+        }
+    }
+    return , @($byName.Values)
+}
+
+function Get-ThrottleUncovered {
+    # The parts of the campaign (part 1 = Blocks A-C, Block D) whose runs no passed licence-telemetry reading covers
+    # (reading since <= first run start and taken after the last run start).
+    param($Data, [object[]]$Gates)
+    $groups = [ordered]@{ 'part 1 (Blocks A-C)' = @(); 'Block D' = @() }
+    foreach ($r in @($Data.runs)) {
+        $b = [string](Get-Field $r 'block')
+        if (-not $b -or $b -eq 'G') { continue }
+        $t = ConvertTo-UtcTime (Get-Field $r 'startedAtUtc')
+        if ($null -eq $t) { continue }
+        $g = $(if ($b -eq 'D') { 'Block D' } else { 'part 1 (Blocks A-C)' })
+        $groups[$g] = @($groups[$g]) + $t
+    }
+    $out = @()
+    foreach ($g in @($groups.Keys)) {
+        $ts = @($groups[$g] | Sort-Object)
+        if ($ts.Count -eq 0) { continue }
+        $first = $ts[0]; $last = $ts[-1]
+        $cov = @($Gates | Where-Object { $_.ok -and $null -ne $_.since -and $null -ne $_.checkedAt -and $_.since -le $first -and $_.checkedAt -ge $last })
+        if ($cov.Count -eq 0) { $out += $g }
+    }
+    return , $out
+}
+
+function Get-EnvCaptureLabel {
+    # "Block A repetition 2" (or the capture time) of one ENV_CAPTURE
+    param($Ec)
+    $b = [string](Get-Field $Ec 'block'); $rep = Get-Field $Ec 'repetitionNo'
+    if ($b) { return ('Block ' + $b + $(if ($null -ne $rep -and [string]$rep -ne '') { ' repetition ' + [string]$rep } else { '' })) }
+    return ('captured ' + (Format-UtcMinute (Get-Field $Ec 'capturedAtUtc')))
+}
+
+function Get-SqlThrottlingText {
+    # E14 (user decision 2026-10-04): Acumatica's SQL throttle of unlicensed sites (PX.Data LeakyBucketSqlThrottling)
+    # is switched off on all three sites with <add key="sqlThrottling:Enabled" value="false" />. Two proofs:
+    #  - contract C1: env.app.sqlThrottling.optionsEnabled = false in EVERY ENV_CAPTURE on every engine (a capture
+    #    without env.app.sqlThrottling is not a proof and is named);
+    #  - contract C5 backstop: Run-Campaign's licence-telemetry gates (no SQL throttling, no reduced mode in ChartID 8
+    #    since the checkpoint on all three), covering part 1 and Block D.
+    # "Proven" only when both hold. Without any C1 data the web.config facts of the environment capture are reported.
+    param($Data, [string[]]$Engines)
+    $all = $(if (@($Engines).Count -eq 3) { 'all three sites' } else { 'every site' })
+    $per = [ordered]@{}
+    foreach ($e in @($Engines)) { $per[$e] = [ordered]@{ captures = 0; withC1 = 0; off = 0; other = @(); noC1 = @() } }
+    foreach ($ec in @($Data.envCaptures)) {
+        $eng = Get-InstanceEngine $Data ([string](Get-Field $ec 'instance'))
+        if (-not $per.Contains($eng)) { continue }
+        $per[$eng].captures++
+        $st = Get-PathValue $ec 'env.app.sqlThrottling'
+        if (-not (Test-IsMap $st)) { $per[$eng].noC1 += (Get-EnvCaptureLabel $ec); continue }
+        $per[$eng].withC1++
+        $oe = Get-Field $st 'optionsEnabled'
+        if ($oe -is [bool] -and -not $oe) { $per[$eng].off++ }
+        else {
+            $er = [string](Get-Field $st 'error')
+            if ($er.Length -gt 120) { $er = $er.Substring(0, 117) + '...' }
+            $per[$eng].other += ('optionsEnabled ' + $(if ($null -eq $oe) { 'null' } else { [string]$oe }) + $(if ($er) { ' (' + $er + ')' } else { '' }))
+        }
+    }
+    $anyC1 = @($per.Keys | Where-Object { $per[$_].withC1 -gt 0 }).Count -gt 0
+    $capCounts = ((@($per.Keys) | ForEach-Object { (Get-EngineName $_) + ' ' + $per[$_].captures }) -join ', ')
+    $capProblems = @()
+    if ($anyC1) {
+        foreach ($e in @($per.Keys)) {
+            $x = $per[$e]
+            if ($x.captures -eq 0) { $capProblems += ((Get-EngineName $e) + ': no environment capture'); continue }
+            if ($x.off -ne $x.withC1) { $capProblems += ((Get-EngineName $e) + ': ' + ($x.withC1 - $x.off) + ' of ' + $x.captures + ' captures not off (' + (@($x.other | Select-Object -Unique | Select-Object -First 2) -join '; ') + ')') }
+            if (@($x.noC1).Count) { $capProblems += ((Get-EngineName $e) + ': ' + @($x.noC1).Count + ' of ' + $x.captures + ' captures without the runtime state (' + (@($x.noC1 | Select-Object -First 3) -join ', ') + $(if (@($x.noC1).Count -gt 3) { ' and ' + (@($x.noC1).Count - 3) + ' more' } else { '' }) + ')') }
+        }
+    }
+    $capProven = $anyC1 -and @($Engines).Count -gt 0 -and $capProblems.Count -eq 0
+
+    # licence-telemetry backstop
+    $gates = Get-ThrottleGates $Data; $gates = @($gates)
+    $failedGates = @($gates | Where-Object { -not $_.ok })
+    $uncovered = @()
+    if ($gates.Count) { $uncovered = Get-ThrottleUncovered $Data $gates; $uncovered = @($uncovered) }
+    $gateNames = ((@($gates) | ForEach-Object { $_.name + ' since ' + (Format-UtcMinute $_.sinceUtc) }) -join ', ')
+    $gateFailTxt = ((@($failedGates) | ForEach-Object { 'licence telemetry ' + $_.name + ' since ' + (Format-UtcMinute $_.sinceUtc) + ': ' + (@($_.failures) -join '; ') }) -join '; ')
+    $earlier = @($gates | Where-Object { $_.ok -and $_.earlierFailed } | ForEach-Object { $_.name })
+    $earlierTxt = $(if ($earlier.Count) { ' (an earlier reading of ' + ($earlier -join ', ') + ' did not pass; the latest reading covers the same period)' } else { '' })
+    $delays = 'Acumatica''s SQL throttle of unlicensed sites delays SQL calls once too much SQL time builds up; results of the affected sites may include its delays'
+
+    if ($anyC1) {
+        if ($capProven -and $gates.Count -and $failedGates.Count -eq 0 -and $uncovered.Count -eq 0) {
+            return ('off on ' + $all + ' (sqlThrottling:Enabled=false); a licensed on-premises installation never starts this throttle. Proven at run time: the setting in effect was off in every environment capture (' + $capCounts + '), and Acumatica''s own licence telemetry recorded no SQL throttling and no reduced mode on any of the three sites (readings ' + $gateNames + ')' + $earlierTxt)
+        }
+        if (-not $capProven -or $failedGates.Count) {
+            $why = @($capProblems)
+            if ($failedGates.Count) { $why += $gateFailTxt }
+            $good = @()
+            if ($capProven) { $good += ('the setting in effect was off in every environment capture (' + $capCounts + ')') }
+            if ($gates.Count -and $failedGates.Count -eq 0) { $good += ('Acumatica''s licence telemetry recorded no SQL throttling and no reduced mode (readings ' + $gateNames + ')') }
+            elseif ($gates.Count -eq 0) { $good += 'Acumatica''s licence telemetry was not read for this campaign' }
+            return ('NOT proven off on ' + $all + ': ' + ($why -join '; ') + $(if ($good.Count) { ' (' + ($good -join '; ') + ')' } else { '' }) + '. ' + $delays)
+        }
+        # every capture off, every reading passed, but the backstop is missing or does not cover the whole campaign
+        $gap = $(if ($gates.Count -eq 0) { 'Acumatica''s licence telemetry (the backstop) was not read for this campaign' } else { 'Acumatica''s licence telemetry recorded no SQL throttling and no reduced mode in the readings taken (' + $gateNames + '), but no reading covers ' + ($uncovered -join ' or ') })
+        return ('off on ' + $all + ' (sqlThrottling:Enabled=false); a licensed on-premises installation never starts this throttle. The setting in effect was off in every environment capture (' + $capCounts + '); ' + $gap + ', so the run-time proof is incomplete' + $earlierTxt)
+    }
+
+    # no runtime state in any capture: the web.config facts of the environment capture (appSettings.sqlThrottling,
+    # mirrored as webConfig['sqlThrottling:Enabled'] by Get-PerfEnvironment)
+    $facts = @()
+    $insts = Get-PathValue $Data.start 'acumatica.instances'
+    foreach ($i in (Get-Keys $insts)) {
+        $entry = Get-Field $insts $i
+        $v = Get-Field (Get-Field $entry 'appSettings') 'sqlThrottling'
+        if ($null -eq $v) {
+            $wc = Get-Field $entry 'webConfig'
+            foreach ($k in @('sqlThrottling:Enabled', 'sqlThrottlingEnabled', 'sqlThrottling')) { $v = Get-Field $wc $k; if ($null -ne $v) { break } }
+        }
+        $facts += [pscustomobject]@{ engine = (Get-InstanceEngine $Data $i); value = $v }
+    }
+    $isOff = { param($x) ([string]$x).Trim() -match '^(?i)false$' }
+    $offEngines = @($facts | Where-Object { & $isOff $_.value } | ForEach-Object { $_.engine } | Select-Object -Unique)
+    $webOff = $facts.Count -gt 0 -and @($facts | Where-Object { -not (& $isOff $_.value) }).Count -eq 0 -and @($Engines | Where-Object { $offEngines -notcontains $_ }).Count -eq 0
+    if ($failedGates.Count) {
+        return ('NOT proven off on ' + $all + ': ' + $gateFailTxt + $(if ($webOff) { ' (set off in web.config on ' + $all + '; the runtime state was not captured)' } else { '' }) + '. ' + $delays)
+    }
+    $gateOk = $(if ($gates.Count -and $uncovered.Count -eq 0) { '; Acumatica''s licence telemetry recorded no SQL throttling and no reduced mode (readings ' + $gateNames + ')' + $earlierTxt } elseif ($gates.Count) { '; Acumatica''s licence telemetry recorded no SQL throttling and no reduced mode in the readings taken (' + $gateNames + '), but no reading covers ' + ($uncovered -join ' or ') } else { '' })
+    if ($webOff) { return ('set off in web.config on ' + $all + ' (sqlThrottling:Enabled=false); a licensed on-premises installation never starts this throttle. The runtime state was not captured' + $gateOk) }
+    return ('(not captured): whether Acumatica''s SQL throttle of unlicensed sites was off is not recorded in this campaign' + $gateOk)
+}
+
+function Get-AppCpuCores {
+    # Acumatica (w3wp) CPU in the measured phase, in cores: result.appCpuMs / result.phasesMs.measured, for runs with 4 or
+    # more users and a measured phase of at least 5 s (the runs that keep Acumatica busy).
+    param($A)
+    $out = [ordered]@{}
+    $users = @{}; foreach ($t in @($A.tests)) { $users[$t.code] = $t.users }
+    foreach ($e in @($A.engines)) {
+        $vals = @(foreach ($r in @($A.runs | Where-Object { $_.engine -eq $e -and $_.valid -and -not $_.isWarmup -and $users.ContainsKey($_.testCode) -and $users[$_.testCode] -ge 4 })) {
+                $app = ConvertTo-Num (Get-Field $r.result 'appCpuMs'); $ms = ConvertTo-Num (Get-PathValue $r.result 'phasesMs.measured')
+                if ($null -ne $app -and $null -ne $ms -and $ms -ge 5000 -and $app -gt 0) { $app / $ms }
+            })
+        if ($vals.Count) { $out[$e] = [ordered]@{ runs = $vals.Count; medianCores = (Get-Median ([double[]]$vals)); maxCores = (($vals | Measure-Object -Maximum).Maximum) } }
+    }
+    return $out
+}
+
+function Get-PCoreShareText {
+    # "(about 0.67 performance cores on average)" for a random 2-core pick, from the host's performance/efficiency core
+    # counts when the environment capture has them; otherwise $null (never guessed).
+    param($Data)
+    $h = @((Get-Field $Data.start 'host'))
+    $p = ConvertTo-Num (Find-Setting $h @('pCores', 'performanceCores'))
+    $e = ConvertTo-Num (Find-Setting $h @('eCores', 'efficiencyCores'))
+    if ($null -eq $p -or $null -eq $e -or ($p + $e) -le 0) { return $null }
+    return ('on this CPU with ' + [int]$p + ' performance and ' + [int]$e + ' efficiency cores, about ' + ([Math]::Round(2.0 * $p / ($p + $e), 2)).ToString($script:Inv) + ' performance cores on average')
+}
+
+function Get-AffinityText {
+    # User decision 2026-10-04: Acumatica's CPU pinning of unlicensed sites is kept as installed (ResourceGovernor pins
+    # each w3wp to 2 random cores, redrawn every 60 s; the licence observer briefly widens it to 4 random cores every
+    # 5-30 min); recorded and disclosed only. A random pick mixes performance and efficiency cores, so short tests are
+    # noisier. Observed: contract C1 env.app.processAffinity (bits of the affinity mask at each ENV_CAPTURE: snapshots
+    # of a mask that changes every minute) and the Acumatica CPU of the busy runs.
+    param($Data, $A)
+    $share = Get-PCoreShareText $Data
+    $txt = 'Acumatica default for an unlicensed site: each site''s worker process is pinned to 2 random cores, picked again every minute (briefly 4); kept as installed, identically on all three sites. A random pick can land on performance or efficiency cores' + $(if ($share) { ' (' + $share + ')' } else { '' }) + ', so short tests are noisier'
+    $bits = [ordered]@{}; $lcpu = $null
+    foreach ($ec in @($Data.envCaptures)) {
+        $pa = Get-PathValue $ec 'env.app.processAffinity'
+        if (-not (Test-IsMap $pa)) { continue }
+        $b = ConvertTo-Num (Get-Field $pa 'bits'); $pc = ConvertTo-Num (Get-Field $pa 'processorCount')
+        if ($null -ne $pc) { $lcpu = $pc }
+        if ($null -eq $b) { continue }
+        $eng = Get-InstanceEngine $Data ([string](Get-Field $ec 'instance'))
+        if (-not $bits.Contains($eng)) { $bits[$eng] = @() }
+        $bits[$eng] += [int]$b
+    }
+    if ($bits.Count) {
+        $txt += '. Cores in the worker process''s affinity mask at the environment captures (snapshots of a mask that changes every minute' + $(if ($lcpu) { '; of ' + [int]$lcpu + ' logical CPUs' } else { '' }) + '): ' + ((@($A.engines) | ForEach-Object { $e = $_; (Get-EngineName $e) + ' ' + $(if ($bits.Contains($e)) { (@($bits[$e] | Sort-Object -Unique) -join '/') + ' (' + @($bits[$e]).Count + ' captures)' } else { '(not captured)' }) }) -join ', ')
+    }
+    else { $txt += '. Affinity mask at the environment captures: (not captured)' }
+    $cores = Get-AppCpuCores $A
+    if ($cores.Count) {
+        $txt += '. Acumatica CPU in the measured phase of the runs with 4 or more users: ' + ((@($cores.Keys) | ForEach-Object { (Get-EngineName $_) + ' median ' + (Format-Sig3 $cores[$_].medianCores) + ' cores (max ' + (Format-Sig3 $cores[$_].maxCores) + ')' }) -join ', ')
+    }
+    return $txt
+}
+
+function Get-SqlLogChainText {
+    # SPEC 6.5 / D1: the SQL Server log chain as checked live by Run-Campaign before the campaign (run-campaign-state.json).
+    param($Data)
+    $lc = Get-Field $Data.runCampaignState 'sqlLogChain'
+    if (-not (Test-IsMap $lc)) { return $null }
+    $active = Get-Field $lc 'active'
+    $detail = [string](Get-Field $lc 'detail')
+    $when = [string](Get-Field $lc 'checkedAtUtc')
+    $head = if ($null -eq $active) { 'log chain state not recorded' } elseif (ConvertTo-Flag $active) { 'log chain active' } else { 'log chain inactive' }
+    return ($head + $(if ($detail) { ' (' + $detail + ')' } else { '' }) + $(if ($when) { ', checked ' + $when } else { '' }))
 }
 
 function Get-EnvChanges {
@@ -2251,6 +3095,10 @@ function Get-Diagnostics {
     foreach ($k in @('cacheDefeatProbe', 'aaCalibration', 'statementsPerOp', 'transportAB', 'apiReadMs', 'spillsAndJit', 'sqlServerPlanCheck')) {
         $d[$k] = $(if ($Data.diagnosticsIn.Contains($k)) { $Data.diagnosticsIn[$k] } else { 'not provided' })
     }
+    # End-to-end API read (dry run 3l, contract C4): only the measurement fields are published (analysis.json, README);
+    # diagnostics.apiReadProbe is read for the not-available reason (endpoint and exception type) and never copied.
+    $d.apiReadMs = Get-ApiReadPublished $d.apiReadMs
+    $d.apiReadSummary = Get-ApiReadSummary $Data $d.apiReadMs $Cells $Runs $Engines
     # SQL Server plan check (dry run 3m) may also be recorded in decisions.json
     if ($d.sqlServerPlanCheck -is [string] -and $Data.decisions) { $pc = Get-Field $Data.decisions 'sqlServerPlanCheck'; if ($null -ne $pc) { $d.sqlServerPlanCheck = $pc } }
     # Statements per operation and spills/JIT from the DryRun -Diagnostics engine counters. The suite stores them per
@@ -2303,7 +3151,9 @@ function Get-Diagnostics {
         $d.spillsAndJit = $sj
     }
     # Residue tables (dry run 3n, SPEC 5.4 item 19): tables whose row count changed, from table-counts-*.json
-    $d.residueTables = Get-ResidueTables $Data
+    $d.residueTables = Get-ResidueTables $Data $Engines
+    # The campaign's residue (contract C2): campaign end against the campaign baseline, exact row counts per engine
+    $d.campaignResidue = Get-CampaignResidue $Data $Engines
     # Start/end environment differences (SPEC 6.4), listed in the environment fragment
     $d.environmentChanges = Get-EnvChanges $Data
     # background work left behind, per block: database CPU used while its engine was idle / CPU used in its own runs
@@ -2515,6 +3365,9 @@ function New-ReadmeFragments {
             & $add ('**What this simulates:** ' + $info.what)
             & $add ''
             $why = $info.why
+            # SPEC FR-M11 / 6.6 3l: the pointer to dry-run step 3l stays only when 3l measured the end-to-end API read on
+            # every engine (the HTML report is rendered from this same text)
+            if ($fk -eq 'Screens' -and -not $A.diagnostics.apiReadSummary.available) { $why = [regex]::Replace($why, '\s*\(dry-run step 3l[^)]*\)', '') }
             if (($fk -eq 'ManyUsers' -or $fk -eq 'InvoiceRelease') -and $mysqlRR) { $why += ' ' + $isoSentence }
             & $add ('**Why it matters when choosing a database:** ' + $why)
             & $add ''
@@ -2854,6 +3707,8 @@ function Get-Limits {
     $out += $(if ($E10Rejected) { 'Client connection: SQL Server used shared memory and MySQL used TLS; PostgreSQL used plain TCP (see the dry-run A/B in the appendix).' } else { 'Client connection: all three over loopback TCP without encryption.' })
     $out += 'Running reports and order entry at the same time (mixed load) was not tested.'
     $out += 'Unlicensed local instances (2 users / 2 API users); "users" are in-process workers with no think time, so 16 workers represent a much larger real team.'
+    $share = Get-PCoreShareText $Data
+    $out += 'Acumatica pins the worker process of an unlicensed site to 2 random cores, picked again every minute (briefly 4); this was kept as installed, identically on all three sites (Table 1). A random pick can land on performance or efficiency cores' + $(if ($share) { ' (' + $share + ')' } else { '' }) + ', so short tests are noisier: one database''s short runs can land on slower cores by chance. Tests that keep Acumatica busy (several users, order entry, invoices) are limited by those 2 cores on every database, which can make the differences between databases smaller.'
     $out += 'Windows only.'
     $out += 'Results describe Acumatica on each database, not raw database speed.'
     $out += 'A separate database server was not tested. Every request then pays a network round trip on every engine, so relative gaps in tests with many small requests shrink.'
@@ -2905,6 +3760,9 @@ function Get-DisclosureTables {
     $sizes = @($engs | ForEach-Object { $sz = Find-Setting (Get-EngineEnvSources $Data $_) @('databaseSizeMb', 'sizeMb', 'databaseSize'); if ($sz) { (Get-EngineName $_) + ' ' + $sz + ' MB' } })
     & $add ('| Dataset | ' + (Get-MdCell ('SalesDemo tenant 2: ' + (Format-EnvValue $fpTxt) + $(if ($fph) { '; data fingerprint ' + $fph } else { '' }) + $(if ($sizes.Count) { '; database size ' + ($sizes -join ', ') } else { '' }))) + ' |')
     & $add '| Licence | unlicensed: 2 users / 2 API users; users in these tests are threads inside Acumatica |'
+    # fairness disclosures from the captures (user decisions 2026-10-04: E14 throttle off; CPU pinning kept as installed)
+    & $add ('| Acumatica SQL throttle (unlicensed sites) | ' + (Get-MdCell (Get-SqlThrottlingText $Data $engs)) + ' |')
+    & $add ('| Acumatica worker CPU pinning (unlicensed sites) | ' + (Get-MdCell (Get-AffinityText $Data $A)) + ' |')
     & $add ''
     & $add 'Client, Acumatica and all three databases share this one machine; only one database is busy at a time.'
     & $add ''
@@ -2947,7 +3805,7 @@ function Get-DisclosureTables {
     & $row 'Commit durability' {
         param($e)
         switch ($e) {
-            'SQLServer' { (Format-EnvValue (Find-Setting $src[$e] @('recovery_model_desc', 'recoveryModel'))) + ' recovery, log flushed at commit (+ log backups between blocks if the chain is active)' }
+            'SQLServer' { $lct = Get-SqlLogChainText $Data; (Format-EnvValue (Find-Setting $src[$e] @('recovery_model_desc', 'recoveryModel'))) + ' recovery, log flushed at commit' + $(if ($lct) { '; ' + $lct + '; log backups between blocks and before Block D only while the chain is active' } else { ' (+ log backups between blocks if the chain is active)' }) }
             'MySQL' { 'flush_log_at_trx_commit=' + (Format-EnvValue (Find-Setting $src[$e] @('innodb_flush_log_at_trx_commit'))) + '; binary log ' + (Format-EnvValue (Find-Setting $src[$e] @('log_bin'))) + ', sync_binlog=' + (Format-EnvValue (Find-Setting $src[$e] @('sync_binlog'))) }
             'PostgreSQL' { 'synchronous_commit=' + (Format-EnvValue (Find-Setting $src[$e] @('synchronous_commit'))) + '; wal_level=' + (Format-EnvValue (Find-Setting $src[$e] @('wal_level'))) }
         }
@@ -2965,7 +3823,8 @@ function Get-DisclosureTables {
     & $row 'Reports that spilled to disk / used JIT (dry run 3d)' { param($e) if ($spills -and (Test-IsMap $spills)) { $x = @((Get-Keys $spills) | ForEach-Object { $t = $_; $v = Get-Field (Get-Field $spills $t) $e; if ($v) { $t + ': ' + $v } }); if ($x.Count) { $x -join '; ' } else { '(not captured)' } } else { '(not captured)' } }
     & $row 'Statistics refresh before the campaign' { param($e) switch ($e) { 'SQLServer' { 'UPDATE STATISTICS, default sampling, every table' } 'MySQL' { 'ANALYZE TABLE, every table' } 'PostgreSQL' { 'VACUUM (ANALYZE), default target' } } }
     & $row 'Instrumentation on during the campaign' { param($e) switch ($e) { 'SQLServer' { 'Query Store ' + (Format-EnvValue (Find-Setting $src[$e] @('queryStore', 'query_store'))) + ' (default)' } 'MySQL' { 'performance_schema ' + (Format-EnvValue (Find-Setting $src[$e] @('performance_schema'))) + ' (default)' } 'PostgreSQL' { 'none (pg_stat_statements only in the dry run, if E12)' } } }
-    & $row 'Collation / text search' { param($e) switch ($e) { 'SQLServer' { (Format-EnvValue (Find-Setting $src[$e] @('collation_name', 'collation'))) + ' (case-insensitive, accent-sensitive)' } 'MySQL' { (Format-EnvValue (Find-Setting $src[$e] @('collation_server'))) + '; LIKE uses utf8mb4_unicode_ci (case- and accent-insensitive)' } 'PostgreSQL' { 'ICU; LIKE becomes ILIKE (case-insensitive, accent-sensitive)' } } }
+    # contract C3 (databases.<Engine>.collation): database default and Acumatica's column collation, LIKE, observed probe
+    & $row 'Collation / text search' { param($e) Get-CollationCell $Data $A $src[$e] $e }
     & $row 'Login used by Acumatica' { param($e) switch ($e) { 'SQLServer' { 'Windows login IIS APPPOOL\PerfSQL' } 'MySQL' { 'acumatica (ALL on schema)' } 'PostgreSQL' { 'acumatica (SUPERUSER)' } } }
     $av = Find-Setting @((Get-Field $Data.start 'antivirus')) @('exclusions', 'antivirus')
     & $row 'Antivirus exclusion of data folder; scheduled scans' { param($e) Format-EnvValue $av }
@@ -3022,7 +3881,7 @@ function Get-DisclosureTables {
     & $add ''
     $spo = $A.diagnostics.statementsPerOp
     if ($spo -and (Test-IsMap $spo)) {
-        & $add ('Database statements per operation (dry run 3f): ' + (((Get-Keys $spo) | ForEach-Object { $t = $_; $t + ' ' + (((Get-Keys (Get-Field $spo $t)) | ForEach-Object { (Get-EngineName $_) + ' ' + [string](Get-Field (Get-Field $spo $t) $_) }) -join ', ') }) -join '; ') + '.')
+        & $add ($script:StatementCounterHead + ' ' + $script:StatementCounterTail + ' Dry run 3f: ' + (Get-StatementsPerOpValues $spo) + '.')
         & $add ''
     }
 
@@ -3077,26 +3936,49 @@ function Get-AppendixMd {
     if (@($bd.gateWarnings).Count) { $bdTxt += '. Gate log: ' + ((@($bd.gateWarnings) -join ' ').TrimEnd('.')) }
     & $add ('- **Block D data differences** (gate G2d): ' + $bdTxt + '.')
     foreach ($k in @('transportAB', 'apiReadMs', 'sqlServerPlanCheck', 'cacheDefeatProbe', 'aaCalibration', 'statementsPerOp', 'spillsAndJit')) {
-        $label = @{ transportAB = 'Transport A/B (dry run 3k)'; apiReadMs = 'End-to-end API read, ms (dry run 3l)'; sqlServerPlanCheck = 'SQL Server plan check: batch mode or parallelism in the report plans (dry run 3m)'; cacheDefeatProbe = 'Cache-defeat proof (dry run 3f)'; aaCalibration = 'A/A robust CV, % (dry run 3h)'; statementsPerOp = 'Database statements per operation (dry run 3f)'; spillsAndJit = 'Sort spills and JIT (dry run 3d)' }[$k]
+        $label = @{ transportAB = 'Transport A/B (dry run 3k)'; sqlServerPlanCheck = 'SQL Server plan check: batch mode or parallelism in the report plans (dry run 3m)'; cacheDefeatProbe = 'Cache-defeat proof (dry run 3f)'; aaCalibration = 'A/A robust CV, % (dry run 3h)'; spillsAndJit = 'Sort spills and JIT (dry run 3d)' }[$k]
         $v = $d[$k]
-        $txt = if ($v -is [string]) { $v } else { $m = [ordered]@{}; Get-LeafMap $v '' $m; ((@($m.Keys) | ForEach-Object { $_ + ' = ' + $m[$_] }) -join '; ') }
-        & $add ('- **' + $label + ':** ' + $txt + '.')
-    }
-    # residue tables (dry run 3n): the tables that grew outside the tested documents, and soft-deleted rows
-    $res = @($d.residueTables)
-    if ($res.Count -eq 0) { & $add '- **Residue tables (dry run 3n):** not provided (no table-counts-*.json next to the input or embedded in it).' }
-    foreach ($rt in $res) {
-        $parts = @()
-        foreach ($e in @($rt.changedTables.Keys)) {
-            $rows = @($rt.changedTables[$e])
-            $shown = @($rows | Select-Object -First 15 | ForEach-Object { $dlt = 0 + $_.delta; $_.table + ' ' + ('{0:N0}' -f (0 + $_.before)) + ' ' + $script:ARROW + ' ' + ('{0:N0}' -f (0 + $_.after)) + ' (' + $(if ($dlt -ge 0) { '+' } else { '' }) + ('{0:N0}' -f $dlt) + ')' })
-            $more = if ($rows.Count -gt 15) { ' and ' + ($rows.Count - 15) + ' more' } else { '' }
-            $parts += ((Get-EngineName $e) + ': ' + $(if ($rows.Count) { ($shown -join ', ') + $more } else { 'no table changed' }))
+        switch ($k) {
+            # SPEC FR-M11 / 6.6 3l: the sentence per engine, or "not available (<endpoint>: <exception type>)"; only the
+            # measurement fields of diagnostics.apiReadMs are published, never the probe
+            'apiReadMs' {
+                $at = Get-ApiReadText $d.apiReadSummary
+                & $add ('- **End-to-end API read:** ' + $at.Substring('End-to-end API read: '.Length) + '.')
+            }
+            'cacheDefeatProbe' { & $add ('- **' + $label + ':** ' + (Get-CacheDefeatText $v) + '.') }
+            'statementsPerOp' { & $add ('- **' + $script:StatementCounterHead + '** ' + $script:StatementCounterTail + ' Dry run 3f: ' + (Get-StatementsPerOpValues $v) + '.') }
+            default {
+                $txt = if ($v -is [string]) { $v } else { $m = [ordered]@{}; Get-LeafMap $v '' $m; ((@($m.Keys) | ForEach-Object { $_ + ' = ' + $m[$_] }) -join '; ') }
+                & $add ('- **' + $label + ':** ' + $txt + '.')
+            }
         }
-        if (-not $rt.baselineFile -and @($rt.changedTables.Keys).Count -eq 0) { $parts += 'no baseline to compare with' }
-        $softTxt = @(Get-Keys $rt.softDeleted | ForEach-Object { $e = $_; $sd = Get-Field $rt.softDeleted $e; $kv = @(Get-Keys $sd | ForEach-Object { $_ + ' ' + [string](Get-Field $sd $_) }); if ($kv.Count) { (Get-EngineName $e) + ' ' + ($kv -join ', ') } })
-        if ($softTxt.Count) { $parts += ('soft-deleted / archived rows: ' + ($softTxt -join '; ')) }
-        & $add ('- **Residue tables (dry run 3n), ' + $(if ($rt.label) { $rt.label } else { $rt.source }) + ':** ' + ($parts -join '. ') + '.')
+    }
+    # residue tables (contract C2): the campaign end against the campaign baseline, exact row counts per engine; an
+    # engine without exact counts is named as not captured. Without those two files: every table-count capture (3n).
+    $cr = $d.campaignResidue
+    $res = @($d.residueTables)
+    if ($cr) {
+        & $add ('- **Residue tables (campaign end against the campaign baseline taken after the dry run''s clean-up, exact row counts):** ' + (Get-CampaignResidueText $cr) + '.')
+        $dry = @($res | Where-Object { $_.source -notmatch '^table-counts-campaign-' })
+        if ($dry.Count) { & $add ('- The dry-run table counts (3n: ' + (@($dry | ForEach-Object { $(if ($_.label) { $_.label } else { $_.source }) }) -join ', ') + ') are listed in analysis.json (diagnostics.residueTables).') }
+    }
+    elseif ($res.Count -eq 0) { & $add '- **Residue tables (dry run 3n):** not provided (no table-counts-*.json next to the input or embedded in it).' }
+    else {
+        foreach ($rt in $res) {
+            $parts = @()
+            foreach ($e in @($rt.changedTables.Keys)) {
+                if ($rt.notCaptured -and $rt.notCaptured.Contains($e)) { continue }
+                $rows = @($rt.changedTables[$e])
+                $shown = @($rows | Select-Object -First 15 | ForEach-Object { Format-ResidueRow $_ })
+                $more = if ($rows.Count -gt 15) { ' and ' + ($rows.Count - 15) + ' more' } else { '' }
+                $parts += ((Get-EngineName $e) + ': ' + $(if ($rows.Count) { ($shown -join ', ') + $more } else { 'no table changed' }))
+            }
+            foreach ($e in @($rt.notCaptured.Keys)) { $parts += ((Get-EngineName $e) + ': not captured (' + $rt.notCaptured[$e] + '), so its residue is not known') }
+            if (-not $rt.baselineFile -and @($rt.changedTables.Keys).Count -eq 0) { $parts += 'no baseline to compare with' }
+            $softTxt = @(Get-Keys $rt.softDeleted | ForEach-Object { $e = $_; $sd = Get-Field $rt.softDeleted $e; $kv = @(Get-Keys $sd | ForEach-Object { $_ + ' ' + [string](Get-Field $sd $_) }); if ($kv.Count) { (Get-EngineName $e) + ' ' + ($kv -join ', ') } })
+            if ($softTxt.Count) { $parts += ('soft-deleted / archived rows: ' + ($softTxt -join '; ')) }
+            & $add ('- **Residue tables (dry run 3n), ' + $(if ($rt.label) { $rt.label } else { $rt.source }) + ':** ' + ($parts -join '. ') + '.')
+        }
     }
     & $add ''
     return $sb.ToString()
