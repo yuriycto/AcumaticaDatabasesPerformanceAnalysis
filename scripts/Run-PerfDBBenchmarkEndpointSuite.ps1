@@ -2685,6 +2685,21 @@ function Wait-ForBenchmarkExecution {
     }
 }
 
+function Test-RestartBetweenRuns {
+    # Restart between runs (SPEC 5.4 item 7): ServerAppStartUtc differs from the last value the suite saw. Raises the
+    # AppRestart event, flags a re-warm (Blocks A-C) and remembers the new value. A busy read (409) has no
+    # ServerAppStartUtc and changes nothing, so a later readable value is still compared with the last one seen.
+    param([Parameter(Mandatory = $true)]$Inst, [Parameter(Mandatory = $true)]$Fields, [Parameter(Mandatory = $true)][string]$Block)
+    if (-not [string]::IsNullOrWhiteSpace($Fields.AppStart)) {
+        if (-not [string]::IsNullOrWhiteSpace($Inst.LastAppStartUtc) -and $Fields.AppStart -ne $Inst.LastAppStartUtc) {
+            Add-SuiteEvent -Kind "AppRestart" -Instance $Inst.Name -Detail ("the application restarted between runs (ServerAppStartUtc {0} -> {1})" -f $Inst.LastAppStartUtc, $Fields.AppStart)
+            if ($Block -ne "D") { $Inst.NeedsRewarm = $true }
+        }
+        $Inst.LastAppStartUtc = $Fields.AppStart
+    }
+    Save-InstanceState -Inst $Inst
+}
+
 function Invoke-SuiteRun {
     # One run on one instance: restart check, idle check, re-warm, cool-down + settle gate, counters,
     # PUT + verify, POST RunBenchmark, wait, fetch the result row, restart check, ParamsHash check, append.
@@ -2708,15 +2723,15 @@ function Invoke-SuiteRun {
     # Restart between runs, and an instance that is still busy (Running, or a long operation of the screen: 409).
     $preFields = Get-ControlFieldsOrBusy -Inst $Inst
     Update-InstanceFromControl -Inst $Inst -Fields $preFields
-    if (-not [string]::IsNullOrWhiteSpace($Inst.LastAppStartUtc) -and -not [string]::IsNullOrWhiteSpace($preFields.AppStart) -and $preFields.AppStart -ne $Inst.LastAppStartUtc) {
-        Add-SuiteEvent -Kind "AppRestart" -Instance $Inst.Name -Detail ("the application restarted between runs (ServerAppStartUtc {0} -> {1})" -f $Inst.LastAppStartUtc, $preFields.AppStart)
-        if ($Block -ne "D") { $Inst.NeedsRewarm = $true }
-    }
-    if (-not [string]::IsNullOrWhiteSpace($preFields.AppStart)) { $Inst.LastAppStartUtc = $preFields.AppStart }
-    Save-InstanceState -Inst $Inst
+    Test-RestartBetweenRuns -Inst $Inst -Fields $preFields -Block $Block
     if (Test-ControlRunning -Inst $Inst -Fields $preFields) {
         if (-not (Wait-InstanceIdle -Inst $Inst -Block $Block)) { return $null }
         $preFields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst -FactsWaitSec 30)
+        Update-InstanceFromControl -Inst $Inst -Fields $preFields
+        # Again on the re-read: the first read may have been busy (409: no ServerAppStartUtc to compare), or the
+        # application restarted while the suite waited (for example a recycle that ended the busy or Running work).
+        # Without this the run's own restart check starts from the new value and the restart is never reported.
+        Test-RestartBetweenRuns -Inst $Inst -Fields $preFields -Block $Block
     }
 
     # Blocks A-C: one re-warm run (R0 profile) before the next run after an application restart (SPEC 5.4 item 7).

@@ -311,6 +311,8 @@ A browser-based smoke test that drives Chrome in headless mode via the Chrome De
 powershell -ExecutionPolicy Bypass -File .\scripts\Test-PerfDBBenchmark.ps1
 ```
 
+This script is stale and is not part of the campaign. It waits for the classic UI's "Executing. Press to abort" indicator, which a benchmark run no longer shows (see Notes). Without the indicator it waits 8 s and then checks only that the grid contains some "Sequential Write" row for the instance, so an older row can make it pass without a new result. When it is next updated it should wait on `LastRequestStatus` and `LastRequestID` of the control row instead.
+
 ## Required web.config Settings
 
 Parallel benchmark actions require Acumatica parallel processing to be enabled in each benchmark website's `web.config`.
@@ -329,3 +331,4 @@ Tune the thread and batch settings to the hardware available on each server. The
 
 - The publish script works directly against local website roots through `PX.CommandLine.exe`, so HTTP login credentials are not required for the CLI-based publish flow.
 - Screen permissions for `AC301000` are now self-registered by the customization on authenticated requests, so no manual `RolesInGraph` SQL patch is required after publish.
+- A benchmark run (Run Selected Test, the legacy run buttons and the REST `RunBenchmark` action) runs as a long operation keyed by its RequestID, not by the screen. The screen's own key would make the contract-based API answer every request to `BenchmarkControl` with 409 for as long as the run lasts in that session, so the control row could not be polled and `AbortBenchmark` could not be called. As a consequence, a run started on `AC301000` does not show "Executing. Press to abort" and the page does not refresh when the run ends: press **Refresh Status** (or reopen the screen) and read `LastRequestStatus` / `LastRequestMessage`, and use **Abort Run** to stop a run. Maintenance actions (for example Clear Test Data and Clear Test Records) still run under the screen's key and still show the indicator; while one of them runs, REST requests to `BenchmarkControl` from the same session get 409.
