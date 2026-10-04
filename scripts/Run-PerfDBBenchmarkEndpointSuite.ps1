@@ -2261,7 +2261,12 @@ function Add-RunRecord {
     param($Record)
     $script:State.runs.Add($Record)
     $script:State.suiteState["inFlight"] = $null
-    Save-CampaignState
+    # A failed save must not turn a recorded run into an error: in dry-run 3d (2026-10-04) the exception reached the
+    # run's error handler, which added a duplicate Failed record next to the Completed one. The record is in memory and
+    # reaches the file with the next save. Block D stays safe: every run's in-flight marker is saved before
+    # RunBenchmark is sent, so a resume after a crash adopts the run from the server instead of repeating it.
+    try { Save-CampaignState }
+    catch { Add-SuiteEvent -Kind "SuiteNotice" -Instance ([string]$Record.instance) -Detail ("saving the campaign JSON after {0} failed; the next save writes it: {1}" -f [string]$Record.testCode, $_.Exception.Message) }
 }
 
 function Write-RunLine {
