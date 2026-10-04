@@ -190,6 +190,8 @@ internal sealed class PerfRunDetail
     public readonly SortedDictionary<string, string> Parity = new SortedDictionary<string, string>(StringComparer.Ordinal);
     public readonly SortedDictionary<string, string> InvariantChecks = new SortedDictionary<string, string>(StringComparer.Ordinal);
     public readonly SortedDictionary<string, string> Notes = new SortedDictionary<string, string>(StringComparer.Ordinal);
+    /// <summary>ResultJson "profiler": what the Request Profiler guard found, did and left, and the state during the run.</summary>
+    public readonly SortedDictionary<string, string> Profiler = new SortedDictionary<string, string>(StringComparer.Ordinal);
     public readonly SortedDictionary<string, Dictionary<string, object>> SubPhases = new SortedDictionary<string, Dictionary<string, object>>(StringComparer.Ordinal);
     public readonly List<string> AdditionalReasons = new List<string>();
     public int OpsPerPass;
@@ -289,9 +291,10 @@ internal sealed class PerfRunEngine
 
     public PerfRunMetrics Execute()
     {
-        // Request Profiler guard: before the run's stopwatch and every timed region; never throws (failures go to the notes).
+        // Request Profiler guard: before the run's stopwatch and every timed region; never throws (failures go to the
+        // ResultJson "profiler" section). PX.Telemetry switches profiling on again with every HTTP request (see PerfProfilerGuard).
         var profilerGuard = PerfProfilerGuard.Apply();
-        profilerGuard.WriteNotes(Detail.Notes);
+        profilerGuard.WriteTo(Detail.Profiler);
 
         var total = Stopwatch.StartNew();
         var m = _metrics;
@@ -333,6 +336,7 @@ internal sealed class PerfRunEngine
         var cpuStart = TimeSpan.Zero;
         var cpuMeasured = false;
         var sw = new Stopwatch();
+        var profilerTally = new PerfProfilerTally();
 
         try
         {
@@ -410,7 +414,9 @@ internal sealed class PerfRunEngine
                     cpuMeasured = true;
                 }
 
+                if (pass >= 0) profilerTally.Sample();   // untimed: before the pass's workers start
                 var record = RunPass(pass);
+                if (pass >= 0) profilerTally.Sample();   // untimed: after every worker of the pass ended
                 record.Digest = PassDigest();
                 _ctx.PassDigestsInternal[pass] = record.Digest;
 
@@ -470,8 +476,10 @@ internal sealed class PerfRunEngine
             Detail.CleanupMs = m.CleanupMs = Ms(sw);
         }
 
-        // Read-only and untimed: shows whether the Request Profiler was switched on again while the run was in progress.
-        Detail.Notes["profilerAtEnd"] = PerfProfilerGuard.Read().ToNote();
+        // Read-only and untimed: the state around the measured passes and after Cleanup (PX.Telemetry may have switched
+        // profiling on again with the suite's status polls).
+        Detail.Profiler["duringMeasuredPasses"] = profilerTally.ToNote();
+        Detail.Profiler["atEnd"] = PerfProfilerGuard.Read().ToNote();
 
         if (failure != null)
         {

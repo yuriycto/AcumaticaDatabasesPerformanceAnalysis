@@ -20,6 +20,7 @@ using GLAccount = PX.Objects.GL.Account;
 using GLBranch = PX.Objects.GL.Branch;
 using GLLedger = PX.Objects.GL.Ledger;
 using GLSub = PX.Objects.GL.Sub;
+using SMPerformanceSettings = PX.SM.PerformanceMonitorMaint.SMPerformanceSettings;
 
 namespace PerfDBBenchmark.Core.Scenarios.Environment;
 
@@ -323,9 +324,16 @@ internal static class EnvCaptureCollector
             ["dbmsVersionLabel"] = PerfRuntimeInfo.DbmsVersionLabel,
             ["settings"] = settings,
             ["connection"] = connection,
-            // Effective state, read after the engine's profiler guard; requestProfilerFound is the state the guard found.
-            ["requestProfiler"] = RequestProfiler(),
-            ["requestProfilerFound"] = PerfProfilerGuard.FoundJson(profilerGuard)
+            // The state the run found (before the engine's profiler guard acted; a live read when the guard did not run).
+            ["requestProfiler"] = profilerGuard?.Found != null
+                ? profilerGuard.Found.ToEnvJson("PX.SM.PXPerformanceMonitor", "beforeGuard")
+                : RequestProfiler("live"),
+            // Read now (Prepare, after the guard). It depends on whether a status poll already switched profiling on again,
+            // and says nothing about the timed passes: ResultJson.profiler.duringMeasuredPasses does.
+            ["requestProfilerAfterGuard"] = RequestProfiler(profilerGuard != null ? "afterGuard" : "live"),
+            ["requestProfilerFound"] = PerfProfilerGuard.FoundJson(profilerGuard),
+            ["requestProfilerTelemetry"] = (profilerGuard?.Telemetry ?? PerfTelemetryState.Read()).ToJson(),
+            ["requestProfilerSettingsRow"] = ProfilerSettingsRow(errors, profilerGuard != null ? "afterGuard" : "live")
         };
         if (database.Count > 0) db["database"] = database;
         if (errors.Count > 0) db["errors"] = errors;
@@ -439,8 +447,8 @@ internal static class EnvCaptureCollector
         for (var i = 0; i < names.Length; i++) target[names[i]] = i < row.Length ? Str(row[i]) : null;
     }
 
-    /// <summary>Request Profiler state (review-api m9): PX.SM.PXPerformanceMonitor static members, read by reflection.</summary>
-    private static Dictionary<string, object> RequestProfiler()
+    /// <summary>Request Profiler state (review-api m9): PX.SM.PXPerformanceMonitor static members, read by reflection now.</summary>
+    private static Dictionary<string, object> RequestProfiler(string readAt)
     {
         var result = new Dictionary<string, object>(StringComparer.Ordinal);
         try
@@ -449,11 +457,13 @@ internal static class EnvCaptureCollector
             if (type == null)
             {
                 result["source"] = Unavailable;
+                result["readAt"] = readAt;
                 return result;
             }
 
             result["source"] = "PX.SM.PXPerformanceMonitor";
-            foreach (var name in new[] { "IsEnabled", "SqlProfilerEnabled", "TraceEnabled", "TraceExceptionsEnabled", "IsLongOperationCollectMemory", "ProfilerAutoTurnOff" })
+            foreach (var name in new[] { "IsEnabled", "SqlProfilerEnabled", "TraceEnabled", "TraceExceptionsEnabled", "IsLongOperationCollectMemory", "ProfilerAutoTurnOff",
+                         "SqlProfilerStackTraceEnabled", "SaveRequestsToDb", "SaveSqlToDb" })
             {
                 result[name] = ReadStatic(type, name);
             }
@@ -464,7 +474,42 @@ internal static class EnvCaptureCollector
             result["error"] = ex.Message;
         }
 
+        result["readAt"] = readAt;
         return result;
+    }
+
+    /// <summary>
+    /// The persisted Request Profiler settings (SMPerformanceSettings, a system table without CompanyID), read the way
+    /// PXPerformanceMonitor.LoadSettings reads them. LoadSettings(true) applies this row when the site starts, before
+    /// PX.Telemetry's first request.
+    /// </summary>
+    private static Dictionary<string, object> ProfilerSettingsRow(Dictionary<string, object> errors, string readAt)
+    {
+        var map = new Dictionary<string, object>(StringComparer.Ordinal) { ["source"] = "SMPerformanceSettings", ["readAt"] = readAt };
+        var names = new[] { "ProfilerEnabled", "SqlProfiler", "SqlProfilerStackTrace", "TraceEnabled", "TraceExceptionsEnabled", "SaveRequestsToDb", "SaveSqlToDb" };
+        var countErrors = new Dictionary<string, object>(StringComparer.Ordinal);
+        CountRows<SMPerformanceSettings>(map, countErrors, "rows");
+        foreach (var kv in countErrors) errors["requestProfilerSettingsRow." + kv.Key] = kv.Value;
+        try
+        {
+            using (PXDataRecord rec = PXDatabase.SelectSingle<SMPerformanceSettings>(names.Select(n => new PXDataField(n)).ToArray()))
+            {
+                if (rec == null)
+                {
+                    map["row"] = "none";
+                    return map;
+                }
+
+                for (var i = 0; i < names.Length; i++) map[names[i]] = rec.GetBoolean(i);
+            }
+        }
+        catch (Exception ex)
+        {
+            map["source"] = Unavailable;
+            errors["requestProfilerSettingsRow"] = ex.GetType().Name + ": " + ex.Message;
+        }
+
+        return map;
     }
 
     private static object ReadStatic(Type type, string name)

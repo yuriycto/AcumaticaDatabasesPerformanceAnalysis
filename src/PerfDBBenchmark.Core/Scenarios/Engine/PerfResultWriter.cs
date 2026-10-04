@@ -377,6 +377,8 @@ public static class PerfResultWriter
         doc["aborted"] = detail?.Aborted ?? false;
         doc["appCpuMs"] = J(m.AppCpuMs);
         doc["notes"] = detail != null ? ToObjectMap(detail.Notes) : new Dictionary<string, object>();
+        // Request Profiler evidence as its own small section, so the 64 KB shrink steps (notes: first 20 keys) never drop it.
+        if (detail != null && detail.Profiler.Count > 0) doc["profiler"] = ToObjectMap(detail.Profiler);
         doc["server"] = new Dictionary<string, object>(StringComparer.Ordinal)
         {
             ["instance"] = request.InstanceName,
