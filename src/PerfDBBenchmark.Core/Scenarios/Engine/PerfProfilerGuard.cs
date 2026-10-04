@@ -299,6 +299,11 @@ internal sealed class PerfProfilerGuardResult
         {
             if (Found == null || Found.Error != null) return PerfRuntimeInfo.Unavailable;
             var sql = Telemetry?.ReenablesSql;
+            if (PerfProfilerGuard.ReportOnly)
+            {
+                return "report-only: kept as shipped (" + (sql == true ? "PX.Telemetry LogSQL=True switches SQL capture on with every HTTP request" :
+                    sql == false ? "PX.Telemetry LogSQL=False" : "PX.Telemetry LogSQL unknown") + ")";
+            }
             if (sql == true) return "SQL capture left on (PX.Telemetry LogSQL=True switches it on with every HTTP request)";
             if (sql == null) return "switch-off (PX.Telemetry LogSQL unknown)";
             return "switch-off";
@@ -313,6 +318,7 @@ internal sealed class PerfProfilerGuardResult
     {
         get
         {
+            if (PerfProfilerGuard.ReportOnly) return null;   // as shipped by decision; the state is recorded, not a defect
             if (Telemetry?.ReenablesSql == true)
             {
                 return "SQL capture with stack traces is on for the whole run: PX.Telemetry LogSQL=True switches it on with every " +
@@ -430,6 +436,12 @@ internal static class PerfProfilerGuard
     private const string Source = "PX.SM.PXPerformanceMonitor";
     private static readonly object Sync = new object();
 
+    /// <summary>
+    /// Campaign policy (user decision 2026-10-04): measure Acumatica as shipped, so the guard only REPORTS the profiler state
+    /// (PX.Telemetry with LogSQL=True switches the in-memory request/SQL profiler on with every HTTP request) and never changes it.
+    /// </summary>
+    internal static readonly bool ReportOnly = true;
+
     /// <summary>Reads the profiler state (never throws).</summary>
     public static PerfProfilerState Read()
     {
@@ -458,7 +470,7 @@ internal static class PerfProfilerGuard
                 {
                     result.Error = "Profiler state unavailable: " + result.Found.Error;
                 }
-                else
+                else if (!ReportOnly)
                 {
                     try
                     {
