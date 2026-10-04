@@ -50,7 +50,9 @@ public static class PerfExceptionCounter
 
     private static void EnsureSubscribed()
     {
-        if (Enabled && Interlocked.Exchange(ref _subscribed, 1) == 0)
+        // Volatile read first: BeginOperation calls this for every operation on every worker, and an unconditional
+        // Interlocked.Exchange would make them all write the same cache line.
+        if (Enabled && Volatile.Read(ref _subscribed) == 0 && Interlocked.Exchange(ref _subscribed, 1) == 0)
         {
             AppDomain.CurrentDomain.FirstChanceException += OnFirstChanceException;
         }
@@ -70,7 +72,8 @@ public static class PerfExceptionCounter
     /// <summary>
     /// Ends the watch started by BeginOperation. True when a contention exception (IsContentionException) was raised on this
     /// thread inside the operation, even when Acumatica later rethrew the failure as a plain PXException without the inner
-    /// exception (ARDocumentRelease.ReleaseDoc does: <c>throw new PXException(errorMsg)</c>). Safe to call twice.
+    /// exception (ARDocumentRelease.ReleaseDoc does: <c>throw new PXException(errorMsg)</c>). Pass it to ClassifyFailure, which
+    /// uses it only for such bare rethrows. Safe to call twice.
     /// </summary>
     internal static bool EndOperation()
     {
@@ -81,10 +84,61 @@ public static class PerfExceptionCounter
     }
 
     /// <summary>
+    /// Classifies one failed operation for SPEC §4.4 rule 7b; true = contention. The final exception decides first: a contention
+    /// failure anywhere in its chain (IsContention) is contention. Otherwise the operation's contention watch (contentionSeen,
+    /// from EndOperation) counts only when the final exception carries no cause of its own (IsBareRethrow), the case of
+    /// ARDocumentRelease.ReleaseDoc's <c>throw new PXException(errorMsg)</c>. A deadlock or lock violation that Acumatica raised
+    /// and recovered from earlier in the operation therefore never hides a later validation failure (PXRowPersistingException,
+    /// PXSetPropertyException, PXOuterException, …). masked = contention was seen in the operation, but the failure is counted
+    /// as non-contention.
+    /// </summary>
+    internal static bool ClassifyFailure(Exception error, bool contentionSeen, out bool masked)
+    {
+        masked = false;
+        if (IsContention(error)) return true;
+        if (!contentionSeen) return false;
+        if (IsBareRethrow(error)) return true;
+        masked = true;
+        return false;
+    }
+
+    /// <summary>
     /// True when the exception or one of its inner exceptions is a contention failure: a deadlock, a lock or command time-out,
     /// a lock violation, or a serialization failure (IsContentionException).
     /// </summary>
     internal static bool IsContention(Exception ex) => IsContention(ex, 0);
+
+    /// <summary>
+    /// True when every exception in the chain (inner exceptions and AggregateException members) is only a carrier: exactly
+    /// PXException (a message rethrown without its cause), PXMassProcessException, PXOperationCompletedWithErrorException,
+    /// TargetInvocationException or AggregateException. Any other type names the cause (validation, provider error, …).
+    /// </summary>
+    internal static bool IsBareRethrow(Exception ex) => ex != null && IsBareRethrow(ex, 0);
+
+    private static bool IsBareRethrow(Exception ex, int depth)
+    {
+        for (var e = ex; e != null; e = e.InnerException, depth++)
+        {
+            if (depth >= 16) return false;
+            if (e is AggregateException ae)
+            {
+                foreach (var inner in ae.InnerExceptions)
+                {
+                    if (inner != null && !IsBareRethrow(inner, depth + 1)) return false;
+                }
+
+                return true;
+            }
+
+            var carrier = e.GetType() == typeof(PXException)
+                          || e is PX.Objects.Common.PXMassProcessException
+                          || e is PXOperationCompletedWithErrorException
+                          || e is TargetInvocationException;
+            if (!carrier) return false;
+        }
+
+        return true;
+    }
 
     private static bool IsContention(Exception ex, int depth)
     {
@@ -107,14 +161,16 @@ public static class PerfExceptionCounter
     /// One exception, without its inner exceptions: PXDatabaseException Deadlock or Timeout, PXLockViolationException,
     /// TimeoutException, or a provider exception for a deadlock / lock wait / serialization failure / statement time-out that
     /// Acumatica maps to PXDbExceptions.Unknown or does not retry (SPEC §1.6): SQL Server 1205, 1222, -2; MySQL 1205, 1213;
-    /// PostgreSQL 40P01, 40001, 55P03, 57014.
+    /// PostgreSQL 40P01, 40001, 55P03, 57014. Not contention: a Timeout that PX.PgSql made from SqlState XX000 (internal_error;
+    /// PgSqlDatabaseProvider.newDatabaseException maps it to PXDbExceptions.Timeout).
     /// </summary>
     private static bool IsContentionException(Exception e)
     {
         switch (e)
         {
             case PXDatabaseException dbe:
-                return dbe.ErrorCode == PXDbExceptions.Deadlock || dbe.ErrorCode == PXDbExceptions.Timeout;
+                if (dbe.ErrorCode == PXDbExceptions.Deadlock) return true;
+                return dbe.ErrorCode == PXDbExceptions.Timeout && !HasSqlState(dbe.InnerException, "XX000");
             case PXLockViolationException _:
             case TimeoutException _:
                 return true;
@@ -148,6 +204,21 @@ public static class PerfExceptionCounter
                     return state == "40P01" || state == "40001" || state == "55P03" || state == "57014";
                 }
             }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>True when ex is a provider exception (DbException) whose SqlState property equals state.</summary>
+    private static bool HasSqlState(Exception ex, string state)
+    {
+        if (!(ex is DbException)) return false;
+        try
+        {
+            var value = ex.GetType().GetProperty("SqlState", BindingFlags.Instance | BindingFlags.Public)?.GetValue(ex, null) as string;
+            return string.Equals(value, state, StringComparison.Ordinal);
         }
         catch
         {

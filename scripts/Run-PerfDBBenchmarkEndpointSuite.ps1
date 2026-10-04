@@ -13,7 +13,9 @@
       blocks A -> B -> C -> D; per block the warm-up repetition R0 (discarded) and repetitions 1..N, each in
       its rotation order; test-major interleave; ENV_CAPTURE and gates G1-G7 before every repetition;
       cool-down and settle gate before every run; parameter verification (SPEC section 3.10) before every run;
-      triple re-runs at the end of every block; restart, stuck-instance, login-limit and resume handling.
+      triple re-runs at the end of every block (not for runs whose own operations are broken: InvalidReason
+      NonContentionErrors or NoSuccessfulOps is flagged with a GateWarning instead); restart, stuck-instance,
+      login-limit and resume handling.
 
     -PlanOnly prints the plan and the run counts without any REST call and without credentials.
     -ReportOnly -InputJson <paths> delegates to New-PerfDBBenchmarkReport.ps1.
@@ -1482,7 +1484,7 @@ function Write-PlanReport {
     Write-Host ("Run budgets   : {0}" -f $budgetText)
     Write-Host ("Settle gate   : wait >= {0} s; {1} s window: CPU < {2}%, disk < {3} MB/s; timeout {4} s (A) / {5} s (B-D, plus other DB processes < {6}% of a core and < {7} MB/s); cool-down {8} s after runs with >= 8 workers" -f $SettleMinWaitSec, $SettleWindowSec, $SettleCpuPct, $SettleDiskMBps, $SettleTimeoutSec, $SettleTimeoutSecBCD, $SettleOtherDbCpuPctOfCore, $SettleOtherDbIoMBps, $CoolDownSecAfterMultiUser)
     Write-Host ("Poll          : {0} s for the first {1} s of a run, then {2} s" -f $PollFastSec, $PollFastForSec, $PollSlowSec)
-    Write-Host ("Re-runs       : {0}" -f $(if ($NoRerun) { "disabled (-NoRerun)" } else { "triples (all instances, the repetition's order) at the end of each block; at most 2 rounds per slot" }))
+    Write-Host ("Re-runs       : {0}" -f $(if ($NoRerun) { "disabled (-NoRerun)" } else { "triples (all instances, the repetition's order) at the end of each block; at most 2 rounds per slot; NonContentionErrors / NoSuccessfulOps runs are flagged (GateWarning), not re-run" }))
     Write-Host ""
 
     $totalRuns = 0
@@ -3357,6 +3359,15 @@ function Invoke-GroupRuns {
     }
 }
 
+function Test-DefectReason {
+    # Engine status rules 7b/7c (PerfEngineInvalidReasons): an operation of the test itself failed for a reason other
+    # than contention, or no measured operation succeeded. A re-run would repeat the defect (and in Block D add
+    # invoices on every instance), so such slots are flagged, not re-run.
+    param([string]$Reason)
+    if ([string]::IsNullOrWhiteSpace($Reason)) { return $false }
+    return ($Reason.StartsWith("NonContentionErrors", [StringComparison]::Ordinal) -or $Reason.StartsWith("NoSuccessfulOps", [StringComparison]::Ordinal))
+}
+
 function Get-SlotStatus {
     param([string]$Block, [string]$TestCode, [int]$Rep, [string[]]$Order)
     $records = Get-SlotRecords -Block $Block -TestCode $TestCode -Rep $Rep -Round -1
@@ -3364,6 +3375,7 @@ function Get-SlotStatus {
     foreach ($r in $records) { $roundsDone = [Math]::Max($roundsDone, (Get-RecordRound $r)) }
     $missing = New-Object System.Collections.Generic.List[string]
     $reasons = New-Object System.Collections.Generic.List[string]
+    $defects = New-Object System.Collections.Generic.List[string]
     foreach ($name in $Order) {
         $mine = @($records | Where-Object { $_.instance -eq $name })
         if (@($mine | Where-Object { Test-RecordValid $_ }).Count -gt 0) { continue }
@@ -3371,6 +3383,7 @@ function Get-SlotStatus {
         if ($mine.Count -gt 0) {
             $last = $mine[-1]
             $reasons.Add(("{0}: {1}{2}" -f $name, $last.status, $(if ([string]::IsNullOrWhiteSpace([string]$last.invalidReason)) { "" } else { " " + $last.invalidReason })))
+            if ([string]$last.status -eq "Invalid" -and (Test-DefectReason ([string]$last.invalidReason))) { $defects.Add(("{0}: {1}" -f $name, $last.invalidReason)) }
         }
         else {
             $skips = @($script:State.suiteState["skipped"] | Where-Object { $_.block -eq $Block -and $_.testCode -eq $TestCode -and (Test-RepEqual $_.repetitionNo $Rep) -and $_.instance -eq $name })
@@ -3386,7 +3399,7 @@ function Get-SlotStatus {
             if ($hasRecord -or -not $g3) { $g3Only = $false }
         }
     }
-    return [pscustomobject]@{ Needs = ($missing.Count -gt 0); Missing = $missing.ToArray(); Reasons = $reasons.ToArray(); RoundsDone = $roundsDone; G3Only = $g3Only }
+    return [pscustomobject]@{ Needs = ($missing.Count -gt 0); Missing = $missing.ToArray(); Reasons = $reasons.ToArray(); RoundsDone = $roundsDone; G3Only = $g3Only; Defects = $defects.ToArray() }
 }
 
 function Update-StuckInstances {
@@ -3438,6 +3451,14 @@ function Invoke-RerunRounds {
                     if (-not $listedD.ContainsKey($key)) {
                         $listedD[$key] = $true
                         Add-SuiteEvent -Kind "GateWarning" -Instance $null -Detail ("Block {0}: {1} R{2} not re-run: the instances without a valid run are Stuck ({3})" -f $block, $test.TestCode, $repPlan.Rep, ($status.Missing -join ", "))
+                    }
+                    continue
+                }
+                if ($status.Defects.Count -gt 0 -and -not $decision.Partial) {
+                    $key = "defect|{0}|{1}" -f $test.TestCode, $repPlan.Rep
+                    if (-not $listedD.ContainsKey($key)) {
+                        $listedD[$key] = $true
+                        Add-SuiteEvent -Kind "GateWarning" -Instance $null -Detail ("Block {0}: {1} R{2} not re-run: an operation of the test itself failed for a reason other than a deadlock, lock wait or time-out, or nothing succeeded, so a re-run would repeat it; fix the cause, then re-run the slot by hand ({3})" -f $block, $test.TestCode, $repPlan.Rep, ($status.Defects -join "; "))
                     }
                     continue
                 }

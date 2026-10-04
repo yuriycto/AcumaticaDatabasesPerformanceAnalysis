@@ -169,6 +169,11 @@ internal sealed class PerfRunDetail
     public int ContentionErrorCount;
     /// <summary>Every other failed operation (validation, PXRowPersistingException, …): ErrorCount − ContentionErrorCount.</summary>
     public int NonContentionErrorCount;
+    /// <summary>
+    /// Of NonContentionErrorCount: operations that met a contention exception before they failed for another reason
+    /// (PerfExceptionCounter.ClassifyFailure, masked). Diagnostic only.
+    /// </summary>
+    public int NonContentionWithContentionSeenCount;
     public bool CountersEnabled;
     public readonly List<string> ErrorSamples = new List<string>();
     public readonly List<string> FailedOps = new List<string>();
@@ -221,6 +226,7 @@ internal sealed class PerfRunEngine
     private int _warmupErrors;
     private int _contentionErrors;
     private int _nonContentionErrors;
+    private int _nonContentionWithContentionSeen;
     private volatile bool _engineStop;
 
     private string _interruptKind;
@@ -835,7 +841,9 @@ internal sealed class PerfRunEngine
                 }
                 else
                 {
-                    RecordOpError(worker, wp, op, error, contentionSeen || PerfExceptionCounter.IsContention(error));
+                    var contention = PerfExceptionCounter.ClassifyFailure(error, contentionSeen, out var masked);
+                    if (masked) Interlocked.Increment(ref _nonContentionWithContentionSeen);
+                    RecordOpError(worker, wp, op, error, contention);
                 }
 
                 if (_plan.OperationCapMs > 0 && ms > _plan.OperationCapMs)
@@ -857,8 +865,8 @@ internal sealed class PerfRunEngine
 
     /// <summary>
     /// Records one failed operation. contention = the failure was a deadlock, lock violation, time-out or serialization failure
-    /// (PerfExceptionCounter.IsContention, or such an exception was raised inside the operation); every other failure means the
-    /// operation itself is broken (SPEC §4.4 rule 7b).
+    /// (PerfExceptionCounter.ClassifyFailure for ExecuteOperation, PerfExceptionCounter.IsContention for the untimed resets);
+    /// every other failure means the operation itself is broken (SPEC §4.4 rule 7b).
     /// </summary>
     private void RecordOpError(PerfWorkerContext worker, WorkerPass wp, PerfOpInfo op, Exception ex, bool contention)
     {
@@ -914,6 +922,7 @@ internal sealed class PerfRunEngine
         Detail.WarmupErrorCount = Volatile.Read(ref _warmupErrors);
         Detail.ContentionErrorCount = Volatile.Read(ref _contentionErrors);
         Detail.NonContentionErrorCount = Volatile.Read(ref _nonContentionErrors);
+        Detail.NonContentionWithContentionSeenCount = Volatile.Read(ref _nonContentionWithContentionSeen);
         if (_counters != null)
         {
             m.DeadlockCount = Volatile.Read(ref _counters.Deadlocks);

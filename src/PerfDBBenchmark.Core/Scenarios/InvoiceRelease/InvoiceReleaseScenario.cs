@@ -52,6 +52,7 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
     public const decimal InvoiceAmount = FirstLinePrice + SecondLinePrice;   // 350.00
     public const int LinesPerInvoice = 2;
     public const int ExpectedGlLinesPerInvoice = 3;
+    private const int MaxReleasedUnpostedListed = 20;
 
     // coordinating-thread state (never read by workers, which use worker.State and ctx.Items)
     private int _ledgerId;
@@ -210,7 +211,12 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
         context.Notes["unreleasedRemoved"] = _unreleasedRemoved.ToString(CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Cumulative for the run: n = warm-up plus measured successful invoices (SPEC §1.7 Verify).</summary>
+    /// <summary>
+    /// Cumulative for the run: n = warm-up plus measured successful invoices (SPEC §1.7 Verify). r = tagged invoices whose
+    /// release committed but whose GL posting then failed (ARDocumentRelease.ReleaseDoc releases and posts in separate
+    /// transactions and throws PXMassProcessException after a failed PostBatchProc): a failed operation (allowed in U04 when it
+    /// is contention), so the invoice, its 2 ARTran and its L GLTran rows stay, while GLHistory moves only for posted batches.
+    /// </summary>
     public override void Verify(PerfScenarioContext context, PerfRunMetrics metrics)
     {
         var states = context.Workers.Select(wk => wk.State as InvoiceReleaseWorkerState).Where(s => s != null).ToArray();
@@ -221,12 +227,15 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
         var g = context.MainGraph;
         var tag = context.DocumentTag;
 
-        // 1–2. n invoices with this tag: released, open, status Open, GL batch posted; Σ amounts = n × 350.00
+        // 1–2. n invoices with this tag: released, open, status Open, GL batch posted; Σ amounts = n × 350.00;
+        //      plus r released invoices whose GL batch exists but is not posted (failed operations, see the summary)
         g.Clear(PXClearOption.ClearQueriesOnly);
         var tagged = 0;
         var good = 0;
         var goodAmount = 0m;
         var goodBatches = new HashSet<string>(StringComparer.Ordinal);
+        var releasedUnposted = 0;
+        var releasedUnpostedRefs = new List<string>();
         foreach (PXResult<ARInvoice, Batch> r in SelectFrom<ARInvoice>
                      .LeftJoin<Batch>.On<Batch.module.IsEqual<BatchModule.moduleAR>
                          .And<Batch.batchNbr.IsEqual<ARInvoice.batchNbr>>>
@@ -245,8 +254,22 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
                 goodAmount += inv.CuryOrigDocAmt ?? 0m;
                 goodBatches.Add(batch.BatchNbr.TrimEnd());
             }
+            else if (inv.Released == true && batch?.BatchNbr != null && batch.Posted != true)
+            {
+                releasedUnposted++;
+                if (releasedUnpostedRefs.Count < MaxReleasedUnpostedListed)
+                    releasedUnpostedRefs.Add(inv.RefNbr?.TrimEnd() + "/" + batch.BatchNbr.TrimEnd());
+            }
         }
-        context.CheckInvariant("invoicesTagged", n, tagged);
+        if (releasedUnposted > 0)
+        {
+            context.Notes["releasedUnposted"] = releasedUnposted.ToString(CultureInfo.InvariantCulture) + ": "
+                + string.Join(",", releasedUnpostedRefs)
+                + (releasedUnposted > releasedUnpostedRefs.Count ? ",…+" + (releasedUnposted - releasedUnpostedRefs.Count).ToString(CultureInfo.InvariantCulture) + " more" : "");
+        }
+        // each released-but-unposted invoice is a failed operation: never more of them than failed operations
+        context.CheckInvariant("releasedUnpostedWithinErrors", Math.Min(releasedUnposted, metrics?.ErrorCount ?? 0), releasedUnposted);
+        context.CheckInvariant("invoicesTagged", n + releasedUnposted, tagged);
         context.CheckInvariant("invoicesReleasedPosted", n, good);
         context.CheckInvariant("invoiceAmountSum", expectedAmount, goodAmount);
 
@@ -274,12 +297,12 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
         context.CheckInvariant("glCreditSum", expectedAmount, credit);
         var linesPerInvoice = GlLinesPerInvoice(linesPerBatch, context);
 
-        // 4–6. deltas against the Prepare baseline
+        // 4–6. deltas against the Prepare baseline (GLHistory: posted batches only; ARTran and GLTran: also the r unposted)
         var now = ReadBaseline(g);
         var before = _baseline ?? throw new PXException(Descriptor.TestCode + ": the baseline was not read in Prepare.");
         context.CheckInvariant("glHistoryPtdDebitDelta", expectedAmount, now.GlPtdDebit - before.GlPtdDebit);
-        context.CheckInvariant("arTranDelta", LinesPerInvoice * n, now.ArTranCount - before.ArTranCount);
-        context.CheckInvariant("glTranDelta", linesPerInvoice * n, now.GlTranCount - before.GlTranCount);
+        context.CheckInvariant("arTranDelta", LinesPerInvoice * (n + releasedUnposted), now.ArTranCount - before.ArTranCount);
+        context.CheckInvariant("glTranDelta", linesPerInvoice * (n + releasedUnposted), now.GlTranCount - before.GlTranCount);
         context.Notes["arRegisterDelta"] = (now.ArRegisterCount - before.ArRegisterCount).ToString(CultureInfo.InvariantCulture);
         context.Notes["invoicesInclWarmUp"] = n.ToString(CultureInfo.InvariantCulture);
 

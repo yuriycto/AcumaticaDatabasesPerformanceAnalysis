@@ -340,6 +340,7 @@ public static class PerfResultWriter
             ["warmup"] = detail?.WarmupErrorCount ?? 0,
             ["contention"] = detail?.ContentionErrorCount ?? 0,         // failed operations: deadlock, lock violation, time-out, serialization failure
             ["nonContention"] = detail?.NonContentionErrorCount ?? 0,   // every other failed operation (status rule 7b)
+            ["nonContentionWithContentionSeen"] = detail?.NonContentionWithContentionSeenCount ?? 0,   // of nonContention: met a contention exception first
             ["deadlocks"] = countersEnabled ? m.DeadlockCount : (object)null,
             ["retries"] = countersEnabled ? m.RetryCount : (object)null,
             ["lockViolations"] = countersEnabled ? m.LockViolationCount : (object)null,
