@@ -105,7 +105,10 @@ public sealed class OrderEntryScenarioFactory : IPerfScenarioFactory
             IsDestructive = false,
             IsOptional = false,
             ExcludeFromComparison = false,
-            ScenarioVersion = 2,   // 2: runs in the PRODWHOLE session-branch context (PerfBranchContext; v1 saved no order)
+            // 2: runs in the PRODWHOLE session-branch context (PerfBranchContext; v1 saved no order).
+            // 3: the per-pass cleanup deletes the orders (v2 left every order behind: the delete used a detached copy of the
+            //    order) and orderState counts SOLine rows instead of LineCntr (lines and splits share LineCntr).
+            ScenarioVersion = 3,
             DefaultOpsPerPass = opsPerPass,
             DefaultPasses = 1,
             DefaultWarmUpPasses = 0,

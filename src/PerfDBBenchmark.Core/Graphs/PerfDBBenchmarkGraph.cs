@@ -349,10 +349,21 @@ public class PerfDBBenchmarkGraph : PXGraph<PerfDBBenchmarkGraph>
         try
         {
             MarkRequestRunning(request, descriptor);
-            PXLongOperation.StartOperation(this, () =>
+
+            // The run's long operation is keyed by its RequestID, not by this graph (whose UID is the screen's per-session
+            // key). The contract-based API refuses every request to the screen's entity (GET by id or list, PUT, POST action)
+            // with 409 while a long operation is running under that key in the same session
+            // (EntityExportContextBuilder.CheckLongOperationForGraph). With its own key the run leaves BenchmarkControl
+            // readable during the run (status polling with the server facts) and AbortBenchmark callable. The graph's
+            // timestamp is still applied to the work, exactly as StartOperation(this, ...) does (PXTimeStampScope).
+            var timeStamp = TimeStamp;
+            PXLongOperation.StartOperation(request.RequestID, () =>
             {
-                var graph = CreateInstance<PerfDBBenchmarkGraph>();
-                graph.ExecuteBenchmark(request);
+                using (new PXTimeStampScope(timeStamp))
+                {
+                    var graph = CreateInstance<PerfDBBenchmarkGraph>();
+                    graph.ExecuteBenchmark(request);
+                }
             });
         }
         catch

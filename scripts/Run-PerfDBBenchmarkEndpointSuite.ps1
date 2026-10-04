@@ -946,12 +946,26 @@ function Invoke-InstanceAction {
     }
 }
 
+function Test-LongOperationConflict {
+    # True for HTTP 409. The contract-based API answers every request to the BenchmarkControl entity (GET by id or
+    # list, PUT, POST action) with 409 "A long operation is running for this screen in the current session" while a
+    # long operation keyed by the screen's per-session graph UID runs in this session (EntityExportContextBuilder
+    # .CheckLongOperationForGraph -> LongOperationInProgressException -> HandleLongOperationInProgressExceptionAttribute).
+    # The maintenance actions (ClearTestRecords, ClearTestData) are such operations, and so is RunBenchmark on a server
+    # DLL older than 2026-10-04 (it now runs under its RequestID). The instance is busy, not failing.
+    param([AllowNull()]$ErrorRecord)
+    return ((Get-ErrorStatusCode $ErrorRecord) -eq 409)
+}
+
 function Get-BenchmarkControl {
-    param([Parameter(Mandatory = $true)]$Inst, [switch]$WithCatalog)
+    param([Parameter(Mandatory = $true)]$Inst, [switch]$WithCatalog, [int]$FactsWaitSec = 0)
     # Always read the control row by id. A list GET is served by Acumatica's optimized path, which returns only
     # stored columns: the server facts filled in by the graph (ServerDllSha256, ServerMethodologyVersion,
     # ServerAppStartUtc) come back empty, and $expand=BenchmarkCatalog fails with "Optimization cannot be
-    # performed ... View BenchmarkCatalog has BQL delegate".
+    # performed ... View BenchmarkCatalog has BQL delegate". A list GET is no way around a 409 either: it builds the
+    # screen graph and checks its long operation just the same (Test-LongOperationConflict).
+    # -FactsWaitSec: on 409 retry once a second for that long before the 409 error is thrown (for the moment after a
+    # long operation has written its status but has not ended yet).
     $id = $null
     if ($null -ne $Inst.Identity -and $Inst.Identity.ContainsKey("id")) { $id = [string]$Inst.Identity["id"] }
     if ([string]::IsNullOrWhiteSpace($id)) {
@@ -966,7 +980,17 @@ function Get-BenchmarkControl {
         }
     }
     $query = if ($WithCatalog) { '?$expand=BenchmarkCatalog' } else { '' }
-    $response = Invoke-InstanceRequest -Inst $Inst -Method GET -RelativeUri ("/BenchmarkControl/" + $id + $query)
+    $deadline = [DateTime]::UtcNow.AddSeconds([Math]::Max(0, $FactsWaitSec))
+    while ($true) {
+        try {
+            $response = Invoke-InstanceRequest -Inst $Inst -Method GET -RelativeUri ("/BenchmarkControl/" + $id + $query)
+            break
+        }
+        catch {
+            if (-not (Test-LongOperationConflict $_) -or [DateTime]::UtcNow -ge $deadline) { throw }
+            Start-Sleep -Seconds 1
+        }
+    }
     $record = Get-FirstRecord -Json $response.Json
     if ($null -eq $record) {
         throw ("BenchmarkControl {0} was not returned by {1}" -f $id, $Inst.Name)
@@ -974,9 +998,26 @@ function Get-BenchmarkControl {
     return $record
 }
 
+function Get-ControlFieldsOrBusy {
+    # The control row's fields, or, while a long operation of the screen runs in this session (409, see
+    # Test-LongOperationConflict), a "busy" record: LongOperation = $true and every other field empty.
+    # Test-ControlRunning treats busy as running, so callers wait instead of failing.
+    param([Parameter(Mandatory = $true)]$Inst, [int]$FactsWaitSec = 0)
+    try {
+        return (Get-ControlFields (Get-BenchmarkControl -Inst $Inst -FactsWaitSec $FactsWaitSec))
+    }
+    catch {
+        if (-not (Test-LongOperationConflict $_)) { throw }
+        $busy = Get-ControlFields $null
+        $busy.LongOperation = $true
+        return $busy
+    }
+}
+
 function Get-ControlFields {
     param([AllowNull()]$Control)
     return [pscustomobject]@{
+        LongOperation = $false
         Status = [string](Get-RecordFieldValue -Record $Control -FieldName "LastRequestStatus")
         TestCode = [string](Get-RecordFieldValue -Record $Control -FieldName "LastRequestedTestCode")
         RequestId = Convert-ToNullableGuid (Get-RecordFieldValue -Record $Control -FieldName "LastRequestID")
@@ -1002,6 +1043,7 @@ function Test-ControlRunning {
     # True when the control row says Running for a request that is still alive. A Running row written
     # before the current application start (AppDomain) is stale: that run died with the old AppDomain.
     param([Parameter(Mandatory = $true)]$Inst, [Parameter(Mandatory = $true)]$Fields)
+    if ($Fields.LongOperation) { return $true }   # 409: a long operation of the screen is running in this session
     if ($Fields.Status -ne "Running") { return $false }
     if (-not [string]::IsNullOrWhiteSpace($Inst.RunningRequestAppStart) -and -not [string]::IsNullOrWhiteSpace($Fields.AppStart) -and $Fields.RequestId -eq $Inst.RunningRequestId -and $Fields.AppStart -ne $Inst.RunningRequestAppStart) {
         return $false
@@ -1110,7 +1152,7 @@ function Invoke-ClearTestRecords {
     param([Parameter(Mandatory = $true)]$Inst)
     Write-SuiteLog ("  {0}: ClearTestRecords" -f $Inst.Name) "DarkGray"
     try {
-        $fields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst)
+        $fields = Get-ControlFieldsOrBusy -Inst $Inst
         if (Test-ControlRunning -Inst $Inst -Fields $fields) {
             Add-SuiteEvent -Kind "GateWarning" -Instance $Inst.Name -Detail "ClearTestRecords skipped: a run is in progress"
             return $false
@@ -2512,7 +2554,7 @@ function Wait-InstanceIdle {
     $pendingDeadline = Get-PendingInFlightDeadline -Inst $Inst
     $abortSent = $false
     while ($true) {
-        $fields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst)
+        $fields = Get-ControlFieldsOrBusy -Inst $Inst
         Update-InstanceFromControl -Inst $Inst -Fields $fields
         if (-not (Test-ControlRunning -Inst $Inst -Fields $fields)) { return $true }
         if ($null -ne $pendingDeadline -and $pendingDeadline -gt $deadline) {
@@ -2538,7 +2580,11 @@ function Wait-InstanceIdle {
 }
 
 function Wait-ForBenchmarkExecution {
-    # Polls the control row: start check on LastRequestedTestCode plus a new LastRequestID, then completion.
+    # Polls the control row by id (with the server facts, so a restart during the run is seen): start check on
+    # LastRequestedTestCode plus a new LastRequestID, then completion.
+    # The server runs RunBenchmark under its own long-operation key, so these reads do not conflict with the run.
+    # A 409 (older server DLL: the run held the screen's per-session key) means the run is in progress: no start
+    # time-out while it lasts; start and completion are matched when the row becomes readable again.
     # Poll interval: PollFastSec for the first PollFastForSec seconds of the run, then PollSlowSec.
     # At the wait limit: AbortBenchmark, then 2 more minutes, then Stuck (SPEC 5.4 item 14).
     param(
@@ -2559,6 +2605,7 @@ function Wait-ForBenchmarkExecution {
     $lastPollErrorMessage = $null
     $runSeenAtUtc = $null
     $abortSentAtUtc = $null
+    $longOperationAtUtc = $null
     $outcome = { param($kind, $message) [pscustomobject]@{ Outcome = $kind; RequestID = $requestId; Control = $latestControl; Message = $message; Aborted = ($null -ne $abortSentAtUtc) } }
 
     while ($true) {
@@ -2567,14 +2614,25 @@ function Wait-ForBenchmarkExecution {
         try {
             $latestControl = Get-BenchmarkControl -Inst $Inst
             $lastPollErrorMessage = $null
+            $longOperationAtUtc = $null
         }
         catch {
             $lastPollErrorMessage = $_.Exception.Message
             $pollOk = $false
+            # 409 after an accepted RunBenchmark: our run's long operation holds the screen (server DLL older than
+            # 2026-10-04, where the run was keyed by the screen's session UID). The run is in progress, not failing.
+            if ((Test-LongOperationConflict $_) -and [string]::IsNullOrWhiteSpace([string]$ActionInvocationErrorMessage)) {
+                if ($null -eq $longOperationAtUtc) { $longOperationAtUtc = $nowUtc }
+                if ($null -eq $runSeenAtUtc) { $runSeenAtUtc = $nowUtc }
+            }
+            else {
+                $longOperationAtUtc = $null
+            }
         }
 
+        if ($pollOk -or $null -ne $longOperationAtUtc) { Add-RunSample -Sampler $Sampler }
+
         if ($pollOk) {
-            Add-RunSample -Sampler $Sampler
             $f = Get-ControlFields $latestControl
             Update-InstanceFromControl -Inst $Inst -Fields $f
             Write-Progress -Id 2 -Activity ("{0} on {1}" -f $Benchmark.TestCode, $Inst.Name) -Status ("{0}; elapsed {1}" -f $(if ($null -eq $requestId) { "waiting for the long operation to start" } else { "running" }), (Format-Duration -Milliseconds ($nowUtc - $InvocationStartedUtc).TotalMilliseconds))
@@ -2601,7 +2659,9 @@ function Wait-ForBenchmarkExecution {
             }
         }
 
-        if ($null -eq $requestId -and $nowUtc -gt $startDeadlineUtc) {
+        # While the long operation answers 409 the run has started even though its RequestID cannot be read yet: no start
+        # time-out (the wait limit below still applies). Start and completion are matched once the control row is readable.
+        if ($null -eq $requestId -and $null -eq $longOperationAtUtc -and $nowUtc -gt $startDeadlineUtc) {
             $message = if (-not [string]::IsNullOrWhiteSpace([string]$ActionInvocationErrorMessage)) { $ActionInvocationErrorMessage }
             elseif (-not [string]::IsNullOrWhiteSpace([string]$lastPollErrorMessage)) { $lastPollErrorMessage }
             else { "Timed out waiting for benchmark '$($Benchmark.TestCode)' to start on $($Inst.Name)." }
@@ -2645,8 +2705,8 @@ function Invoke-SuiteRun {
     $isEnv = ($Test.TestCode -eq $script:EnvCaptureCode)
     if ($Inst.StuckBlock -eq $Block) { return $null }
 
-    # Restart between runs, and an instance that is still busy.
-    $preFields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst)
+    # Restart between runs, and an instance that is still busy (Running, or a long operation of the screen: 409).
+    $preFields = Get-ControlFieldsOrBusy -Inst $Inst
     Update-InstanceFromControl -Inst $Inst -Fields $preFields
     if (-not [string]::IsNullOrWhiteSpace($Inst.LastAppStartUtc) -and -not [string]::IsNullOrWhiteSpace($preFields.AppStart) -and $preFields.AppStart -ne $Inst.LastAppStartUtc) {
         Add-SuiteEvent -Kind "AppRestart" -Instance $Inst.Name -Detail ("the application restarted between runs (ServerAppStartUtc {0} -> {1})" -f $Inst.LastAppStartUtc, $preFields.AppStart)
@@ -2656,7 +2716,7 @@ function Invoke-SuiteRun {
     Save-InstanceState -Inst $Inst
     if (Test-ControlRunning -Inst $Inst -Fields $preFields) {
         if (-not (Wait-InstanceIdle -Inst $Inst -Block $Block)) { return $null }
-        $preFields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst)
+        $preFields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst -FactsWaitSec 30)
     }
 
     # Blocks A-C: one re-warm run (R0 profile) before the next run after an application restart (SPEC 5.4 item 7).
@@ -2667,7 +2727,7 @@ function Invoke-SuiteRun {
             Write-SuiteLog ("  {0}: re-warm run of {1} after an application restart" -f $Inst.Name, $Test.TestCode) "DarkYellow"
             [void](Invoke-SuiteRun -Inst $Inst -Test $Test -Block $Block -Rep $Rep -OrderPosition $OrderPosition -Role "rewarm" -ParamProfile "r0" -ProfileSettings $ProfileSettings -ProgressPrefix "  re-warm")
             if ($Inst.StuckBlock -eq $Block) { return $null }
-            $preFields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst)
+            $preFields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst -FactsWaitSec 30)
         }
     }
 
@@ -2786,7 +2846,8 @@ function Invoke-SuiteRun {
 
     # Restart during the run (SPEC 5.4 item 7).
     $afterFields = $null
-    try { $afterFields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst) } catch { $afterFields = $null }
+    # The run has written its status; its long operation may still be ending (409 on an older server DLL): wait for it.
+    try { $afterFields = Get-ControlFields (Get-BenchmarkControl -Inst $Inst -FactsWaitSec 30) } catch { $afterFields = $null }
     $appAfter = if ($null -ne $afterFields) { $afterFields.AppStart } else { $null }
     $record.serverAppStartAfter = $appAfter
     $restarted = ($wait.Outcome -eq "AppRestart") -or (-not [string]::IsNullOrWhiteSpace($verify.Fields.AppStart) -and -not [string]::IsNullOrWhiteSpace($appAfter) -and $appAfter -ne $verify.Fields.AppStart)
@@ -3257,6 +3318,7 @@ function Test-InstanceReachable {
             return $true
         }
         catch {
+            if (Test-LongOperationConflict $_) { return $true }   # busy with a long operation, so reachable
             if ($i -lt 3) { Start-Sleep -Seconds 30 }
         }
     }
@@ -3409,7 +3471,7 @@ function Update-StuckInstances {
     foreach ($inst in $script:SuiteInstances) {
         if ([string]::IsNullOrWhiteSpace([string]$inst.StuckBlock)) { continue }
         try {
-            $fields = Get-ControlFields (Get-BenchmarkControl -Inst $inst)
+            $fields = Get-ControlFieldsOrBusy -Inst $inst
             if (-not (Test-ControlRunning -Inst $inst -Fields $fields)) {
                 Write-SuiteLog ("  {0} is no longer Stuck ({1})" -f $inst.Name, $When) "DarkYellow"
                 $inst.StuckBlock = $null

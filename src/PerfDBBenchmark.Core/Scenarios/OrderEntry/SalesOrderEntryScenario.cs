@@ -221,14 +221,33 @@ public sealed class SalesOrderEntryScenario : PerfScenarioBase
         var states = context.Workers.Select(wk => wk.State as OrderEntryWorkerState).ToArray();
         var createdCount = states.Sum(s => s?.Created.Count ?? 0);
 
-        // 1. the run's orders: count and state
+        // 1. the run's orders: count and state. A saved order has 3 SOLine rows, is Open, not on hold or credit hold, and
+        //    belongs to PRODWHOLE. The lines are counted; SOOrder.LineCntr is not a line count (lines and their splits
+        //    share it, so a saved 3-line order has LineCntr 6).
         try
         {
             var orders = BusinessDocuments.ReadOrdersByTag(g, context.DocumentTag);
             context.CheckInvariant("orderCount:" + label, createdCount, orders.Count);
-            var good = orders.Count(o => o.LineCntr == LinesPerOrder && o.Hold != true && o.CreditHold != true
-                                         && string.Equals(o.Status, SOOrderStatus.Open, StringComparison.Ordinal));
+            var lines = BusinessDocuments.CountLinesByTag(g, context.DocumentTag);
+            var good = 0;
+            string firstMismatch = null;
+            foreach (var o in orders)
+            {
+                lines.TryGetValue(o.OrderNbr ?? string.Empty, out var lineCount);
+                if (lineCount == LinesPerOrder && o.Hold != true && o.CreditHold != true && o.BranchID == _branchId
+                    && string.Equals(o.Status, SOOrderStatus.Open, StringComparison.Ordinal))
+                {
+                    good++;
+                }
+                else if (firstMismatch == null)
+                {
+                    firstMismatch = o.OrderNbr + ": lines=" + lineCount.ToString(CultureInfo.InvariantCulture)
+                                    + " status=" + o.Status + " hold=" + (o.Hold == true) + " creditHold=" + (o.CreditHold == true)
+                                    + " branchID=" + (o.BranchID?.ToString(CultureInfo.InvariantCulture) ?? "null");
+                }
+            }
             context.CheckInvariant("orderState:" + label, orders.Count, good);
+            if (firstMismatch != null) context.Notes.TryAdd("orderStateFirstMismatch", "pass " + label + ": " + firstMismatch);
         }
         catch (Exception ex)
         {
@@ -244,12 +263,14 @@ public sealed class SalesOrderEntryScenario : PerfScenarioBase
             var workerCount = states.Length;
             var slots = Math.Max(1, Math.Min(MaxCleanupSlots, workerCount));
             EnsureSlotGraphs(slots);
+            var branchId = _branchId;
             context.RunUntimedParallel(slots, workerCount, (slot, w) =>
             {
                 try
                 {
                     var st = states[w];
                     if (st == null || st.Created.Count == 0) return;
+                    PerfBranchContext.Ensure(branchId);   // slot thread: before FreshForWrite rebuilds the graph's AccessInfo
                     var sg = _slotGraphs[slot];
                     foreach (var nbr in st.Created.ToArray())
                     {

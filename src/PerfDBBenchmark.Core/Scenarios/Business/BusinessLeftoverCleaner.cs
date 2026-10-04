@@ -15,7 +15,7 @@ namespace PerfDBBenchmark.Core.Scenarios.Business;
 /// Removes leftovers of crashed or interrupted business runs (ClearTestRecords action; SPEC §4.1, §5.2 WP4 item 4):
 /// sales orders whose OrderDesc starts with "PERFBENCH " and <b>unreleased</b> AR invoices whose DocDesc starts with "PERFBENCH ".
 /// Released invoices are permanent by design and are never touched. Deletes go through SOOrderEntry / ARInvoiceEntry,
-/// with PerfGraphs.FreshForWrite before each delete (SPEC §1.3.3).
+/// with PerfGraphs.FreshForWrite before each delete (SPEC §1.3.3), in the PRODWHOLE session branch the documents were written in.
 /// </summary>
 public sealed class BusinessLeftoverCleaner : IPerfLeftoverCleaner
 {
@@ -27,18 +27,39 @@ public sealed class BusinessLeftoverCleaner : IPerfLeftoverCleaner
         var failures = new List<string>();
         var removed = 0;
 
-        var orders = BusinessDocuments.ReadPerfBenchOrders(read);
-        if (orders.Count > 0)
+        // The documents were written in the PRODWHOLE session branch (PerfBranchContext, SPEC §1.6/§1.7); delete them in the
+        // same context. Without PRODWHOLE the deletes run in the caller's context.
+        int? branchBefore = null;
+        var branchEntered = false;
+        try
         {
-            var so = PXGraph.CreateInstance<SOOrderEntry>();
-            removed += BusinessDocuments.DeleteSalesOrders(so, orders, BusinessDocuments.DeleteRetries, failures);
-        }
+            try
+            {
+                branchBefore = PerfBranchContext.Enter(PerfBusinessPools.ResolveBranchId(read));
+                branchEntered = true;
+            }
+            catch (PXException)
+            {
+                // branch not found: keep the caller's branch
+            }
 
-        var invoices = BusinessDocuments.ReadUnreleasedPerfBenchInvoices(read);
-        if (invoices.Count > 0)
+            var orders = BusinessDocuments.ReadPerfBenchOrders(read);
+            if (orders.Count > 0)
+            {
+                var so = PXGraph.CreateInstance<SOOrderEntry>();
+                removed += BusinessDocuments.DeleteSalesOrders(so, orders, BusinessDocuments.DeleteRetries, failures);
+            }
+
+            var invoices = BusinessDocuments.ReadUnreleasedPerfBenchInvoices(read);
+            if (invoices.Count > 0)
+            {
+                var ie = PXGraph.CreateInstance<ARInvoiceEntry>();
+                removed += BusinessDocuments.DeleteUnreleasedInvoices(ie, invoices, BusinessDocuments.DeleteRetries, failures);
+            }
+        }
+        finally
         {
-            var ie = PXGraph.CreateInstance<ARInvoiceEntry>();
-            removed += BusinessDocuments.DeleteUnreleasedInvoices(ie, invoices, BusinessDocuments.DeleteRetries, failures);
+            if (branchEntered) PerfBranchContext.Restore(branchBefore);
         }
 
         if (failures.Count > 0)
@@ -169,6 +190,14 @@ public static class BusinessDocuments
     /// <summary>
     /// Deletes one PERFBENCH sales order through SOOrderEntry (Document.Delete + Save). PerfGraphs.FreshForWrite runs before
     /// every attempt; retried up to <paramref name="retries"/> times, 200 ms apart, on PXDatabaseException / PXLockViolationException.
+    /// <para>
+    /// The order is located through the graph's cache (Document.Search, as the Sales Orders form does), so Document.Current is
+    /// the very instance the SOOrder cache holds. A read-only lookup (SOOrder.PK.Find without IncludeDirty) returns a detached
+    /// copy; Document.Delete then reads the row again and marks that second instance Deleted, and the cascade delete of the lines
+    /// fails in SOOrderEntry.SOLine_RowDeleted, which calls Document.Cache.MarkUpdated(Document.Current, true): "Cannot mark the
+    /// record as updated because another record with the same key exists in the cache" (PXCache.Delete/readItem,
+    /// GraphHelper.MarkUpdated).
+    /// </para>
     /// </summary>
     public static BusinessDeleteOutcome DeleteSalesOrder(SOOrderEntry graph, string orderType, string orderNbr, int retries, out string error)
     {
@@ -179,8 +208,7 @@ public static class BusinessDocuments
             try
             {
                 PerfGraphs.FreshForWrite(graph);
-                graph.Clear(PXClearOption.ClearQueriesOnly);
-                var order = SOOrder.PK.Find(graph, orderType, orderNbr);
+                var order = LocateForWrite(graph, orderType, orderNbr);
                 if (order == null) return BusinessDeleteOutcome.NotFound;
                 if (!IsPerfBenchText(order.OrderDesc))
                 {
@@ -188,7 +216,7 @@ public static class BusinessDocuments
                     return BusinessDeleteOutcome.Skipped;
                 }
                 graph.Document.Current = order;
-                graph.Document.Delete(graph.Document.Current);
+                graph.Document.Delete(order);
                 graph.Save.Press();
                 return BusinessDeleteOutcome.Deleted;
             }
@@ -236,6 +264,43 @@ public static class BusinessDocuments
                 Thread.Sleep(RetryDelayMs);
             }
         }
+    }
+
+    /// <summary>
+    /// The order as the instance held by graph's SOOrder cache, or null when it does not exist. Document.Search merges the row
+    /// into the cache; Document also applies the customer's row-level restriction (Match&lt;Customer, Current&lt;AccessInfo.userName&gt;&gt;),
+    /// so an order the session cannot see there is looked up with PKFindOptions.IncludeDirty, which reads through a
+    /// cache-merging view as well. Never a read-only copy (see DeleteSalesOrder).
+    /// </summary>
+    private static SOOrder LocateForWrite(SOOrderEntry graph, string orderType, string orderNbr)
+    {
+        SOOrder order = graph.Document.Search<SOOrder.orderNbr>(orderNbr, orderType);
+        if (order == null) order = SOOrder.PK.Find(graph, orderType, orderNbr, PKFindOptions.IncludeDirty);
+        if (order == null) return null;
+        return graph.Document.Cache.Locate(order) as SOOrder ?? order;
+    }
+
+    /// <summary>Number of SOLine rows per order of the run (OrderType SO, OrderDesc = tag), keyed by OrderNbr.</summary>
+    /// <remarks>
+    /// SOOrder.LineCntr is not a line count: SOLine.LineNbr and SOLineSplit.SplitLineNbr both take their numbers from it
+    /// (PXLineNbr(typeof(SOOrder.lineCntr))), so a 3-line order with one split per line has LineCntr 6.
+    /// </remarks>
+    public static Dictionary<string, int> CountLinesByTag(PXGraph graph, string tag)
+    {
+        graph.Clear(PXClearOption.ClearQueriesOnly);
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (PXResult<SOLine, SOOrder> r in SelectFrom<SOLine>
+                     .InnerJoin<SOOrder>.On<SOLine.FK.Order>
+                     .Where<SOOrder.orderType.IsEqual<SOOrderTypeConstants.salesOrder>
+                         .And<SOOrder.orderDesc.IsEqual<@P.AsString>>>
+                     .View.ReadOnly.Select(graph, tag))
+        {
+            var line = (SOLine)r;
+            var order = (SOOrder)r;
+            if (line?.OrderNbr == null || order == null || !string.Equals(order.OrderDesc, tag, StringComparison.Ordinal)) continue;
+            counts[line.OrderNbr] = counts.TryGetValue(line.OrderNbr, out var n) ? n + 1 : 1;
+        }
+        return counts;
     }
 
     /// <summary>True for PXDatabaseException (deadlock, lock-wait time-out, serialization failure) and PXLockViolationException, also when wrapped.</summary>
