@@ -54,6 +54,10 @@ public sealed class SalesOrderEntryScenario : PerfScenarioBase
     private SOOrderEntry _coordinatorGraph;
     private SOOrderEntry[] _slotGraphs;
 
+    // the session branch replaced in Prepare (PerfBranchContext.Enter), put back at the end of Cleanup
+    private bool _branchEntered;
+    private int? _branchBeforeRun;
+
     private double _measuredCleanupMs;
     private int _measuredCleanupOrders;
     private int _parallelFailureCount;
@@ -97,6 +101,13 @@ public sealed class SalesOrderEntryScenario : PerfScenarioBase
         // 1. pinned IDs
         _branchId = PerfBusinessPools.ResolveBranchId(g);
         _siteId = PerfBusinessPools.ResolveSiteId(g);
+
+        // 1b. the clerk's current branch (PRODWHOLE) before any SOOrderEntry exists: AccessInfo.BranchID/BaseCuryID drive the
+        //     order's BranchID, CuryID and CurrencyInfo defaults; worker threads started from this thread inherit it
+        _branchBeforeRun = PerfBranchContext.Enter(_branchId);
+        _branchEntered = true;
+        context.Notes["branchContext"] = PerfCampaignConstants.BranchCD + "; session branch before the run: "
+                                         + (_branchBeforeRun?.ToString(CultureInfo.InvariantCulture) ?? "none");
 
         // 2. pools
         _customers = PerfBusinessPools.LoadCustomers(g);
@@ -161,7 +172,9 @@ public sealed class SalesOrderEntryScenario : PerfScenarioBase
 
     public override void BeforeOperation(PerfWorkerContext worker, PerfOpInfo op)
     {
-        ((OrderEntryWorkerState)worker.State).Graph.Clear(PXClearOption.ClearAll);
+        var state = (OrderEntryWorkerState)worker.State;
+        PerfBranchContext.Ensure(state.BranchId);   // worker thread: before Clear(ClearAll) rebuilds AccessInfo
+        state.Graph.Clear(PXClearOption.ClearAll);
     }
 
     public override void ExecuteOperation(PerfWorkerContext worker, PerfOpInfo op)
@@ -340,16 +353,30 @@ public sealed class SalesOrderEntryScenario : PerfScenarioBase
         context.Parity["sumOrderTotal"] = PerfChecksum.Canonical(total);
     }
 
-    /// <summary>Always: removes any order of this run that is still present (coordinating thread, FreshForWrite before each delete).</summary>
+    /// <summary>
+    /// Always: removes any order of this run that is still present (coordinating thread, FreshForWrite before each delete),
+    /// then puts back the session branch that Prepare replaced.
+    /// </summary>
     public override void Cleanup(PerfScenarioContext context)
     {
-        var remaining = BusinessDocuments.ReadOrdersByTag(context.MainGraph, context.DocumentTag);
-        if (remaining.Count == 0) return;
-        var failures = new List<string>();
-        var removed = BusinessDocuments.DeleteSalesOrders(CoordinatorGraph(), remaining, BusinessDocuments.DeleteRetries, failures);
-        context.Notes["cleanupSweepRemoved"] = removed.ToString(CultureInfo.InvariantCulture);
-        if (failures.Count > 0)
-            throw new PXException(Descriptor.TestCode + ": " + failures.Count.ToString(CultureInfo.InvariantCulture) + " sales orders of this run could not be deleted. First: " + failures[0]);
+        try
+        {
+            var remaining = BusinessDocuments.ReadOrdersByTag(context.MainGraph, context.DocumentTag);
+            if (remaining.Count == 0) return;
+            var failures = new List<string>();
+            var removed = BusinessDocuments.DeleteSalesOrders(CoordinatorGraph(), remaining, BusinessDocuments.DeleteRetries, failures);
+            context.Notes["cleanupSweepRemoved"] = removed.ToString(CultureInfo.InvariantCulture);
+            if (failures.Count > 0)
+                throw new PXException(Descriptor.TestCode + ": " + failures.Count.ToString(CultureInfo.InvariantCulture) + " sales orders of this run could not be deleted. First: " + failures[0]);
+        }
+        finally
+        {
+            if (_branchEntered)
+            {
+                _branchEntered = false;
+                PerfBranchContext.Restore(_branchBeforeRun);
+            }
+        }
     }
 
     // ---------------------------------------------------------------- helpers (untimed)

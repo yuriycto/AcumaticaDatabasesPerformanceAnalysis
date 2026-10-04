@@ -67,7 +67,7 @@ public sealed class InvoiceReleaseScenarioFactory : IPerfScenarioFactory
             IsDestructive = true,
             IsOptional = isOptional,
             ExcludeFromComparison = false,
-            ScenarioVersion = 1,
+            ScenarioVersion = 2,   // 2: runs in the PRODWHOLE session-branch context (PerfBranchContext)
             DefaultOpsPerPass = opsPerPass,
             DefaultPasses = 1,
             DefaultWarmUpPasses = 0,

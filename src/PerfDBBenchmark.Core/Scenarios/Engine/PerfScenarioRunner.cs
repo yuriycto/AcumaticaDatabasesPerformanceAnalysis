@@ -165,6 +165,10 @@ internal sealed class PerfRunDetail
 
     public int ErrorCount;
     public int WarmupErrorCount;
+    /// <summary>Failed operations (warm-up included) caused by a deadlock, lock violation, time-out or serialization failure.</summary>
+    public int ContentionErrorCount;
+    /// <summary>Every other failed operation (validation, PXRowPersistingException, …): ErrorCount − ContentionErrorCount.</summary>
+    public int NonContentionErrorCount;
     public bool CountersEnabled;
     public readonly List<string> ErrorSamples = new List<string>();
     public readonly List<string> FailedOps = new List<string>();
@@ -215,6 +219,8 @@ internal sealed class PerfRunEngine
     private int _inFlight;
     private int _passInFlightPeak;
     private int _warmupErrors;
+    private int _contentionErrors;
+    private int _nonContentionErrors;
     private volatile bool _engineStop;
 
     private string _interruptKind;
@@ -773,7 +779,7 @@ internal sealed class PerfRunEngine
                     }
                     catch (Exception ex)
                     {
-                        RecordOpError(worker, wp, op, ex);
+                        RecordOpError(worker, wp, op, ex, PerfExceptionCounter.IsContention(ex));
                         continue;
                     }
                 }
@@ -784,7 +790,7 @@ internal sealed class PerfRunEngine
                 }
                 catch (Exception ex)
                 {
-                    RecordOpError(worker, wp, op, ex);
+                    RecordOpError(worker, wp, op, ex, PerfExceptionCounter.IsContention(ex));
                     continue;
                 }
 
@@ -799,6 +805,7 @@ internal sealed class PerfRunEngine
                 UpdateMax(ref _passInFlightPeak, Interlocked.Increment(ref _inFlight));
                 Exception error = null;
 
+                PerfExceptionCounter.BeginOperation();
                 var t0 = Stopwatch.GetTimestamp();
                 try
                 {
@@ -810,6 +817,7 @@ internal sealed class PerfRunEngine
                 }
 
                 var t1 = Stopwatch.GetTimestamp();
+                var contentionSeen = PerfExceptionCounter.EndOperation();
 
                 Interlocked.Decrement(ref _inFlight);
                 PerfExceptionCounter.UnmarkThread();
@@ -827,7 +835,7 @@ internal sealed class PerfRunEngine
                 }
                 else
                 {
-                    RecordOpError(worker, wp, op, error);
+                    RecordOpError(worker, wp, op, error, contentionSeen || PerfExceptionCounter.IsContention(error));
                 }
 
                 if (_plan.OperationCapMs > 0 && ms > _plan.OperationCapMs)
@@ -840,17 +848,25 @@ internal sealed class PerfRunEngine
         finally
         {
             PerfExceptionCounter.UnmarkThread();
+            PerfExceptionCounter.EndOperation();   // pool threads are reused: never leave the operation watch on
             worker.IsMeasuring = false;
             worker.PassEndTicks = Stopwatch.GetTimestamp();
             if (gate != null) Interlocked.Decrement(ref _active);
         }
     }
 
-    private void RecordOpError(PerfWorkerContext worker, WorkerPass wp, PerfOpInfo op, Exception ex)
+    /// <summary>
+    /// Records one failed operation. contention = the failure was a deadlock, lock violation, time-out or serialization failure
+    /// (PerfExceptionCounter.IsContention, or such an exception was raised inside the operation); every other failure means the
+    /// operation itself is broken (SPEC §4.4 rule 7b).
+    /// </summary>
+    private void RecordOpError(PerfWorkerContext worker, WorkerPass wp, PerfOpInfo op, Exception ex, bool contention)
     {
         worker.Errors++;
         wp.Errors++;
         if (op.IsWarmUp) Interlocked.Increment(ref _warmupErrors);
+        if (contention) Interlocked.Increment(ref _contentionErrors);
+        else Interlocked.Increment(ref _nonContentionErrors);
 
         var id = op.Pass.ToString(CultureInfo.InvariantCulture) + ":" + worker.Index.ToString(CultureInfo.InvariantCulture) + ":" +
                  op.WorkerOpIndex.ToString(CultureInfo.InvariantCulture);
@@ -896,6 +912,8 @@ internal sealed class PerfRunEngine
         m.ErrorCount = workers.Sum(w => w.Errors);
         Detail.ErrorCount = m.ErrorCount;
         Detail.WarmupErrorCount = Volatile.Read(ref _warmupErrors);
+        Detail.ContentionErrorCount = Volatile.Read(ref _contentionErrors);
+        Detail.NonContentionErrorCount = Volatile.Read(ref _nonContentionErrors);
         if (_counters != null)
         {
             m.DeadlockCount = Volatile.Read(ref _counters.Deadlocks);
@@ -1053,7 +1071,10 @@ internal sealed class PerfRunEngine
         Detail.InvariantsOk = _ctx.InvariantsOk;
     }
 
-    /// <summary>Status rules, first match wins; further reasons go to notes.additionalReasons (SPEC §4.4).</summary>
+    /// <summary>
+    /// Status rules, first match wins; further reasons go to notes.additionalReasons (SPEC §4.4, plus rules 7b NonContentionErrors
+    /// and 7c NoSuccessfulOps, PerfEngineInvalidReasons).
+    /// </summary>
     private void ApplyStatus(bool cleanupFailed)
     {
         var m = _metrics;
@@ -1079,9 +1100,29 @@ internal sealed class PerfRunEngine
             reasons.Add((PerfRunStatuses.Invalid, PerfInvalidReasons.Errors + ":" + m.ErrorCount.ToString(CultureInfo.InvariantCulture)));
         }
 
+        // 7b. ErrorsInvalidate = false (many-users families): deadlocks, lock violations, time-outs and serialization failures
+        //     are part of the result and stay reported; any other failed operation (validation, PXRowPersistingException, …)
+        //     means the operation itself is broken, so the run is neither Completed nor Capped.
+        if (!_plan.ErrorsInvalidate && Detail.NonContentionErrorCount > 0)
+        {
+            reasons.Add((PerfRunStatuses.Invalid, PerfEngineInvalidReasons.NonContentionErrors + ":" +
+                                                  Detail.NonContentionErrorCount.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        // 7c. Nothing was measured: measured operations were planned but none succeeded. A cooperative stop (run budget,
+        //     operation cap, AbortBenchmark) that came before the first measured operation keeps its own status.
+        var interrupted = m.CappedKind != null || Detail.Aborted;
+        var plannedMeasured = (long)Math.Max(0, _plan.OpsPerPass) * Math.Max(0, _plan.Passes);
+        var attemptedMeasured = Detail.MeasuredPasses.Sum(p => p.Ops);
+        var okMeasured = Detail.MeasuredPasses.Sum(p => p.OkOps);
+        if (plannedMeasured > 0 && okMeasured == 0 && (attemptedMeasured > 0 || !interrupted))
+        {
+            reasons.Add((PerfRunStatuses.Invalid, PerfEngineInvalidReasons.NoSuccessfulOps + "(0/" +
+                                                  attemptedMeasured.ToString(CultureInfo.InvariantCulture) + ")"));
+        }
+
         if (m.CappedKind != null) reasons.Add((PerfRunStatuses.Capped, m.CappedKind));
 
-        var interrupted = m.CappedKind != null || Detail.Aborted;
         Detail.InvariantsApplied = !interrupted;
         if (!interrupted && !_ctx.InvariantsOk)
         {

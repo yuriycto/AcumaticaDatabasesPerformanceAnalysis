@@ -61,6 +61,10 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
     private int _unreleasedDeleteFailures;
     private string _firstUnreleasedDeleteFailure;
 
+    // the session branch replaced in Prepare (PerfBranchContext.Enter), put back at the end of Cleanup
+    private bool _branchEntered;
+    private int? _branchBeforeRun;
+
     public InvoiceReleaseScenario(PerfTestDescriptor descriptor) : base(descriptor) { }
 
     public override PerfRunPlan CreatePlan(PerfRunRequest request)
@@ -89,6 +93,14 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
 
         // 1. pinned IDs and pools
         var branchId = PerfBusinessPools.ResolveBranchId(g);
+
+        // 1b. the clerk's current branch (PRODWHOLE) before any ARInvoiceEntry exists: AccessInfo.BranchID/BaseCuryID drive the
+        //     invoice's BranchID, CuryID and CurrencyInfo defaults and the release graphs; worker threads inherit it
+        _branchBeforeRun = PerfBranchContext.Enter(branchId);
+        _branchEntered = true;
+        context.Notes["branchContext"] = PerfCampaignConstants.BranchCD + "; session branch before the run: "
+                                         + (_branchBeforeRun?.ToString(CultureInfo.InvariantCulture) ?? "none");
+
         _ledgerId = PerfBusinessPools.ResolveLedgerId(g);
         var customers = PerfBusinessPools.LoadCustomers(g);
         var nonStock = PerfBusinessPools.LoadNonStockPool(g);
@@ -139,7 +151,9 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
 
     public override void BeforeOperation(PerfWorkerContext worker, PerfOpInfo op)
     {
-        ((InvoiceReleaseWorkerState)worker.State).Graph.Clear(PXClearOption.ClearAll);
+        var state = (InvoiceReleaseWorkerState)worker.State;
+        PerfBranchContext.Ensure(state.BranchId);   // worker thread: before Clear(ClearAll) rebuilds AccessInfo
+        state.Graph.Clear(PXClearOption.ClearAll);
     }
 
     public override void ExecuteOperation(PerfWorkerContext worker, PerfOpInfo op)
@@ -275,17 +289,31 @@ public sealed class InvoiceReleaseScenario : PerfScenarioBase
         context.Parity["glLinesPerInvoice"] = linesPerInvoice.ToString(CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Always: deletes any unreleased invoice of this run (released invoices are permanent by design).</summary>
+    /// <summary>
+    /// Always: deletes any unreleased invoice of this run (released invoices are permanent by design), then puts back the
+    /// session branch that Prepare replaced.
+    /// </summary>
     public override void Cleanup(PerfScenarioContext context)
     {
-        var unreleased = BusinessDocuments.ReadUnreleasedInvoicesByTag(context.MainGraph, context.DocumentTag);
-        if (unreleased.Count == 0) return;
-        var failures = new List<string>();
-        var removed = BusinessDocuments.DeleteUnreleasedInvoices(CoordinatorGraph(), unreleased, BusinessDocuments.DeleteRetries, failures);
-        _unreleasedRemoved += removed;
-        context.Notes["unreleasedRemoved"] = _unreleasedRemoved.ToString(CultureInfo.InvariantCulture);
-        if (failures.Count > 0)
-            throw new PXException(Descriptor.TestCode + ": " + failures.Count.ToString(CultureInfo.InvariantCulture) + " unreleased invoices of this run could not be deleted. First: " + failures[0]);
+        try
+        {
+            var unreleased = BusinessDocuments.ReadUnreleasedInvoicesByTag(context.MainGraph, context.DocumentTag);
+            if (unreleased.Count == 0) return;
+            var failures = new List<string>();
+            var removed = BusinessDocuments.DeleteUnreleasedInvoices(CoordinatorGraph(), unreleased, BusinessDocuments.DeleteRetries, failures);
+            _unreleasedRemoved += removed;
+            context.Notes["unreleasedRemoved"] = _unreleasedRemoved.ToString(CultureInfo.InvariantCulture);
+            if (failures.Count > 0)
+                throw new PXException(Descriptor.TestCode + ": " + failures.Count.ToString(CultureInfo.InvariantCulture) + " unreleased invoices of this run could not be deleted. First: " + failures[0]);
+        }
+        finally
+        {
+            if (_branchEntered)
+            {
+                _branchEntered = false;
+                PerfBranchContext.Restore(_branchBeforeRun);
+            }
+        }
     }
 
     // ---------------------------------------------------------------- helpers

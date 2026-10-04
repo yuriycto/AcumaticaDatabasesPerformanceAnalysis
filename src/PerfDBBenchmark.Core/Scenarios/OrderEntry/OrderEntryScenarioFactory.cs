@@ -105,7 +105,7 @@ public sealed class OrderEntryScenarioFactory : IPerfScenarioFactory
             IsDestructive = false,
             IsOptional = false,
             ExcludeFromComparison = false,
-            ScenarioVersion = 1,
+            ScenarioVersion = 2,   // 2: runs in the PRODWHOLE session-branch context (PerfBranchContext; v1 saved no order)
             DefaultOpsPerPass = opsPerPass,
             DefaultPasses = 1,
             DefaultWarmUpPasses = 0,

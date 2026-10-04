@@ -1,4 +1,6 @@
 using System;
+using System.Data.Common;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading;
@@ -12,6 +14,8 @@ namespace PerfDBBenchmark.Core.Scenarios;
 /// operation points at the run's counters, so only worker threads of the current run count, and concurrent runs cannot
 /// cross-count. Each exception object is counted once per run (the CLR raises FirstChanceException again on every rethrow).
 /// The handler never throws and allocates only for the first sighting of a counted exception.
+/// Separately, BeginOperation/EndOperation tell the engine whether a failed operation (warm-up included) met a contention
+/// exception, so contention errors can be told apart from broken operations (SPEC §4.4 rule 7b).
 /// </summary>
 public static class PerfExceptionCounter
 {
@@ -23,6 +27,8 @@ public static class PerfExceptionCounter
 
     [ThreadStatic] private static RunCounters _marker;
     [ThreadStatic] private static bool _inHandler;
+    [ThreadStatic] private static bool _opTracking;
+    [ThreadStatic] private static bool _opContention;
 
     /// <summary>Per-run counters (one instance per run).</summary>
     internal sealed class RunCounters
@@ -38,12 +44,115 @@ public static class PerfExceptionCounter
     /// <summary>Creates the counters of one run and makes sure the handler is subscribed.</summary>
     internal static RunCounters Begin()
     {
+        EnsureSubscribed();
+        return new RunCounters();
+    }
+
+    private static void EnsureSubscribed()
+    {
         if (Enabled && Interlocked.Exchange(ref _subscribed, 1) == 0)
         {
             AppDomain.CurrentDomain.FirstChanceException += OnFirstChanceException;
         }
+    }
 
-        return new RunCounters();
+    /// <summary>
+    /// Starts watching the operation about to run on the current thread (warm-up and measured operations alike), for the
+    /// contention classification of a failed operation (SPEC §4.4 rule 7b). Call outside the timer.
+    /// </summary>
+    internal static void BeginOperation()
+    {
+        EnsureSubscribed();
+        _opContention = false;
+        _opTracking = true;
+    }
+
+    /// <summary>
+    /// Ends the watch started by BeginOperation. True when a contention exception (IsContentionException) was raised on this
+    /// thread inside the operation, even when Acumatica later rethrew the failure as a plain PXException without the inner
+    /// exception (ARDocumentRelease.ReleaseDoc does: <c>throw new PXException(errorMsg)</c>). Safe to call twice.
+    /// </summary>
+    internal static bool EndOperation()
+    {
+        var seen = _opContention;
+        _opTracking = false;
+        _opContention = false;
+        return seen;
+    }
+
+    /// <summary>
+    /// True when the exception or one of its inner exceptions is a contention failure: a deadlock, a lock or command time-out,
+    /// a lock violation, or a serialization failure (IsContentionException).
+    /// </summary>
+    internal static bool IsContention(Exception ex) => IsContention(ex, 0);
+
+    private static bool IsContention(Exception ex, int depth)
+    {
+        for (var e = ex; e != null && depth < 16; e = e.InnerException, depth++)
+        {
+            if (IsContentionException(e)) return true;
+            if (e is AggregateException ae)
+            {
+                foreach (var inner in ae.InnerExceptions)
+                {
+                    if (IsContention(inner, depth + 1)) return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// One exception, without its inner exceptions: PXDatabaseException Deadlock or Timeout, PXLockViolationException,
+    /// TimeoutException, or a provider exception for a deadlock / lock wait / serialization failure / statement time-out that
+    /// Acumatica maps to PXDbExceptions.Unknown or does not retry (SPEC §1.6): SQL Server 1205, 1222, -2; MySQL 1205, 1213;
+    /// PostgreSQL 40P01, 40001, 55P03, 57014.
+    /// </summary>
+    private static bool IsContentionException(Exception e)
+    {
+        switch (e)
+        {
+            case PXDatabaseException dbe:
+                return dbe.ErrorCode == PXDbExceptions.Deadlock || dbe.ErrorCode == PXDbExceptions.Timeout;
+            case PXLockViolationException _:
+            case TimeoutException _:
+                return true;
+            case DbException _:
+                return IsProviderContention(e);
+            default:
+                return false;
+        }
+    }
+
+    private static bool IsProviderContention(Exception e)
+    {
+        try
+        {
+            var type = e.GetType();
+            switch (type.Name)
+            {
+                case "SqlException":
+                {
+                    var n = type.GetProperty("Number", BindingFlags.Instance | BindingFlags.Public)?.GetValue(e, null) as int?;
+                    return n == 1205 || n == 1222 || n == -2;
+                }
+                case "MySqlException":
+                {
+                    var n = type.GetProperty("Number", BindingFlags.Instance | BindingFlags.Public)?.GetValue(e, null) as int?;
+                    return n == 1205 || n == 1213;
+                }
+                default:
+                {
+                    var state = type.GetProperty("SqlState", BindingFlags.Instance | BindingFlags.Public)?.GetValue(e, null) as string;
+                    return state == "40P01" || state == "40001" || state == "55P03" || state == "57014";
+                }
+            }
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>Marks the current thread as running a measured operation of the given run (null = not measuring).</summary>
@@ -60,12 +169,16 @@ public static class PerfExceptionCounter
     private static void OnFirstChanceException(object sender, FirstChanceExceptionEventArgs e)
     {
         var run = _marker;
-        if (run == null || run.Closed || _inHandler) return;
+        var tracking = _opTracking;
+        if (_inHandler || (!tracking && (run == null || run.Closed))) return;
 
         _inHandler = true;
         try
         {
             var ex = e.Exception;
+            if (tracking && !_opContention && IsContentionException(ex)) _opContention = true;
+            if (run == null || run.Closed) return;
+
             bool deadlock = false, timeout = false, lockViolation = false, retry = false;
 
             if (ex is PXDatabaseException dbe)
