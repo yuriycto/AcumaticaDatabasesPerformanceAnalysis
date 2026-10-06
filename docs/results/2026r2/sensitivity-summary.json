@@ -1,0 +1,134 @@
+{
+    "engine":  "MySQL",
+    "threshold":  1.3,
+    "campaignId":  "36afb400-6a15-407c-964c-56128df64b43",
+    "repetitions":  3,
+    "settings":  [
+                     {
+                         "name":  "innodb_io_capacity_max",
+                         "applied":  "20000",
+                         "source":  "MySQL 8.4 Reference Manual, What Is New in MySQL 8.4 since MySQL 8.0, table of InnoDB defaults that differ from 8.0 (innodb_io_capacity_max = 2 x innodb_io_capacity = 20000), https://dev.mysql.com/doc/refman/8.4/en/mysql-nutshell.html ; MySQL 8.0 Reference Manual, Configuring InnoDB I/O Capacity (twice innodb_io_capacity is a good starting point; it cannot be lower than innodb_io_capacity; both can be set at runtime), https://dev.mysql.com/doc/refman/8.0/en/innodb-configuring-io-capacity.html ; accessed 2026-10-03. Why: raises the limit for background flushing when it falls behind, sized for the host\u0027s SSD RAID 0. Scope: server (SET PERSIST). Restart: not needed. Keep this entry before innodb_io_capacity.",
+                         "before":  "2000",
+                         "beforePersisted":  null
+                     },
+                     {
+                         "name":  "innodb_io_capacity",
+                         "applied":  "10000",
+                         "source":  "MySQL 8.4 Reference Manual, What Is New in MySQL 8.4 since MySQL 8.0 (InnoDB default changes: innodb_io_capacity 200 -\u003e 10000), https://dev.mysql.com/doc/refman/8.4/en/mysql-nutshell.html ; MySQL 8.0 Reference Manual, Configuring InnoDB I/O Capacity (the default 200 suits lower-end SSDs; higher-end bus-attached SSDs can use 1000 or more; above 20000 only if lower values are not enough), https://dev.mysql.com/doc/refman/8.0/en/innodb-configuring-io-capacity.html ; accessed 2026-10-03. Why: the 8.0 default flushes pages far more slowly than the SSD RAID 0 allows, which matters in the write-heavy tests. Scope: server (SET PERSIST). Restart: not needed.",
+                         "before":  "200",
+                         "beforePersisted":  null
+                     },
+                     {
+                         "name":  "innodb_log_buffer_size",
+                         "applied":  "67108864",
+                         "source":  "Acumatica ERP 2018 R1 Installation Guide, Troubleshooting Performance, Step 4.2: Check the Configuration of MySQL Database Server (innodb_log_buffer_size 16M as a minimum; a larger log buffer saves disk I/O for large transactions), https://acumatica-builds.s3.amazonaws.com/builds/2018R1/PDF/AcumaticaERP_InstallationGuide.pdf pp. 84-85. This is the latest Acumatica release that publishes MySQL settings; the current help (2025 R2, 2026 R1) has no MySQL page. MySQL 8.0 Reference Manual, Optimizing InnoDB Redo Logging (consider a larger log buffer for transactions that change many rows; dynamic in 8.0), https://dev.mysql.com/doc/refman/8.0/en/optimizing-innodb-logging.html ; 64 MiB is the MySQL 8.4 default, https://dev.mysql.com/doc/refman/8.4/en/mysql-nutshell.html ; accessed 2026-10-03. Why: invoice release and order entry write large transactions. It adds 48 MiB outside the buffer pool, so the aligned 8 GB does not change. Scope: server (SET PERSIST). Restart: not needed.",
+                         "before":  "16777216",
+                         "beforePersisted":  null
+                     },
+                     {
+                         "name":  "innodb_adaptive_hash_index",
+                         "applied":  "OFF",
+                         "source":  "MySQL 8.4 Reference Manual, What Is New in MySQL 8.4 since MySQL 8.0 (InnoDB default changes: innodb_adaptive_hash_index ON -\u003e OFF), https://dev.mysql.com/doc/refman/8.4/en/mysql-nutshell.html ; MySQL 8.0 Reference Manual, Adaptive Hash Index (under heavy workloads such as many concurrent joins it can become a point of contention; benchmark with it on and off), https://dev.mysql.com/doc/refman/8.0/en/innodb-adaptive-hash.html ; can be set with SET GLOBAL without a restart, per InnoDB Startup Options and System Variables, https://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html ; accessed 2026-10-03. Why: this is the vendor\u0027s current default, and it removes contention on the adaptive hash index latch in the multi-user tests. Scope: server (SET PERSIST). Restart: not needed.",
+                         "before":  "ON",
+                         "beforePersisted":  null
+                     },
+                     {
+                         "name":  "innodb_change_buffering",
+                         "applied":  "none",
+                         "source":  "MySQL 8.4 Reference Manual, What Is New in MySQL 8.4 since MySQL 8.0 (InnoDB default changes: innodb_change_buffering all -\u003e none), https://dev.mysql.com/doc/refman/8.4/en/mysql-nutshell.html ; MySQL 8.0 Reference Manual, Change Buffer (disabling can help when the working set nearly fits in the buffer pool or tables have few secondary indexes; settable with SET GLOBAL), https://dev.mysql.com/doc/refman/8.0/en/innodb-change-buffer.html ; accessed 2026-10-03. Why: this is the vendor\u0027s current default. The 2 GB database fits in the 8 GB buffer pool, so buffering secondary-index changes only adds merge work after the cold start. Scope: server (SET PERSIST). Restart: not needed.",
+                         "before":  "all",
+                         "beforePersisted":  null
+                     }
+                 ],
+    "tests":  [
+                  {
+                      "testCode":  "SCR_CUSTOMER_SEARCH",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  1.421521,
+                      "tunedRelToFastest":  1.431733,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "no (indicative): still 1.3x or more slower after tuning"
+                  },
+                  {
+                      "testCode":  "RPT_SALES_BY_CUSTOMER_MONTH",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  4.614088,
+                      "tunedRelToFastest":  7.482419,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "no (indicative): still 1.3x or more slower after tuning"
+                  },
+                  {
+                      "testCode":  "RPT_GL_ACCOUNT_DETAILS",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  2.020306,
+                      "tunedRelToFastest":  1.903703,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "no (indicative): still 1.3x or more slower after tuning"
+                  },
+                  {
+                      "testCode":  "RPT_LARGE_LIST_PAGING",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  1.699855,
+                      "tunedRelToFastest":  1.756659,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "no (indicative): still 1.3x or more slower after tuning"
+                  },
+                  {
+                      "testCode":  "ORD_SO_ENTRY_U04",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  1.576386,
+                      "tunedRelToFastest":  1.049128,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "yes (indicative): below 1.3x of the fastest after tuning"
+                  },
+                  {
+                      "testCode":  "INV_RELEASE_TO_GL_U01",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  1.428533,
+                      "tunedRelToFastest":  1.108768,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "yes (indicative): below 1.3x of the fastest after tuning"
+                  },
+                  {
+                      "testCode":  "CORE_READ_1U",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  2.33187,
+                      "tunedRelToFastest":  3.277402,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "no (indicative): still 1.3x or more slower after tuning"
+                  },
+                  {
+                      "testCode":  "CORE_READ_8U",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  1.875213,
+                      "tunedRelToFastest":  1.827364,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "no (indicative): still 1.3x or more slower after tuning"
+                  },
+                  {
+                      "testCode":  "CORE_DELETE_1U",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  1.535726,
+                      "tunedRelToFastest":  1.430203,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "no (indicative): still 1.3x or more slower after tuning"
+                  },
+                  {
+                      "testCode":  "CORE_JOIN_SLIM_1U",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  1.373745,
+                      "tunedRelToFastest":  1.657642,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "no (indicative): still 1.3x or more slower after tuning"
+                  },
+                  {
+                      "testCode":  "CORE_JOIN_SLIM_8U",
+                      "engine":  "MySQL",
+                      "mainRelToFastest":  1.475708,
+                      "tunedRelToFastest":  1.437516,
+                      "tunedNValid":  3,
+                      "wouldTuningChangeThis":  "no (indicative): still 1.3x or more slower after tuning"
+                  }
+              ],
+    "note":  "Published only as \"would tuning change this?\", never in the headline verdicts (SPEC 6.2 E11). Indicative: the mini-run has R0 + 3 measured repetitions (tunedNValid valid runs per engine), below the 5 the report needs to call a test comparable, so its ratios are medians of at most 3 runs and carry no tie-rule verdict."
+}
