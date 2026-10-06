@@ -425,7 +425,7 @@ Engine statement counter per operation (whole run incl. warm-up, Prepare, Verify
 
 ### Environment changes during the campaign
 
-- background.runningServices: removed: none → added: CodexSandboxService.OpenAI.Codex, W32Time
+- background.runningServices: removed: none → added: (a third-party application service), W32Time
 - databases.SQLServer.database.log_reuse_wait_desc: LOG_BACKUP → NOTHING
 - databases.SQLServer.files.files[PerfSQL].sizeMB: 2760 → 2888
 - databases.SQLServer.files.totalMB: 10952 → 11080

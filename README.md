@@ -948,12 +948,12 @@ Everything that could favour one database is listed here, including the things w
 
 ### Environment changes during the campaign
 
-The environment captured at the end of the campaign differed from the one at the start in 42 recorded items (the list below shows 40; all 42 are in `analysis.json`): database sizes, statistics dates and row counts that the tests change by design, SQL Server's log state after its log backups and its number of open sessions, and two Windows services that were running at the end but not at the start (`CodexSandboxService.OpenAI.Codex` and `W32Time`, the Windows time service). When and why these two services started was not recorded; the PC was in desktop use during part of the campaign ([How we measured](#how-we-measured)).
+The environment captured at the end of the campaign differed from the one at the start in 42 recorded items (the list below shows 40; all 42 are in `analysis.json`): database sizes, statistics dates and row counts that the tests change by design, SQL Server's log state after its log backups and its number of open sessions, and two Windows services that were running at the end but not at the start (a third-party desktop application's background service and `W32Time`, the Windows time service). When and why these two services started was not recorded; the PC was in desktop use during part of the campaign ([How we measured](#how-we-measured)).
 
 <details>
 <summary>The recorded changes (raw list)</summary>
 
-- background.runningServices: removed: none → added: CodexSandboxService.OpenAI.Codex, W32Time
+- background.runningServices: removed: none → added: (a third-party application service), W32Time
 - databases.SQLServer.database.log_reuse_wait_desc: LOG_BACKUP → NOTHING
 - databases.SQLServer.files.files[PerfSQL].sizeMB: 2760 → 2888
 - databases.SQLServer.files.totalMB: 10952 → 11080

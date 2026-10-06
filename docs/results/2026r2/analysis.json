@@ -4085,7 +4085,7 @@
       "errors": []
     },
     "environmentChanges": [
-      {"key":"background.runningServices","start":"removed: none","end":"added: CodexSandboxService.OpenAI.Codex, W32Time"},
+      {"key":"background.runningServices","start":"removed: none","end":"added: (a third-party application service), W32Time"},
       {"key":"databases.SQLServer.database.log_reuse_wait_desc","start":"LOG_BACKUP","end":"NOTHING"},
       {"key":"databases.SQLServer.files.files[PerfSQL].sizeMB","start":"2760","end":"2888"},
       {"key":"databases.SQLServer.files.totalMB","start":"10952","end":"11080"},
