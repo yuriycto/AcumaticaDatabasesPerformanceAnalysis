@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="468" viewBox="0 0 960 468" role="img" aria-label="Orders per minute with more clerks working non-stop">
+<title>Orders per minute with more clerks working non-stop</title>
+<defs><pattern id="capHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#ffffff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#4B5563" stroke-width="2"/></pattern></defs>
+<rect x="0" y="0" width="960" height="468" fill="#ffffff"/>
+<g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" fill="#1F2937">
+<text x="16" y="30" font-size="18" text-anchor="start" font-weight="600" fill="#1F2937">Orders per minute with more clerks working non-stop</text>
+<text x="16" y="50" font-size="12" text-anchor="start" font-weight="normal" fill="#4B5563">Solid lines: different products (spread). Dashed lines and squares: everyone sells the best-seller (hot item).</text>
+<text x="16" y="66" font-size="12" text-anchor="start" font-weight="normal" fill="#4B5563">Whiskers: min–max of the runs. Higher is better. The 1-clerk point uses the same wall-clock basis as the others.</text>
+<rect x="16" y="82" width="12" height="12" fill="#0072B2"/>
+<text x="33" y="92" font-size="12" text-anchor="start" font-weight="normal" fill="#1F2937">SQL Server</text>
+<rect x="118" y="82" width="12" height="12" fill="#E69F00"/>
+<text x="135" y="92" font-size="12" text-anchor="start" font-weight="normal" fill="#1F2937">MySQL</text>
+<rect x="184" y="82" width="12" height="12" fill="#CC79A7"/>
+<text x="201" y="92" font-size="12" text-anchor="start" font-weight="normal" fill="#1F2937">PostgreSQL</text>
+<line x1="70" y1="412" x2="570" y2="412" stroke="#E5E7EB" stroke-width="1"/>
+<text x="64" y="416" font-size="10" text-anchor="end" font-weight="normal" fill="#4B5563">0</text>
+<line x1="70" y1="352" x2="570" y2="352" stroke="#E5E7EB" stroke-width="1"/>
+<text x="64" y="356" font-size="10" text-anchor="end" font-weight="normal" fill="#4B5563">100</text>
+<line x1="70" y1="292" x2="570" y2="292" stroke="#E5E7EB" stroke-width="1"/>
+<text x="64" y="296" font-size="10" text-anchor="end" font-weight="normal" fill="#4B5563">200</text>
+<line x1="70" y1="232" x2="570" y2="232" stroke="#E5E7EB" stroke-width="1"/>
+<text x="64" y="236" font-size="10" text-anchor="end" font-weight="normal" fill="#4B5563">300</text>
+<line x1="70" y1="172" x2="570" y2="172" stroke="#E5E7EB" stroke-width="1"/>
+<text x="64" y="176" font-size="10" text-anchor="end" font-weight="normal" fill="#4B5563">400</text>
+<line x1="70" y1="112" x2="570" y2="112" stroke="#E5E7EB" stroke-width="1"/>
+<text x="64" y="116" font-size="10" text-anchor="end" font-weight="normal" fill="#4B5563">500</text>
+<text x="110" y="430" font-size="11" text-anchor="middle" font-weight="normal" fill="#1F2937">1</text>
+<text x="250" y="430" font-size="11" text-anchor="middle" font-weight="normal" fill="#1F2937">4</text>
+<text x="390" y="430" font-size="11" text-anchor="middle" font-weight="normal" fill="#1F2937">8</text>
+<text x="530" y="430" font-size="11" text-anchor="middle" font-weight="normal" fill="#1F2937">16</text>
+<text x="320" y="448" font-size="11" text-anchor="middle" font-weight="normal" fill="#4B5563">clerks working non-stop</text>
+<line x1="70" y1="112" x2="70" y2="412" stroke="#9CA3AF"/>
+<line x1="70" y1="412" x2="570" y2="412" stroke="#9CA3AF"/>
+<polyline points="110,363.3 250,282.8 390,323.5 530,326.6" fill="none" stroke="#0072B2" stroke-width="2.5"/>
+<line x1="110" y1="367.1" x2="110" y2="361.9" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="110" cy="363.3" r="4.5" fill="#0072B2"><title>SQL Server, 1 clerks, spread: 81.2 orders/min (min 74.9, max 83.5)</title></circle>
+<line x1="250" y1="328.1" x2="250" y2="247.2" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="250" cy="282.8" r="4.5" fill="#0072B2"><title>SQL Server, 4 clerks, spread: 215 orders/min (min 140, max 275)</title></circle>
+<line x1="390" y1="332.3" x2="390" y2="314.6" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="390" cy="323.5" r="4.5" fill="#0072B2"><title>SQL Server, 8 clerks, spread: 147 orders/min (min 133, max 162)</title></circle>
+<line x1="530" y1="332.2" x2="530" y2="298.6" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="530" cy="326.6" r="4.5" fill="#0072B2"><title>SQL Server, 16 clerks, spread: 142 orders/min (min 133, max 189)</title></circle>
+<polyline points="110,371.1 250,334 390,328 530,332.3" fill="none" stroke="#E69F00" stroke-width="2.5"/>
+<line x1="110" y1="372.4" x2="110" y2="363.8" stroke="#E69F00" stroke-width="1.5"/>
+<circle cx="110" cy="371.1" r="4.5" fill="#E69F00"><title>MySQL, 1 clerks, spread: 68.1 orders/min (min 66, max 80.4)</title></circle>
+<line x1="250" y1="339.3" x2="250" y2="319.8" stroke="#E69F00" stroke-width="1.5"/>
+<circle cx="250" cy="334" r="4.5" fill="#E69F00"><title>MySQL, 4 clerks, spread: 130 orders/min (min 121, max 154)</title></circle>
+<line x1="390" y1="336.9" x2="390" y2="325.6" stroke="#E69F00" stroke-width="1.5"/>
+<circle cx="390" cy="328" r="4.5" fill="#E69F00"><title>MySQL, 8 clerks, spread: 140 orders/min (min 125, max 144)</title></circle>
+<line x1="530" y1="335.9" x2="530" y2="315" stroke="#E69F00" stroke-width="1.5"/>
+<circle cx="530" cy="332.3" r="4.5" fill="#E69F00"><title>MySQL, 16 clerks, spread: 133 orders/min (min 127, max 162)</title></circle>
+<polyline points="110,369.6 250,317.3 390,319.5 530,323.4" fill="none" stroke="#CC79A7" stroke-width="2.5"/>
+<line x1="110" y1="371" x2="110" y2="366.8" stroke="#CC79A7" stroke-width="1.5"/>
+<circle cx="110" cy="369.6" r="4.5" fill="#CC79A7"><title>PostgreSQL, 1 clerks, spread: 70.6 orders/min (min 68.3, max 75.3)</title></circle>
+<line x1="250" y1="328.5" x2="250" y2="302.6" stroke="#CC79A7" stroke-width="1.5"/>
+<circle cx="250" cy="317.3" r="4.5" fill="#CC79A7"><title>PostgreSQL, 4 clerks, spread: 158 orders/min (min 139, max 182)</title></circle>
+<line x1="390" y1="328.4" x2="390" y2="317.2" stroke="#CC79A7" stroke-width="1.5"/>
+<circle cx="390" cy="319.5" r="4.5" fill="#CC79A7"><title>PostgreSQL, 8 clerks, spread: 154 orders/min (min 139, max 158)</title></circle>
+<line x1="530" y1="334.8" x2="530" y2="309.8" stroke="#CC79A7" stroke-width="1.5"/>
+<circle cx="530" cy="323.4" r="4.5" fill="#CC79A7"><title>PostgreSQL, 16 clerks, spread: 148 orders/min (min 129, max 170)</title></circle>
+<polyline points="250,315.5 390,315 530,329.4" fill="none" stroke="#0072B2" stroke-width="2.5" stroke-dasharray="6 4"/>
+<line x1="250" y1="327.7" x2="250" y2="312.7" stroke="#0072B2" stroke-width="1.5"/>
+<rect x="246" y="311.5" width="8" height="8" fill="#ffffff" stroke="#0072B2" stroke-width="2"><title>SQL Server, 4 clerks, hot: 161 orders/min (min 140, max 166)</title></rect>
+<line x1="390" y1="329.7" x2="390" y2="284.3" stroke="#0072B2" stroke-width="1.5"/>
+<rect x="386" y="311" width="8" height="8" fill="#ffffff" stroke="#0072B2" stroke-width="2"><title>SQL Server, 8 clerks, hot: 162 orders/min (min 137, max 213)</title></rect>
+<line x1="530" y1="331.2" x2="530" y2="321.2" stroke="#0072B2" stroke-width="1.5"/>
+<rect x="526" y="325.4" width="8" height="8" fill="#ffffff" stroke="#0072B2" stroke-width="2"><title>SQL Server, 16 clerks, hot: 138 orders/min (min 135, max 151)</title></rect>
+<polyline points="250,326.9 390,335.7 530,323.9" fill="none" stroke="#E69F00" stroke-width="2.5" stroke-dasharray="6 4"/>
+<line x1="250" y1="337.6" x2="250" y2="305.6" stroke="#E69F00" stroke-width="1.5"/>
+<rect x="246" y="322.9" width="8" height="8" fill="#ffffff" stroke="#E69F00" stroke-width="2"><title>MySQL, 4 clerks, hot: 142 orders/min (min 124, max 177)</title></rect>
+<line x1="390" y1="339.5" x2="390" y2="327.7" stroke="#E69F00" stroke-width="1.5"/>
+<rect x="386" y="331.7" width="8" height="8" fill="#ffffff" stroke="#E69F00" stroke-width="2"><title>MySQL, 8 clerks, hot: 127 orders/min (min 121, max 141)</title></rect>
+<line x1="530" y1="338.5" x2="530" y2="312.2" stroke="#E69F00" stroke-width="1.5"/>
+<rect x="526" y="319.9" width="8" height="8" fill="#ffffff" stroke="#E69F00" stroke-width="2"><title>MySQL, 16 clerks, hot: 147 orders/min (min 123, max 166)</title></rect>
+<polyline points="250,318.6 390,320.9 530,318.8" fill="none" stroke="#CC79A7" stroke-width="2.5" stroke-dasharray="6 4"/>
+<line x1="250" y1="333.6" x2="250" y2="274.6" stroke="#CC79A7" stroke-width="1.5"/>
+<rect x="246" y="314.6" width="8" height="8" fill="#ffffff" stroke="#CC79A7" stroke-width="2"><title>PostgreSQL, 4 clerks, hot: 156 orders/min (min 131, max 229)</title></rect>
+<line x1="390" y1="331.7" x2="390" y2="300.8" stroke="#CC79A7" stroke-width="1.5"/>
+<rect x="386" y="316.9" width="8" height="8" fill="#ffffff" stroke="#CC79A7" stroke-width="2"><title>PostgreSQL, 8 clerks, hot: 152 orders/min (min 134, max 185)</title></rect>
+<line x1="530" y1="332.4" x2="530" y2="298.1" stroke="#CC79A7" stroke-width="1.5"/>
+<rect x="526" y="314.8" width="8" height="8" fill="#ffffff" stroke="#CC79A7" stroke-width="2"><title>PostgreSQL, 16 clerks, hot: 155 orders/min (min 133, max 190)</title></rect>
+<text x="538" y="322.8" font-size="10" text-anchor="start" font-weight="normal" fill="#CC79A7">PostgreSQL (hot item)</text>
+<text x="538" y="334.8" font-size="10" text-anchor="start" font-weight="normal" fill="#CC79A7">PostgreSQL</text>
+<text x="538" y="346.8" font-size="10" text-anchor="start" font-weight="normal" fill="#E69F00">MySQL (hot item)</text>
+<text x="538" y="358.8" font-size="10" text-anchor="start" font-weight="normal" fill="#0072B2">SQL Server</text>
+<text x="538" y="370.8" font-size="10" text-anchor="start" font-weight="normal" fill="#0072B2">SQL Server (hot item)</text>
+<text x="538" y="382.8" font-size="10" text-anchor="start" font-weight="normal" fill="#E69F00">MySQL</text>
+<text x="630" y="116" font-size="12" text-anchor="start" font-weight="600" fill="#1F2937">p95 ms per order</text>
+<text x="630" y="131" font-size="11" text-anchor="start" font-weight="normal" fill="#4B5563">(95% of saves were at least this fast)</text>
+<text x="630" y="151" font-size="11" text-anchor="start" font-weight="600" fill="#1F2937">clerks</text>
+<text x="700" y="151" font-size="11" text-anchor="start" font-weight="600" fill="#0072B2">SQL Server</text>
+<text x="772" y="151" font-size="11" text-anchor="start" font-weight="600" fill="#E69F00">MySQL</text>
+<text x="844" y="151" font-size="11" text-anchor="start" font-weight="600" fill="#CC79A7">PostgreSQL</text>
+<text x="630" y="169" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1</text>
+<text x="700" y="169" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">904</text>
+<text x="772" y="169" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1,010</text>
+<text x="844" y="169" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">962</text>
+<text x="630" y="187" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">4</text>
+<text x="700" y="187" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1,540</text>
+<text x="772" y="187" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">2,290</text>
+<text x="844" y="187" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1,850</text>
+<text x="630" y="205" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">8</text>
+<text x="700" y="205" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">5,160</text>
+<text x="772" y="205" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">4,750</text>
+<text x="844" y="205" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">4,370</text>
+<text x="630" y="223" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">16</text>
+<text x="700" y="223" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">10,900</text>
+<text x="772" y="223" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">12,800</text>
+<text x="844" y="223" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">11,900</text>
+<text x="630" y="241" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">4 (hot item)</text>
+<text x="700" y="241" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1,860</text>
+<text x="772" y="241" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">2,210</text>
+<text x="844" y="241" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">2,020</text>
+<text x="630" y="259" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">8 (hot item)</text>
+<text x="700" y="259" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">4,700</text>
+<text x="772" y="259" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">4,840</text>
+<text x="844" y="259" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">4,430</text>
+<text x="630" y="277" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">16 (hot item)</text>
+<text x="700" y="277" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">11,500</text>
+<text x="772" y="277" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">12,200</text>
+<text x="844" y="277" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">9,320</text>
+</g>
+</svg>

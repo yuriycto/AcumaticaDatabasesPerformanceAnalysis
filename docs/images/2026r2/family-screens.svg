@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="482" viewBox="0 0 960 482" role="img" aria-label="Everyday screens">
+<title>Everyday screens</title>
+<defs><pattern id="capHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#ffffff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#4B5563" stroke-width="2"/></pattern></defs>
+<rect x="0" y="0" width="960" height="482" fill="#ffffff"/>
+<g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" fill="#1F2937">
+<text x="16" y="30" font-size="18" text-anchor="start" font-weight="600" fill="#1F2937">Everyday screens</text>
+<text x="16" y="50" font-size="12" text-anchor="start" font-weight="normal" fill="#4B5563">Median of 6 repetitions; each test on its own relative scale; the absolute median is printed after the ratio.</text>
+<rect x="16" y="62" width="12" height="12" fill="#0072B2"/>
+<text x="33" y="72" font-size="12" text-anchor="start" font-weight="normal" fill="#1F2937">SQL Server</text>
+<rect x="118" y="62" width="12" height="12" fill="#E69F00"/>
+<text x="135" y="72" font-size="12" text-anchor="start" font-weight="normal" fill="#1F2937">MySQL</text>
+<rect x="184" y="62" width="12" height="12" fill="#CC79A7"/>
+<text x="201" y="72" font-size="12" text-anchor="start" font-weight="normal" fill="#1F2937">PostgreSQL</text>
+<line x1="108" y1="120" x2="108" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="108" y1="208" x2="108" y2="268" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="108" y1="296" x2="108" y2="356" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="108" y1="384" x2="108" y2="444" stroke="#E5E7EB" stroke-width="1"/>
+<text x="108" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">0×</text>
+<line x1="212.3" y1="120" x2="212.3" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="212.3" y1="208" x2="212.3" y2="268" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="212.3" y1="296" x2="212.3" y2="356" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="212.3" y1="384" x2="212.3" y2="444" stroke="#E5E7EB" stroke-width="1"/>
+<text x="212.3" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">0.25×</text>
+<line x1="316.7" y1="120" x2="316.7" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="316.7" y1="208" x2="316.7" y2="268" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="316.7" y1="296" x2="316.7" y2="356" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="316.7" y1="384" x2="316.7" y2="444" stroke="#E5E7EB" stroke-width="1"/>
+<text x="316.7" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">0.5×</text>
+<line x1="421" y1="120" x2="421" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="421" y1="208" x2="421" y2="268" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="421" y1="296" x2="421" y2="356" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="421" y1="384" x2="421" y2="444" stroke="#E5E7EB" stroke-width="1"/>
+<text x="421" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">0.75×</text>
+<line x1="525.3" y1="120" x2="525.3" y2="180" stroke="#374151" stroke-width="1" stroke-dasharray="4 3"/>
+<line x1="525.3" y1="208" x2="525.3" y2="268" stroke="#374151" stroke-width="1" stroke-dasharray="4 3"/>
+<line x1="525.3" y1="296" x2="525.3" y2="356" stroke="#374151" stroke-width="1" stroke-dasharray="4 3"/>
+<line x1="525.3" y1="384" x2="525.3" y2="444" stroke="#374151" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="525.3" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">1×</text>
+<line x1="629.7" y1="120" x2="629.7" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="629.7" y1="208" x2="629.7" y2="268" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="629.7" y1="296" x2="629.7" y2="356" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="629.7" y1="384" x2="629.7" y2="444" stroke="#E5E7EB" stroke-width="1"/>
+<text x="629.7" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">1.25×</text>
+<line x1="734" y1="120" x2="734" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="734" y1="208" x2="734" y2="268" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="734" y1="296" x2="734" y2="356" stroke="#E5E7EB" stroke-width="1"/>
+<line x1="734" y1="384" x2="734" y2="444" stroke="#E5E7EB" stroke-width="1"/>
+<text x="734" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">1.5×</text>
+<text x="16" y="115" font-size="12" text-anchor="start" font-weight="600" fill="#1F2937">Open a sales order</text>
+<text x="102" y="136" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">SQL Server</text>
+<rect x="108" y="122" width="417" height="16" fill="#0072B2" fill-opacity="1"><title>SQL Server - Open a sales order: median 56.4 ms (56.4 (55.7–61.3)); 1.00× of the fastest</title></rect>
+<line x1="520.2" y1="130" x2="561.6" y2="130" stroke="#111827" stroke-width="1"/>
+<line x1="520.2" y1="127" x2="520.2" y2="133" stroke="#111827" stroke-width="1"/>
+<line x1="561.6" y1="127" x2="561.6" y2="133" stroke="#111827" stroke-width="1"/>
+<text x="567.6" y="136" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1.00× · 56.4 ms</text>
+<text x="102" y="156" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">MySQL</text>
+<rect x="108" y="142" width="539" height="16" fill="#E69F00" fill-opacity="1"><title>MySQL - Open a sales order: median 72.8 ms (72.8 (70.8–79.1)); 1.29× of the fastest</title></rect>
+<line x1="631.5" y1="150" x2="693.1" y2="150" stroke="#111827" stroke-width="1"/>
+<line x1="631.5" y1="147" x2="631.5" y2="153" stroke="#111827" stroke-width="1"/>
+<line x1="693.1" y1="147" x2="693.1" y2="153" stroke="#111827" stroke-width="1"/>
+<text x="699.1" y="156" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">≈ 1.29× · 72.8 ms</text>
+<text x="102" y="176" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">PostgreSQL</text>
+<rect x="108" y="162" width="511" height="16" fill="#CC79A7" fill-opacity="1"><title>PostgreSQL - Open a sales order: median 69.1 ms (69.1 (66.2–78.1)); 1.22× of the fastest</title></rect>
+<line x1="597.6" y1="170" x2="685.7" y2="170" stroke="#111827" stroke-width="1"/>
+<line x1="597.6" y1="167" x2="597.6" y2="173" stroke="#111827" stroke-width="1"/>
+<line x1="685.7" y1="167" x2="685.7" y2="173" stroke="#111827" stroke-width="1"/>
+<text x="691.7" y="176" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">≈ 1.22× · 69.1 ms</text>
+<text x="16" y="203" font-size="12" text-anchor="start" font-weight="600" fill="#1F2937">A customer&#39;s order history</text>
+<text x="102" y="224" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">SQL Server</text>
+<rect x="108" y="210" width="417" height="16" fill="#0072B2" fill-opacity="1"><title>SQL Server - A customer&#39;s order history: median 17.1 ms (17.1 (15.3–17.7)); 1.00× of the fastest</title></rect>
+<line x1="481" y1="218" x2="541" y2="218" stroke="#111827" stroke-width="1"/>
+<line x1="481" y1="215" x2="481" y2="221" stroke="#111827" stroke-width="1"/>
+<line x1="541" y1="215" x2="541" y2="221" stroke="#111827" stroke-width="1"/>
+<text x="547" y="224" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1.00× · 17.1 ms</text>
+<text x="102" y="244" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">MySQL</text>
+<rect x="108" y="230" width="493" height="16" fill="#E69F00" fill-opacity="1"><title>MySQL - A customer&#39;s order history: median 20.2 ms (20.2 (17.9–22.2)); 1.18× of the fastest</title></rect>
+<line x1="544.4" y1="238" x2="650.2" y2="238" stroke="#111827" stroke-width="1"/>
+<line x1="544.4" y1="235" x2="544.4" y2="241" stroke="#111827" stroke-width="1"/>
+<line x1="650.2" y1="235" x2="650.2" y2="241" stroke="#111827" stroke-width="1"/>
+<text x="656.2" y="244" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">≈ 1.18× · 20.2 ms</text>
+<text x="102" y="264" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">PostgreSQL</text>
+<rect x="108" y="250" width="565" height="16" fill="#CC79A7" fill-opacity="1"><title>PostgreSQL - A customer&#39;s order history: median 23.2 ms (23.2 (18.6–24.9)); 1.35× of the fastest</title></rect>
+<line x1="560.9" y1="258" x2="714.8" y2="258" stroke="#111827" stroke-width="1"/>
+<line x1="560.9" y1="255" x2="560.9" y2="261" stroke="#111827" stroke-width="1"/>
+<line x1="714.8" y1="255" x2="714.8" y2="261" stroke="#111827" stroke-width="1"/>
+<text x="720.8" y="264" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">≈ 1.35× · 23.2 ms</text>
+<text x="16" y="291" font-size="12" text-anchor="start" font-weight="600" fill="#1F2937">Who bought this item?</text>
+<text x="102" y="312" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">SQL Server</text>
+<rect x="108" y="298" width="417" height="16" fill="#0072B2" fill-opacity="1"><title>SQL Server - Who bought this item?: median 47.1 ms (47.1 (43.8–50.4)); 1.00× of the fastest</title></rect>
+<line x1="495.9" y1="306" x2="555.1" y2="306" stroke="#111827" stroke-width="1"/>
+<line x1="495.9" y1="303" x2="495.9" y2="309" stroke="#111827" stroke-width="1"/>
+<line x1="555.1" y1="303" x2="555.1" y2="309" stroke="#111827" stroke-width="1"/>
+<text x="561.1" y="312" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1.00× · 47.1 ms</text>
+<text x="102" y="332" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">MySQL</text>
+<rect x="108" y="318" width="454" height="16" fill="#E69F00" fill-opacity="1"><title>MySQL - Who bought this item?: median 51.3 ms (51.3 (47–53.4)); 1.09× of the fastest</title></rect>
+<line x1="524.6" y1="326" x2="581.1" y2="326" stroke="#111827" stroke-width="1"/>
+<line x1="524.6" y1="323" x2="524.6" y2="329" stroke="#111827" stroke-width="1"/>
+<line x1="581.1" y1="323" x2="581.1" y2="329" stroke="#111827" stroke-width="1"/>
+<text x="587.1" y="332" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">≈ 1.09× · 51.3 ms</text>
+<text x="102" y="352" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">PostgreSQL</text>
+<rect x="108" y="338" width="451" height="16" fill="#CC79A7" fill-opacity="1"><title>PostgreSQL - Who bought this item?: median 50.9 ms (50.9 (48.9–51.3)); 1.08× of the fastest</title></rect>
+<line x1="541.5" y1="346" x2="562.3" y2="346" stroke="#111827" stroke-width="1"/>
+<line x1="541.5" y1="343" x2="541.5" y2="349" stroke="#111827" stroke-width="1"/>
+<line x1="562.3" y1="343" x2="562.3" y2="349" stroke="#111827" stroke-width="1"/>
+<text x="568.3" y="352" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">≈ 1.08× · 50.9 ms</text>
+<text x="16" y="379" font-size="12" text-anchor="start" font-weight="600" fill="#1F2937">Find a customer by part of the name</text>
+<text x="102" y="400" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">SQL Server</text>
+<rect x="108" y="386" width="417" height="16" fill="#0072B2" fill-opacity="1"><title>SQL Server - Find a customer by part of the name: median 1.97 ms (1.97 (1.77–2.24)); 1.00× of the fastest</title></rect>
+<line x1="484.4" y1="394" x2="584.5" y2="394" stroke="#111827" stroke-width="1"/>
+<line x1="484.4" y1="391" x2="484.4" y2="397" stroke="#111827" stroke-width="1"/>
+<line x1="584.5" y1="391" x2="584.5" y2="397" stroke="#111827" stroke-width="1"/>
+<text x="590.5" y="400" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1.00× · 1.97 ms</text>
+<text x="102" y="420" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">MySQL</text>
+<rect x="108" y="406" width="593" height="16" fill="#E69F00" fill-opacity="1"><title>MySQL - Find a customer by part of the name: median 2.79 ms (2.79 (2.71–2.9)); 1.42× of the fastest</title></rect>
+<line x1="684.1" y1="414" x2="724.1" y2="414" stroke="#111827" stroke-width="1"/>
+<line x1="684.1" y1="411" x2="684.1" y2="417" stroke="#111827" stroke-width="1"/>
+<line x1="724.1" y1="411" x2="724.1" y2="417" stroke="#111827" stroke-width="1"/>
+<text x="730.1" y="420" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">≈ 1.42× · 2.79 ms</text>
+<text x="102" y="440" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">PostgreSQL</text>
+<rect x="108" y="426" width="532" height="16" fill="#CC79A7" fill-opacity="1"><title>PostgreSQL - Find a customer by part of the name: median 2.5 ms (2.5 (2.15–2.7)); 1.27× of the fastest</title></rect>
+<line x1="564.2" y1="434" x2="681.5" y2="434" stroke="#111827" stroke-width="1"/>
+<line x1="564.2" y1="431" x2="564.2" y2="437" stroke="#111827" stroke-width="1"/>
+<line x1="681.5" y1="431" x2="681.5" y2="437" stroke="#111827" stroke-width="1"/>
+<text x="687.5" y="440" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">≈ 1.27× · 2.5 ms</text>
+<text x="16" y="466" font-size="11" text-anchor="start" font-weight="normal" fill="#4B5563">Time relative to the fastest engine on each test (1.00× = fastest; lower is better). Whiskers: min–max of the runs. ≈ = tied with the fastest; ≥ = over the time limit.</text>
+</g>
+</svg>

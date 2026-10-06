@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="218" viewBox="0 0 960 218" role="img" aria-label="Order entry (1 clerk) (1 test)">
+<title>Order entry (1 clerk) (1 test)</title>
+<defs><pattern id="capHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#ffffff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#4B5563" stroke-width="2"/></pattern></defs>
+<rect x="0" y="0" width="960" height="218" fill="#ffffff"/>
+<g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" fill="#1F2937">
+<text x="16" y="30" font-size="18" text-anchor="start" font-weight="600" fill="#1F2937">Order entry (1 clerk) (1 test)</text>
+<text x="16" y="50" font-size="12" text-anchor="start" font-weight="normal" fill="#4B5563">Median of 6 repetitions; each test on its own relative scale; the absolute median is printed after the ratio.</text>
+<rect x="16" y="62" width="12" height="12" fill="#0072B2"/>
+<text x="33" y="72" font-size="12" text-anchor="start" font-weight="normal" fill="#1F2937">SQL Server</text>
+<rect x="118" y="62" width="12" height="12" fill="#E69F00"/>
+<text x="135" y="72" font-size="12" text-anchor="start" font-weight="normal" fill="#1F2937">MySQL</text>
+<rect x="184" y="62" width="12" height="12" fill="#CC79A7"/>
+<text x="201" y="72" font-size="12" text-anchor="start" font-weight="normal" fill="#1F2937">PostgreSQL</text>
+<line x1="108" y1="120" x2="108" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<text x="108" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">0×</text>
+<line x1="212.3" y1="120" x2="212.3" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<text x="212.3" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">0.25×</text>
+<line x1="316.7" y1="120" x2="316.7" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<text x="316.7" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">0.5×</text>
+<line x1="421" y1="120" x2="421" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<text x="421" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">0.75×</text>
+<line x1="525.3" y1="120" x2="525.3" y2="180" stroke="#374151" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="525.3" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">1×</text>
+<line x1="629.7" y1="120" x2="629.7" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<text x="629.7" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">1.25×</text>
+<line x1="734" y1="120" x2="734" y2="180" stroke="#E5E7EB" stroke-width="1"/>
+<text x="734" y="90" font-size="10" text-anchor="middle" font-weight="normal" fill="#4B5563">1.5×</text>
+<text x="16" y="115" font-size="12" text-anchor="start" font-weight="600" fill="#1F2937">Enter sales orders – 1 clerk</text>
+<text x="102" y="136" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">SQL Server</text>
+<rect x="108" y="122" width="417" height="16" fill="#0072B2" fill-opacity="1"><title>SQL Server - Enter sales orders – 1 clerk: median 739 ms (739 (718–836)); 1.00× of the fastest</title></rect>
+<line x1="513.5" y1="130" x2="579.8" y2="130" stroke="#111827" stroke-width="1"/>
+<line x1="513.5" y1="127" x2="513.5" y2="133" stroke="#111827" stroke-width="1"/>
+<line x1="579.8" y1="127" x2="579.8" y2="133" stroke="#111827" stroke-width="1"/>
+<text x="585.8" y="136" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1.00× · 739 ms</text>
+<text x="102" y="156" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">MySQL</text>
+<rect x="108" y="142" width="499" height="16" fill="#E69F00" fill-opacity="1"><title>MySQL - Enter sales orders – 1 clerk: median 885 ms (885 (758–949)); 1.20× of the fastest</title></rect>
+<line x1="536" y1="150" x2="644" y2="150" stroke="#111827" stroke-width="1"/>
+<line x1="536" y1="147" x2="536" y2="153" stroke="#111827" stroke-width="1"/>
+<line x1="644" y1="147" x2="644" y2="153" stroke="#111827" stroke-width="1"/>
+<text x="650" y="156" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1.20× · 885 ms</text>
+<text x="102" y="176" font-size="11" text-anchor="end" font-weight="normal" fill="#1F2937">PostgreSQL</text>
+<rect x="108" y="162" width="478" height="16" fill="#CC79A7" fill-opacity="1"><title>PostgreSQL - Enter sales orders – 1 clerk: median 847 ms (847 (795–888)); 1.15× of the fastest</title></rect>
+<line x1="556.9" y1="170" x2="609.5" y2="170" stroke="#111827" stroke-width="1"/>
+<line x1="556.9" y1="167" x2="556.9" y2="173" stroke="#111827" stroke-width="1"/>
+<line x1="609.5" y1="167" x2="609.5" y2="173" stroke="#111827" stroke-width="1"/>
+<text x="615.5" y="176" font-size="11" text-anchor="start" font-weight="normal" fill="#1F2937">1.15× · 847 ms</text>
+<text x="16" y="202" font-size="11" text-anchor="start" font-weight="normal" fill="#4B5563">Time relative to the fastest engine on each test (1.00× = fastest; lower is better). Whiskers: min–max of the runs. ≈ = tied with the fastest; ≥ = over the time limit.</text>
+</g>
+</svg>
