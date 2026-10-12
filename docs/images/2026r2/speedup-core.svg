@@ -1,137 +1,144 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="843" viewBox="0 0 960 843" role="img" aria-labelledby="speedup-core-title speedup-core-desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="880" viewBox="0 0 960 880" role="img" aria-labelledby="speedup-core-title speedup-core-desc">
 <title id="speedup-core-title">Does sharing a job among 8 workers help?</title>
-<desc id="speedup-core-desc">Yes, but far from 8×: with one job shared by 8 workers, each job finished 1.7–3.7× faster than with 1 worker (8× would be a perfect split). Acumatica ran on about 2 processor cores on every database, which limits the gain. Load 10,000 records: 8 workers: 2.1–3.7× faster (SQL Server 3.70× faster, 0.219 s → 0.0592 s; MySQL 2.62× faster, 0.259 s → 0.0985 s; PostgreSQL 2.11× faster, 0.111 s → 0.0525 s). Save 10,000 new records: 8 workers: 1.7–2.2× faster (SQL Server 1.68× faster, 7.57 s → 4.51 s; MySQL 2.11× faster, 9.34 s → 4.42 s; PostgreSQL 2.17× faster, 11.8 s → 5.44 s). Change 10,000 records: 8 workers: 1.8–2.3× faster (SQL Server 1.82× faster, 5.73 s → 3.15 s; MySQL 2.30× faster, 7.03 s → 3.06 s; PostgreSQL 2.34× faster, 8.23 s → 3.51 s). Delete 10,000 records: 8 workers: 1.8–2.5× faster (SQL Server 1.79× faster, 24.1 s → 13.4 s; MySQL 2.26× faster, 36.9 s → 16.4 s; PostgreSQL 2.54× faster, 37.4 s → 14.7 s). Stock availability list, all columns: 8 workers: 2.2–2.4× faster (SQL Server 2.23× faster, 118 ms → 53 ms; MySQL 2.41× faster, 116 ms → 48.1 ms; PostgreSQL 2.18× faster, 112 ms → 51.4 ms). Stock availability list, only the needed columns: 8 workers: 1.7–2.8× faster (SQL Server 1.74× faster, 23.8 ms → 13.7 ms; MySQL 1.80× faster, 32.7 ms → 18.2 ms; PostgreSQL 2.76× faster, 34 ms → 12.3 ms). Speed-ups are not ranked; all bars have one neutral colour.</desc>
-<rect x="0.5" y="0.5" width="959" height="842" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+<desc id="speedup-core-desc">Yes, but far from 8×: with one job shared by 8 workers, each job finished 1.7–3.7× faster than with 1 worker (8× would be a perfect split). Acumatica ran on about 2 processor cores on every database, which limits the gain. Load 10,000 records: 8 workers: 2.1–3.7× faster (SQL Server 3.70× faster, 0.219 s → 0.0592 s per 10,000-record job; MySQL 2.62× faster, 0.259 s → 0.0985 s per 10,000-record job; PostgreSQL 2.11× faster, 0.111 s → 0.0525 s per 10,000-record job). Save 10,000 new records: 8 workers: 1.7–2.2× faster (SQL Server 1.68× faster, 7.57 s → 4.51 s per 10,000-record job; MySQL 2.11× faster, 9.34 s → 4.42 s per 10,000-record job; PostgreSQL 2.17× faster, 11.8 s → 5.44 s per 10,000-record job). Change 10,000 records: 8 workers: 1.8–2.3× faster (SQL Server 1.82× faster, 5.73 s → 3.15 s per 10,000-record job; MySQL 2.30× faster, 7.03 s → 3.06 s per 10,000-record job; PostgreSQL 2.34× faster, 8.23 s → 3.51 s per 10,000-record job). Delete 10,000 records: 8 workers: 1.8–2.5× faster (SQL Server 1.79× faster, 24.1 s → 13.4 s per 10,000-record job; MySQL 2.26× faster, 36.9 s → 16.4 s per 10,000-record job; PostgreSQL 2.54× faster, 37.4 s → 14.7 s per 10,000-record job). Stock availability list, all columns: 8 workers: 2.2–2.4× faster (SQL Server 2.23× faster, 118 ms → 53 ms per list page; MySQL 2.41× faster, 116 ms → 48.1 ms per list page; PostgreSQL 2.18× faster, 112 ms → 51.4 ms per list page). Stock availability list, only the needed columns: 8 workers: 1.7–2.8× faster (SQL Server 1.74× faster, 23.8 ms → 13.7 ms per list page; MySQL 1.80× faster, 32.7 ms → 18.2 ms per list page; PostgreSQL 2.76× faster, 34 ms → 12.3 ms per list page). Speed-ups are not ranked; all bars have one neutral colour.</desc>
+<rect x="0.5" y="0.5" width="959" height="879" rx="12" fill="#ffffff" stroke="#d0d7de"/>
 <g font-family="-apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, &#39;Helvetica Neue&#39;, Helvetica, Arial, &#39;Liberation Sans&#39;, sans-serif">
 <text x="24" y="46" font-size="21" font-weight="600" fill="#111827">Does sharing a job among 8 workers help?</text>
 <text x="24" y="72" font-size="16" font-weight="600" fill="#111827">Yes, but far from 8×: with one job shared by 8 workers, each job finished 1.7–3.7× faster than with 1 worker</text>
 <text x="24" y="94" font-size="16" font-weight="600" fill="#111827">(8× would be a perfect split). Acumatica ran on about 2 processor cores on every database, which limits</text>
 <text x="24" y="116" font-size="16" font-weight="600" fill="#111827">the gain.</text>
-<text x="24" y="140" font-size="13" fill="#4b5563">Acumatica 2026 R2 · median of 6 runs per test and database · one shared scale from zero · higher is better</text>
-<rect x="24" y="159" width="15" height="14" rx="3" fill="#64748b"/>
-<text x="48" y="170" font-size="13"><tspan font-weight="600" fill="#111827">One colour for every bar:</tspan><tspan fill="#4b5563"> Speed-ups are not ranked: the tie rule compares times, not speed-ups. Which database was faster with 1</tspan></text>
-<text x="48" y="188" font-size="13" fill="#4b5563">and with 8 workers is in the “Platform basics: bulk record work” chart above.</text>
-<line x1="24" y1="206" x2="936" y2="206" stroke="#111827" stroke-width="1.5"/>
-<text x="516.3" y="228" font-size="12" text-anchor="middle" fill="#4b5563">no gain</text>
-<text x="907.1" y="228" font-size="12" text-anchor="middle" fill="#4b5563">perfect split</text>
-<text x="458" y="245" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">0×</text>
-<text x="516.3" y="245" font-size="12" font-weight="600" text-anchor="middle" fill="#111827" style="font-variant-numeric: tabular-nums">1×</text>
-<text x="574.5" y="245" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">2×</text>
-<text x="632.8" y="245" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">3×</text>
-<text x="691" y="245" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">4×</text>
-<text x="749.3" y="245" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">5×</text>
-<text x="807.5" y="245" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">6×</text>
-<text x="865.8" y="245" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">7×</text>
-<text x="924" y="245" font-size="12" font-weight="600" text-anchor="middle" fill="#111827" style="font-variant-numeric: tabular-nums">8×</text>
-<line x1="574.5" y1="252" x2="574.5" y2="773" stroke="#e5e7eb" stroke-width="1"/>
-<line x1="632.8" y1="252" x2="632.8" y2="773" stroke="#e5e7eb" stroke-width="1"/>
-<line x1="691" y1="252" x2="691" y2="773" stroke="#e5e7eb" stroke-width="1"/>
-<line x1="749.3" y1="252" x2="749.3" y2="773" stroke="#e5e7eb" stroke-width="1"/>
-<line x1="807.5" y1="252" x2="807.5" y2="773" stroke="#e5e7eb" stroke-width="1"/>
-<line x1="865.8" y1="252" x2="865.8" y2="773" stroke="#e5e7eb" stroke-width="1"/>
-<line x1="458.5" y1="252" x2="458.5" y2="773" stroke="#9ca3af" stroke-width="1"/>
-<line x1="516.3" y1="252" x2="516.3" y2="773" stroke="#6b7280" stroke-width="1"/>
-<line x1="924" y1="252" x2="924" y2="773" stroke="#6b7280" stroke-width="1"/>
-<text x="24" y="278" font-size="14" font-weight="600" fill="#111827">Load 10,000 records</text>
-<text x="24" y="296" font-size="13" fill="#4b5563">8 workers: 2.1–3.7× faster</text>
-<text x="450" y="278.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
-<path d="M458.5,266 H669.8 A4,4 0 0 1 673.8,270 V278 A4,4 0 0 1 669.8,282 H458.5 Z" fill="#64748b"><title>SQL Server, Load 10,000 records: 3.70× faster (1 worker → 8 workers: 0.219 s → 0.0592 s)</title></path>
-<rect x="678.3" y="266.5" width="222" height="16" fill="#ffffff"/>
-<text x="681.3" y="278.5" font-size="13" fill="#111827"><tspan font-weight="600">3.70× faster</tspan><tspan fill="#4b5563"> · 0.219 s → 0.0592 s</tspan></text>
-<text x="450" y="300.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
-<path d="M458.5,288 H607.3 A4,4 0 0 1 611.3,292 V300 A4,4 0 0 1 607.3,304 H458.5 Z" fill="#64748b"><title>MySQL, Load 10,000 records: 2.62× faster (1 worker → 8 workers: 0.259 s → 0.0985 s)</title></path>
-<rect x="615.8" y="288.5" width="222" height="16" fill="#ffffff"/>
-<text x="618.8" y="300.5" font-size="13" fill="#111827"><tspan font-weight="600">2.62× faster</tspan><tspan fill="#4b5563"> · 0.259 s → 0.0985 s</tspan></text>
-<text x="450" y="322.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
-<path d="M458.5,310 H577.4 A4,4 0 0 1 581.4,314 V322 A4,4 0 0 1 577.4,326 H458.5 Z" fill="#64748b"><title>PostgreSQL, Load 10,000 records: 2.11× faster (1 worker → 8 workers: 0.111 s → 0.0525 s)</title></path>
-<rect x="585.9" y="310.5" width="222" height="16" fill="#ffffff"/>
-<text x="588.9" y="322.5" font-size="13" fill="#111827"><tspan font-weight="600">2.11× faster</tspan><tspan fill="#4b5563"> · 0.111 s → 0.0525 s</tspan></text>
-<line x1="24" y1="338" x2="936" y2="338" stroke="#e5e7eb" stroke-width="1"/>
-<text x="24" y="364" font-size="14" font-weight="600" fill="#111827">Save 10,000 new records</text>
-<text x="24" y="382" font-size="13" fill="#4b5563">8 workers: 1.7–2.2× faster</text>
-<text x="450" y="364.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
-<path d="M458.5,352 H552.3 A4,4 0 0 1 556.3,356 V364 A4,4 0 0 1 552.3,368 H458.5 Z" fill="#64748b"><title>SQL Server, Save 10,000 new records: 1.68× faster (1 worker → 8 workers: 7.57 s → 4.51 s)</title></path>
-<rect x="560.8" y="352.5" width="198.6" height="16" fill="#ffffff"/>
-<text x="563.8" y="364.5" font-size="13" fill="#111827"><tspan font-weight="600">1.68× faster</tspan><tspan fill="#4b5563"> · 7.57 s → 4.51 s</tspan></text>
-<text x="450" y="386.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
-<path d="M458.5,374 H577.5 A4,4 0 0 1 581.5,378 V386 A4,4 0 0 1 577.5,390 H458.5 Z" fill="#64748b"><title>MySQL, Save 10,000 new records: 2.11× faster (1 worker → 8 workers: 9.34 s → 4.42 s)</title></path>
-<rect x="586" y="374.5" width="198.6" height="16" fill="#ffffff"/>
-<text x="589" y="386.5" font-size="13" fill="#111827"><tspan font-weight="600">2.11× faster</tspan><tspan fill="#4b5563"> · 9.34 s → 4.42 s</tspan></text>
-<text x="450" y="408.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
-<path d="M458.5,396 H581.1 A4,4 0 0 1 585.1,400 V408 A4,4 0 0 1 581.1,412 H458.5 Z" fill="#64748b"><title>PostgreSQL, Save 10,000 new records: 2.17× faster (1 worker → 8 workers: 11.8 s → 5.44 s)</title></path>
-<rect x="589.6" y="396.5" width="198.6" height="16" fill="#ffffff"/>
-<text x="592.6" y="408.5" font-size="13" fill="#111827"><tspan font-weight="600">2.17× faster</tspan><tspan fill="#4b5563"> · 11.8 s → 5.44 s</tspan></text>
-<line x1="24" y1="424" x2="936" y2="424" stroke="#e5e7eb" stroke-width="1"/>
-<text x="24" y="450" font-size="14" font-weight="600" fill="#111827">Change 10,000 records</text>
-<text x="24" y="468" font-size="13" fill="#4b5563">8 workers: 1.8–2.3× faster</text>
-<text x="450" y="450.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
-<path d="M458.5,438 H560.5 A4,4 0 0 1 564.5,442 V450 A4,4 0 0 1 560.5,454 H458.5 Z" fill="#64748b"><title>SQL Server, Change 10,000 records: 1.82× faster (1 worker → 8 workers: 5.73 s → 3.15 s)</title></path>
-<rect x="569" y="438.5" width="198.6" height="16" fill="#ffffff"/>
-<text x="572" y="450.5" font-size="13" fill="#111827"><tspan font-weight="600">1.82× faster</tspan><tspan fill="#4b5563"> · 5.73 s → 3.15 s</tspan></text>
-<text x="450" y="472.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
-<path d="M458.5,460 H588.2 A4,4 0 0 1 592.2,464 V472 A4,4 0 0 1 588.2,476 H458.5 Z" fill="#64748b"><title>MySQL, Change 10,000 records: 2.30× faster (1 worker → 8 workers: 7.03 s → 3.06 s)</title></path>
-<rect x="596.7" y="460.5" width="198.6" height="16" fill="#ffffff"/>
-<text x="599.7" y="472.5" font-size="13" fill="#111827"><tspan font-weight="600">2.30× faster</tspan><tspan fill="#4b5563"> · 7.03 s → 3.06 s</tspan></text>
-<text x="450" y="494.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
-<path d="M458.5,482 H590.9 A4,4 0 0 1 594.9,486 V494 A4,4 0 0 1 590.9,498 H458.5 Z" fill="#64748b"><title>PostgreSQL, Change 10,000 records: 2.34× faster (1 worker → 8 workers: 8.23 s → 3.51 s)</title></path>
-<rect x="599.4" y="482.5" width="198.6" height="16" fill="#ffffff"/>
-<text x="602.4" y="494.5" font-size="13" fill="#111827"><tspan font-weight="600">2.34× faster</tspan><tspan fill="#4b5563"> · 8.23 s → 3.51 s</tspan></text>
-<line x1="24" y1="510" x2="936" y2="510" stroke="#e5e7eb" stroke-width="1"/>
-<text x="24" y="536" font-size="14" font-weight="600" fill="#111827">Delete 10,000 records</text>
-<text x="24" y="554" font-size="13" fill="#4b5563">8 workers: 1.8–2.5× faster</text>
-<text x="450" y="536.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
-<path d="M458.5,524 H558.9 A4,4 0 0 1 562.9,528 V536 A4,4 0 0 1 558.9,540 H458.5 Z" fill="#64748b"><title>SQL Server, Delete 10,000 records: 1.79× faster (1 worker → 8 workers: 24.1 s → 13.4 s)</title></path>
-<rect x="567.4" y="524.5" width="198.6" height="16" fill="#ffffff"/>
-<text x="570.4" y="536.5" font-size="13" fill="#111827"><tspan font-weight="600">1.79× faster</tspan><tspan fill="#4b5563"> · 24.1 s → 13.4 s</tspan></text>
-<text x="450" y="558.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
-<path d="M458.5,546 H586 A4,4 0 0 1 590,550 V558 A4,4 0 0 1 586,562 H458.5 Z" fill="#64748b"><title>MySQL, Delete 10,000 records: 2.26× faster (1 worker → 8 workers: 36.9 s → 16.4 s)</title></path>
-<rect x="594.5" y="546.5" width="198.6" height="16" fill="#ffffff"/>
-<text x="597.5" y="558.5" font-size="13" fill="#111827"><tspan font-weight="600">2.26× faster</tspan><tspan fill="#4b5563"> · 36.9 s → 16.4 s</tspan></text>
-<text x="450" y="580.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
-<path d="M458.5,568 H602.6 A4,4 0 0 1 606.6,572 V580 A4,4 0 0 1 602.6,584 H458.5 Z" fill="#64748b"><title>PostgreSQL, Delete 10,000 records: 2.54× faster (1 worker → 8 workers: 37.4 s → 14.7 s)</title></path>
-<rect x="611.1" y="568.5" width="198.6" height="16" fill="#ffffff"/>
-<text x="614.1" y="580.5" font-size="13" fill="#111827"><tspan font-weight="600">2.54× faster</tspan><tspan fill="#4b5563"> · 37.4 s → 14.7 s</tspan></text>
-<line x1="24" y1="596" x2="936" y2="596" stroke="#e5e7eb" stroke-width="1"/>
-<text x="24" y="622" font-size="14" font-weight="600" fill="#111827">Stock availability list, all columns</text>
-<text x="24" y="640" font-size="13" fill="#4b5563">8 workers: 2.2–2.4× faster</text>
-<text x="450" y="622.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
-<path d="M458.5,610 H584.6 A4,4 0 0 1 588.6,614 V622 A4,4 0 0 1 584.6,626 H458.5 Z" fill="#64748b"><title>SQL Server, Stock availability list, all columns: 2.23× faster (1 worker → 8 workers: 118 ms → 53 ms)</title></path>
-<rect x="593.1" y="610.5" width="207.2" height="16" fill="#ffffff"/>
-<text x="596.1" y="622.5" font-size="13" fill="#111827"><tspan font-weight="600">2.23× faster</tspan><tspan fill="#4b5563"> · 118 ms → 53 ms</tspan></text>
-<text x="450" y="644.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
-<path d="M458.5,632 H594.9 A4,4 0 0 1 598.9,636 V644 A4,4 0 0 1 594.9,648 H458.5 Z" fill="#64748b"><title>MySQL, Stock availability list, all columns: 2.41× faster (1 worker → 8 workers: 116 ms → 48.1 ms)</title></path>
-<rect x="603.4" y="632.5" width="218.9" height="16" fill="#ffffff"/>
-<text x="606.4" y="644.5" font-size="13" fill="#111827"><tspan font-weight="600">2.41× faster</tspan><tspan fill="#4b5563"> · 116 ms → 48.1 ms</tspan></text>
-<text x="450" y="666.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
-<path d="M458.5,654 H581.2 A4,4 0 0 1 585.2,658 V666 A4,4 0 0 1 581.2,670 H458.5 Z" fill="#64748b"><title>PostgreSQL, Stock availability list, all columns: 2.18× faster (1 worker → 8 workers: 112 ms → 51.4 ms)</title></path>
-<rect x="589.7" y="654.5" width="218.9" height="16" fill="#ffffff"/>
-<text x="592.7" y="666.5" font-size="13" fill="#111827"><tspan font-weight="600">2.18× faster</tspan><tspan fill="#4b5563"> · 112 ms → 51.4 ms</tspan></text>
-<line x1="24" y1="682" x2="936" y2="682" stroke="#e5e7eb" stroke-width="1"/>
-<text x="24" y="708" font-size="14" font-weight="600" fill="#111827">Stock availability list, only the</text>
-<text x="24" y="726" font-size="14" font-weight="600" fill="#111827">needed columns</text>
-<text x="24" y="744" font-size="13" fill="#4b5563">8 workers: 1.7–2.8× faster</text>
-<text x="450" y="708.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
-<path d="M458.5,696 H555.9 A4,4 0 0 1 559.9,700 V708 A4,4 0 0 1 555.9,712 H458.5 Z" fill="#64748b"><title>SQL Server, Stock availability list, only the needed columns: 1.74× faster (1 worker → 8 workers: 23.8 ms → 13.7 ms)</title></path>
-<rect x="564.4" y="696.5" width="222.8" height="16" fill="#ffffff"/>
-<text x="567.4" y="708.5" font-size="13" fill="#111827"><tspan font-weight="600">1.74× faster</tspan><tspan fill="#4b5563"> · 23.8 ms → 13.7 ms</tspan></text>
-<text x="450" y="730.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
-<path d="M458.5,718 H559.1 A4,4 0 0 1 563.1,722 V730 A4,4 0 0 1 559.1,734 H458.5 Z" fill="#64748b"><title>MySQL, Stock availability list, only the needed columns: 1.80× faster (1 worker → 8 workers: 32.7 ms → 18.2 ms)</title></path>
-<rect x="567.6" y="718.5" width="222.8" height="16" fill="#ffffff"/>
-<text x="570.6" y="730.5" font-size="13" fill="#111827"><tspan font-weight="600">1.80× faster</tspan><tspan fill="#4b5563"> · 32.7 ms → 18.2 ms</tspan></text>
-<text x="450" y="752.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
-<path d="M458.5,740 H615.2 A4,4 0 0 1 619.2,744 V752 A4,4 0 0 1 615.2,756 H458.5 Z" fill="#64748b"><title>PostgreSQL, Stock availability list, only the needed columns: 2.76× faster (1 worker → 8 workers: 34 ms → 12.3 ms)</title></path>
-<rect x="623.7" y="740.5" width="211.1" height="16" fill="#ffffff"/>
-<text x="626.7" y="752.5" font-size="13" fill="#111827"><tspan font-weight="600">2.76× faster</tspan><tspan fill="#4b5563"> · 34 ms → 12.3 ms</tspan></text>
-<text x="458" y="789" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">0×</text>
-<text x="516.3" y="789" font-size="12" font-weight="600" text-anchor="middle" fill="#111827" style="font-variant-numeric: tabular-nums">1×</text>
-<text x="574.5" y="789" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">2×</text>
-<text x="632.8" y="789" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">3×</text>
-<text x="691" y="789" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">4×</text>
-<text x="749.3" y="789" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">5×</text>
-<text x="807.5" y="789" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">6×</text>
-<text x="865.8" y="789" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">7×</text>
-<text x="924" y="789" font-size="12" font-weight="600" text-anchor="middle" fill="#111827" style="font-variant-numeric: tabular-nums">8×</text>
-<text x="24" y="819" font-size="12.5" fill="#4b5563">Speed-up = median time with 1 worker / median time with 8 workers, same job (10,000 records or 80 list pages split 8 ways).</text>
+<text x="24" y="140" font-size="13" fill="#4b5563">Acumatica 2026 R2 · median of 6 runs per test and database · one shared scale from zero · a longer bar means more gain from 8 workers, not</text>
+<text x="24" y="160" font-size="13" fill="#4b5563">a faster database</text>
+<rect x="24" y="179" width="15" height="14" rx="3" fill="#64748b"/>
+<text x="48" y="190" font-size="13"><tspan font-weight="600" fill="#111827">One colour for every bar:</tspan><tspan fill="#4b5563"> Speed-ups are not ranked: the verdicts compare times, not speed-ups. Which database was faster with 1</tspan></text>
+<text x="48" y="208" font-size="13" fill="#4b5563">and with 8 workers is in the “Platform basics: bulk record work” chart above.</text>
+<line x1="24" y1="226" x2="936" y2="226" stroke="#111827" stroke-width="1.5"/>
+<text x="516.3" y="248" font-size="12" text-anchor="middle" fill="#4b5563">no gain</text>
+<text x="907.1" y="248" font-size="12" text-anchor="middle" fill="#4b5563">perfect split</text>
+<text x="458" y="265" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">0×</text>
+<text x="516.3" y="265" font-size="12" font-weight="600" text-anchor="middle" fill="#111827" style="font-variant-numeric: tabular-nums">1×</text>
+<text x="574.5" y="265" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">2×</text>
+<text x="632.8" y="265" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">3×</text>
+<text x="691" y="265" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">4×</text>
+<text x="749.3" y="265" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">5×</text>
+<text x="807.5" y="265" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">6×</text>
+<text x="865.8" y="265" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">7×</text>
+<text x="924" y="265" font-size="12" font-weight="600" text-anchor="middle" fill="#111827" style="font-variant-numeric: tabular-nums">8×</text>
+<line x1="574.5" y1="272" x2="574.5" y2="810" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="632.8" y1="272" x2="632.8" y2="810" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="691" y1="272" x2="691" y2="810" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="749.3" y1="272" x2="749.3" y2="810" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="807.5" y1="272" x2="807.5" y2="810" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="865.8" y1="272" x2="865.8" y2="810" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458.5" y1="272" x2="458.5" y2="810" stroke="#9ca3af" stroke-width="1"/>
+<line x1="516.3" y1="272" x2="516.3" y2="810" stroke="#6b7280" stroke-width="1"/>
+<line x1="924" y1="272" x2="924" y2="810" stroke="#6b7280" stroke-width="1"/>
+<text x="24" y="298" font-size="14" font-weight="600" fill="#111827">Load 10,000 records</text>
+<text x="24" y="316" font-size="13" fill="#4b5563">8 workers: 2.1–3.7× faster</text>
+<text x="24" y="333" font-size="13" fill="#4b5563">Times per 10,000-record job</text>
+<text x="450" y="298.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,286 H669.8 A4,4 0 0 1 673.8,290 V298 A4,4 0 0 1 669.8,302 H458.5 Z" fill="#64748b"><title>SQL Server, Load 10,000 records: 3.70× faster (1 worker → 8 workers: 0.219 s → 0.0592 s per 10,000-record job)</title></path>
+<rect x="678.3" y="286.5" width="222" height="16" fill="#ffffff"/>
+<text x="681.3" y="298.5" font-size="13" fill="#111827"><tspan font-weight="600">3.70× faster</tspan><tspan fill="#4b5563"> · 0.219 s → 0.0592 s</tspan></text>
+<text x="450" y="320.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,308 H607.3 A4,4 0 0 1 611.3,312 V320 A4,4 0 0 1 607.3,324 H458.5 Z" fill="#64748b"><title>MySQL, Load 10,000 records: 2.62× faster (1 worker → 8 workers: 0.259 s → 0.0985 s per 10,000-record job)</title></path>
+<rect x="615.8" y="308.5" width="222" height="16" fill="#ffffff"/>
+<text x="618.8" y="320.5" font-size="13" fill="#111827"><tspan font-weight="600">2.62× faster</tspan><tspan fill="#4b5563"> · 0.259 s → 0.0985 s</tspan></text>
+<text x="450" y="342.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,330 H577.4 A4,4 0 0 1 581.4,334 V342 A4,4 0 0 1 577.4,346 H458.5 Z" fill="#64748b"><title>PostgreSQL, Load 10,000 records: 2.11× faster (1 worker → 8 workers: 0.111 s → 0.0525 s per 10,000-record job)</title></path>
+<rect x="585.9" y="330.5" width="222" height="16" fill="#ffffff"/>
+<text x="588.9" y="342.5" font-size="13" fill="#111827"><tspan font-weight="600">2.11× faster</tspan><tspan fill="#4b5563"> · 0.111 s → 0.0525 s</tspan></text>
+<line x1="24" y1="358" x2="936" y2="358" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="384" font-size="14" font-weight="600" fill="#111827">Save 10,000 new records</text>
+<text x="24" y="402" font-size="13" fill="#4b5563">8 workers: 1.7–2.2× faster</text>
+<text x="24" y="419" font-size="13" fill="#4b5563">Times per 10,000-record job</text>
+<text x="450" y="384.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,372 H552.3 A4,4 0 0 1 556.3,376 V384 A4,4 0 0 1 552.3,388 H458.5 Z" fill="#64748b"><title>SQL Server, Save 10,000 new records: 1.68× faster (1 worker → 8 workers: 7.57 s → 4.51 s per 10,000-record job)</title></path>
+<rect x="560.8" y="372.5" width="198.6" height="16" fill="#ffffff"/>
+<text x="563.8" y="384.5" font-size="13" fill="#111827"><tspan font-weight="600">1.68× faster</tspan><tspan fill="#4b5563"> · 7.57 s → 4.51 s</tspan></text>
+<text x="450" y="406.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,394 H577.5 A4,4 0 0 1 581.5,398 V406 A4,4 0 0 1 577.5,410 H458.5 Z" fill="#64748b"><title>MySQL, Save 10,000 new records: 2.11× faster (1 worker → 8 workers: 9.34 s → 4.42 s per 10,000-record job)</title></path>
+<rect x="586" y="394.5" width="198.6" height="16" fill="#ffffff"/>
+<text x="589" y="406.5" font-size="13" fill="#111827"><tspan font-weight="600">2.11× faster</tspan><tspan fill="#4b5563"> · 9.34 s → 4.42 s</tspan></text>
+<text x="450" y="428.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,416 H581.1 A4,4 0 0 1 585.1,420 V428 A4,4 0 0 1 581.1,432 H458.5 Z" fill="#64748b"><title>PostgreSQL, Save 10,000 new records: 2.17× faster (1 worker → 8 workers: 11.8 s → 5.44 s per 10,000-record job)</title></path>
+<rect x="589.6" y="416.5" width="198.6" height="16" fill="#ffffff"/>
+<text x="592.6" y="428.5" font-size="13" fill="#111827"><tspan font-weight="600">2.17× faster</tspan><tspan fill="#4b5563"> · 11.8 s → 5.44 s</tspan></text>
+<line x1="24" y1="444" x2="936" y2="444" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="470" font-size="14" font-weight="600" fill="#111827">Change 10,000 records</text>
+<text x="24" y="488" font-size="13" fill="#4b5563">8 workers: 1.8–2.3× faster</text>
+<text x="24" y="505" font-size="13" fill="#4b5563">Times per 10,000-record job</text>
+<text x="450" y="470.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,458 H560.5 A4,4 0 0 1 564.5,462 V470 A4,4 0 0 1 560.5,474 H458.5 Z" fill="#64748b"><title>SQL Server, Change 10,000 records: 1.82× faster (1 worker → 8 workers: 5.73 s → 3.15 s per 10,000-record job)</title></path>
+<rect x="569" y="458.5" width="198.6" height="16" fill="#ffffff"/>
+<text x="572" y="470.5" font-size="13" fill="#111827"><tspan font-weight="600">1.82× faster</tspan><tspan fill="#4b5563"> · 5.73 s → 3.15 s</tspan></text>
+<text x="450" y="492.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,480 H588.2 A4,4 0 0 1 592.2,484 V492 A4,4 0 0 1 588.2,496 H458.5 Z" fill="#64748b"><title>MySQL, Change 10,000 records: 2.30× faster (1 worker → 8 workers: 7.03 s → 3.06 s per 10,000-record job)</title></path>
+<rect x="596.7" y="480.5" width="198.6" height="16" fill="#ffffff"/>
+<text x="599.7" y="492.5" font-size="13" fill="#111827"><tspan font-weight="600">2.30× faster</tspan><tspan fill="#4b5563"> · 7.03 s → 3.06 s</tspan></text>
+<text x="450" y="514.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,502 H590.9 A4,4 0 0 1 594.9,506 V514 A4,4 0 0 1 590.9,518 H458.5 Z" fill="#64748b"><title>PostgreSQL, Change 10,000 records: 2.34× faster (1 worker → 8 workers: 8.23 s → 3.51 s per 10,000-record job)</title></path>
+<rect x="599.4" y="502.5" width="198.6" height="16" fill="#ffffff"/>
+<text x="602.4" y="514.5" font-size="13" fill="#111827"><tspan font-weight="600">2.34× faster</tspan><tspan fill="#4b5563"> · 8.23 s → 3.51 s</tspan></text>
+<line x1="24" y1="530" x2="936" y2="530" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="556" font-size="14" font-weight="600" fill="#111827">Delete 10,000 records</text>
+<text x="24" y="574" font-size="13" fill="#4b5563">8 workers: 1.8–2.5× faster</text>
+<text x="24" y="591" font-size="13" fill="#4b5563">Times per 10,000-record job</text>
+<text x="450" y="556.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,544 H558.9 A4,4 0 0 1 562.9,548 V556 A4,4 0 0 1 558.9,560 H458.5 Z" fill="#64748b"><title>SQL Server, Delete 10,000 records: 1.79× faster (1 worker → 8 workers: 24.1 s → 13.4 s per 10,000-record job)</title></path>
+<rect x="567.4" y="544.5" width="198.6" height="16" fill="#ffffff"/>
+<text x="570.4" y="556.5" font-size="13" fill="#111827"><tspan font-weight="600">1.79× faster</tspan><tspan fill="#4b5563"> · 24.1 s → 13.4 s</tspan></text>
+<text x="450" y="578.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,566 H586 A4,4 0 0 1 590,570 V578 A4,4 0 0 1 586,582 H458.5 Z" fill="#64748b"><title>MySQL, Delete 10,000 records: 2.26× faster (1 worker → 8 workers: 36.9 s → 16.4 s per 10,000-record job)</title></path>
+<rect x="594.5" y="566.5" width="198.6" height="16" fill="#ffffff"/>
+<text x="597.5" y="578.5" font-size="13" fill="#111827"><tspan font-weight="600">2.26× faster</tspan><tspan fill="#4b5563"> · 36.9 s → 16.4 s</tspan></text>
+<text x="450" y="600.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,588 H602.6 A4,4 0 0 1 606.6,592 V600 A4,4 0 0 1 602.6,604 H458.5 Z" fill="#64748b"><title>PostgreSQL, Delete 10,000 records: 2.54× faster (1 worker → 8 workers: 37.4 s → 14.7 s per 10,000-record job)</title></path>
+<rect x="611.1" y="588.5" width="198.6" height="16" fill="#ffffff"/>
+<text x="614.1" y="600.5" font-size="13" fill="#111827"><tspan font-weight="600">2.54× faster</tspan><tspan fill="#4b5563"> · 37.4 s → 14.7 s</tspan></text>
+<line x1="24" y1="616" x2="936" y2="616" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="642" font-size="14" font-weight="600" fill="#111827">Stock availability list, all columns</text>
+<text x="24" y="660" font-size="13" fill="#4b5563">8 workers: 2.2–2.4× faster</text>
+<text x="24" y="677" font-size="13" fill="#4b5563">Times per list page</text>
+<text x="450" y="642.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,630 H584.6 A4,4 0 0 1 588.6,634 V642 A4,4 0 0 1 584.6,646 H458.5 Z" fill="#64748b"><title>SQL Server, Stock availability list, all columns: 2.23× faster (1 worker → 8 workers: 118 ms → 53 ms per list page)</title></path>
+<rect x="593.1" y="630.5" width="207.2" height="16" fill="#ffffff"/>
+<text x="596.1" y="642.5" font-size="13" fill="#111827"><tspan font-weight="600">2.23× faster</tspan><tspan fill="#4b5563"> · 118 ms → 53 ms</tspan></text>
+<text x="450" y="664.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,652 H594.9 A4,4 0 0 1 598.9,656 V664 A4,4 0 0 1 594.9,668 H458.5 Z" fill="#64748b"><title>MySQL, Stock availability list, all columns: 2.41× faster (1 worker → 8 workers: 116 ms → 48.1 ms per list page)</title></path>
+<rect x="603.4" y="652.5" width="218.9" height="16" fill="#ffffff"/>
+<text x="606.4" y="664.5" font-size="13" fill="#111827"><tspan font-weight="600">2.41× faster</tspan><tspan fill="#4b5563"> · 116 ms → 48.1 ms</tspan></text>
+<text x="450" y="686.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,674 H581.2 A4,4 0 0 1 585.2,678 V686 A4,4 0 0 1 581.2,690 H458.5 Z" fill="#64748b"><title>PostgreSQL, Stock availability list, all columns: 2.18× faster (1 worker → 8 workers: 112 ms → 51.4 ms per list page)</title></path>
+<rect x="589.7" y="674.5" width="218.9" height="16" fill="#ffffff"/>
+<text x="592.7" y="686.5" font-size="13" fill="#111827"><tspan font-weight="600">2.18× faster</tspan><tspan fill="#4b5563"> · 112 ms → 51.4 ms</tspan></text>
+<line x1="24" y1="702" x2="936" y2="702" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="728" font-size="14" font-weight="600" fill="#111827">Stock availability list, only the</text>
+<text x="24" y="746" font-size="14" font-weight="600" fill="#111827">needed columns</text>
+<text x="24" y="764" font-size="13" fill="#4b5563">8 workers: 1.7–2.8× faster</text>
+<text x="24" y="781" font-size="13" fill="#4b5563">Times per list page</text>
+<text x="450" y="728.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,716 H555.9 A4,4 0 0 1 559.9,720 V728 A4,4 0 0 1 555.9,732 H458.5 Z" fill="#64748b"><title>SQL Server, Stock availability list, only the needed columns: 1.74× faster (1 worker → 8 workers: 23.8 ms → 13.7 ms per list page)</title></path>
+<rect x="564.4" y="716.5" width="222.8" height="16" fill="#ffffff"/>
+<text x="567.4" y="728.5" font-size="13" fill="#111827"><tspan font-weight="600">1.74× faster</tspan><tspan fill="#4b5563"> · 23.8 ms → 13.7 ms</tspan></text>
+<text x="450" y="750.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,738 H559.1 A4,4 0 0 1 563.1,742 V750 A4,4 0 0 1 559.1,754 H458.5 Z" fill="#64748b"><title>MySQL, Stock availability list, only the needed columns: 1.80× faster (1 worker → 8 workers: 32.7 ms → 18.2 ms per list page)</title></path>
+<rect x="567.6" y="738.5" width="222.8" height="16" fill="#ffffff"/>
+<text x="570.6" y="750.5" font-size="13" fill="#111827"><tspan font-weight="600">1.80× faster</tspan><tspan fill="#4b5563"> · 32.7 ms → 18.2 ms</tspan></text>
+<text x="450" y="772.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,760 H615.2 A4,4 0 0 1 619.2,764 V772 A4,4 0 0 1 615.2,776 H458.5 Z" fill="#64748b"><title>PostgreSQL, Stock availability list, only the needed columns: 2.76× faster (1 worker → 8 workers: 34 ms → 12.3 ms per list page)</title></path>
+<rect x="623.7" y="760.5" width="211.1" height="16" fill="#ffffff"/>
+<text x="626.7" y="772.5" font-size="13" fill="#111827"><tspan font-weight="600">2.76× faster</tspan><tspan fill="#4b5563"> · 34 ms → 12.3 ms</tspan></text>
+<text x="458" y="826" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">0×</text>
+<text x="516.3" y="826" font-size="12" font-weight="600" text-anchor="middle" fill="#111827" style="font-variant-numeric: tabular-nums">1×</text>
+<text x="574.5" y="826" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">2×</text>
+<text x="632.8" y="826" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">3×</text>
+<text x="691" y="826" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">4×</text>
+<text x="749.3" y="826" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">5×</text>
+<text x="807.5" y="826" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">6×</text>
+<text x="865.8" y="826" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">7×</text>
+<text x="924" y="826" font-size="12" font-weight="600" text-anchor="middle" fill="#111827" style="font-variant-numeric: tabular-nums">8×</text>
+<text x="24" y="856" font-size="12.5" fill="#4b5563">Speed-up = median time with 1 worker / median time with 8 workers, same job (10,000 records or 80 list pages split 8 ways).</text>
 </g>
 </svg>

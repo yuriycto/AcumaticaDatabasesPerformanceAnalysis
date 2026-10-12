@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1220" viewBox="0 0 960 1220" role="img" aria-labelledby="scaling-orders-title scaling-orders-desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1254" viewBox="0 0 960 1254" role="img" aria-labelledby="scaling-orders-title scaling-orders-desc">
 <title id="scaling-orders-title">More clerks, more orders?</title>
-<desc id="scaling-orders-desc">Orders per minute rose 1.9–2.7× from 1 to 4 clerks, but more clerks did not raise it by another 10% on any database (127–162 per minute with 8 and 16 clerks). Each extra clerk mostly added waiting: 95% of orders were saved within 1.54–2.29 s with 4 clerks and 9.32–12.8 s with 16. Different products, orders per minute, SQL Server: 1 clerk 81.2, 4 clerks 215, 8 clerks 147, 16 clerks 142. Different products, orders per minute, MySQL: 1 clerk 68.1, 4 clerks 130, 8 clerks 140, 16 clerks 133. Different products, orders per minute, PostgreSQL: 1 clerk 70.6, 4 clerks 158, 8 clerks 154, 16 clerks 148. Everyone sells the best-seller, orders per minute, SQL Server: 4 clerks 161, 8 clerks 162, 16 clerks 138. Everyone sells the best-seller, orders per minute, MySQL: 4 clerks 142, 8 clerks 127, 16 clerks 147. Everyone sells the best-seller, orders per minute, PostgreSQL: 4 clerks 156, 8 clerks 152, 16 clerks 155. Different products, 1 clerk verdict (per order): SQL Server fastest; MySQL 20% slower +145 ms vs SQL Server; PostgreSQL 15% slower +108 ms vs SQL Server. Different products, 4 clerks verdict: tie SQL Server’s runs varied 140–275/min. Everyone sells the best-seller, 4 clerks verdict: tie MySQL’s gap is within run-to-run swings. Different products, 8 clerks verdict: PostgreSQL joint fastest; MySQL 10% slower vs PostgreSQL only; SQL Server ties with both. Everyone sells the best-seller, 8 clerks verdict: tie SQL Server’s runs varied 137–213/min. Different products, 16 clerks verdict: tie MySQL’s gap is within run-to-run swings. Everyone sells the best-seller, 16 clerks verdict: tie SQL Server’s gap is within run-to-run swings. Different products, 95% wait in seconds, SQL Server: 1 clerk 0.904, 4 clerks 1.54, 8 clerks 5.16, 16 clerks 10.9. Different products, 95% wait in seconds, MySQL: 1 clerk 1.01, 4 clerks 2.29, 8 clerks 4.75, 16 clerks 12.8. Different products, 95% wait in seconds, PostgreSQL: 1 clerk 0.962, 4 clerks 1.85, 8 clerks 4.37, 16 clerks 11.9. Everyone sells the best-seller, 95% wait in seconds, SQL Server: 4 clerks 1.86, 8 clerks 4.7, 16 clerks 11.5. Everyone sells the best-seller, 95% wait in seconds, MySQL: 4 clerks 2.21, 8 clerks 4.84, 16 clerks 12.2. Everyone sells the best-seller, 95% wait in seconds, PostgreSQL: 4 clerks 2.02, 8 clerks 4.43, 16 clerks 9.32.</desc>
-<rect x="0.5" y="0.5" width="959" height="1219" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+<desc id="scaling-orders-desc">Orders per minute rose 1.9–2.7× from 1 to 4 clerks, then levelled off or fell back: more clerks did not raise it by another 10% on any database (127–162 per minute with 8 and 16 clerks). Each extra clerk mostly added waiting: 95% of orders were saved within 1.54–2.29 s with 4 clerks and 9.32–12.8 s with 16. Different products, orders per minute, SQL Server: 1 clerk 81.2, 4 clerks 215, 8 clerks 147, 16 clerks 142. Different products, orders per minute, MySQL: 1 clerk 68.1, 4 clerks 130, 8 clerks 140, 16 clerks 133. Different products, orders per minute, PostgreSQL: 1 clerk 70.6, 4 clerks 158, 8 clerks 154, 16 clerks 148. Everyone sells the best-seller, orders per minute, SQL Server: 4 clerks 161, 8 clerks 162, 16 clerks 138. Everyone sells the best-seller, orders per minute, MySQL: 4 clerks 142, 8 clerks 127, 16 clerks 147. Everyone sells the best-seller, orders per minute, PostgreSQL: 4 clerks 156, 8 clerks 152, 16 clerks 155. Different products, 1 clerk verdict (judged on time per order): SQL Server fastest; MySQL 20% slower +145 ms vs SQL Server; PostgreSQL 15% slower +108 ms vs SQL Server. Different products, 4 clerks verdict: tie SQL Server’s runs varied 140–275/min. Everyone sells the best-seller, 4 clerks verdict: tie MySQL’s gap is within run-to-run swings. Different products, 8 clerks verdict: PostgreSQL joint fastest; SQL Server joint fastest ties with both; MySQL 10% slower vs PostgreSQL only. Everyone sells the best-seller, 8 clerks verdict: tie SQL Server’s runs varied 137–213/min. Different products, 16 clerks verdict: tie MySQL’s gap is within run-to-run swings. Everyone sells the best-seller, 16 clerks verdict: tie SQL Server’s gap is within run-to-run swings. Different products, 95% wait in seconds, SQL Server: 1 clerk 0.904, 4 clerks 1.54, 8 clerks 5.16, 16 clerks 10.9. Different products, 95% wait in seconds, MySQL: 1 clerk 1.01, 4 clerks 2.29, 8 clerks 4.75, 16 clerks 12.8. Different products, 95% wait in seconds, PostgreSQL: 1 clerk 0.962, 4 clerks 1.85, 8 clerks 4.37, 16 clerks 11.9. Everyone sells the best-seller, 95% wait in seconds, SQL Server: 4 clerks 1.86, 8 clerks 4.7, 16 clerks 11.5. Everyone sells the best-seller, 95% wait in seconds, MySQL: 4 clerks 2.21, 8 clerks 4.84, 16 clerks 12.2. Everyone sells the best-seller, 95% wait in seconds, PostgreSQL: 4 clerks 2.02, 8 clerks 4.43, 16 clerks 9.32.</desc>
+<rect x="0.5" y="0.5" width="959" height="1253" rx="12" fill="#ffffff" stroke="#d0d7de"/>
 <g font-family="-apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, &#39;Helvetica Neue&#39;, Helvetica, Arial, &#39;Liberation Sans&#39;, sans-serif">
 <text x="24" y="46" font-size="21" font-weight="600" fill="#111827">More clerks, more orders?</text>
-<text x="24" y="72" font-size="16" font-weight="600" fill="#111827">Orders per minute rose 1.9–2.7× from 1 to 4 clerks, but more clerks did not raise it by another 10% on any</text>
-<text x="24" y="94" font-size="16" font-weight="600" fill="#111827">database (127–162 per minute with 8 and 16 clerks). Each extra clerk mostly added waiting: 95% of orders</text>
-<text x="24" y="116" font-size="16" font-weight="600" fill="#111827">were saved within 1.54–2.29 s with 4 clerks and 9.32–12.8 s with 16.</text>
+<text x="24" y="72" font-size="16" font-weight="600" fill="#111827">Orders per minute rose 1.9–2.7× from 1 to 4 clerks, then levelled off or fell back: more clerks did not raise it</text>
+<text x="24" y="94" font-size="16" font-weight="600" fill="#111827">by another 10% on any database (127–162 per minute with 8 and 16 clerks). Each extra clerk mostly added</text>
+<text x="24" y="116" font-size="16" font-weight="600" fill="#111827">waiting: 95% of orders were saved within 1.54–2.29 s with 4 clerks and 9.32–12.8 s with 16.</text>
 <text x="24" y="140" font-size="13" fill="#4b5563">Acumatica 2026 R2 · median of 6 runs per database and number of clerks · clerks work non-stop, with no pause between orders · Acumatica</text>
 <text x="24" y="160" font-size="13" fill="#4b5563">ran on about 2 processor cores on every database</text>
 <rect x="24" y="179" width="14" height="14" rx="3" fill="#0072B2"/>
@@ -16,194 +16,199 @@
 <text x="162.7" y="190" font-size="13" font-weight="600" fill="#111827">MySQL</text>
 <rect x="234.8" y="179" width="14" height="14" rx="3" fill="#CC79A7"/>
 <text x="254.8" y="190" font-size="13" font-weight="600" fill="#111827">PostgreSQL</text>
-<text x="24" y="215" font-size="13" fill="#4b5563">Line colour = database (identity, not a verdict). The rows under each orders chart say whether users would notice the gap at that number</text>
-<text x="24" y="234" font-size="13" fill="#4b5563">of clerks.</text>
+<text x="24" y="215" font-size="13" fill="#4b5563">Line colour only tells the databases apart; it is not a verdict. The rows under each orders chart say whether users would notice the gap at that</text>
+<text x="24" y="234" font-size="13" fill="#4b5563">number of clerks.</text>
 <line x1="24" y1="250" x2="936" y2="250" stroke="#111827" stroke-width="1.5"/>
 <text x="24" y="280" font-size="15" font-weight="600" fill="#111827">Orders per minute, whole team – higher is better</text>
 <text x="24" y="298" font-size="12.5" fill="#4b5563">Same scale in both charts.</text>
 <text x="24" y="328" font-size="14" font-weight="600" fill="#111827">Different products</text>
 <text x="24" y="345" font-size="12" fill="#4b5563">each clerk’s orders are for different products</text>
-<line x1="54.5" y1="541" x2="314.9" y2="541" stroke="#9ca3af" stroke-width="1"/>
-<text x="46.5" y="545.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="54.5" y1="505" x2="314.9" y2="505" stroke="#e5e7eb" stroke-width="1"/>
-<text x="46.5" y="509.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">50</text>
-<line x1="54.5" y1="469" x2="314.9" y2="469" stroke="#e5e7eb" stroke-width="1"/>
-<text x="46.5" y="473.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">100</text>
-<line x1="54.5" y1="433" x2="314.9" y2="433" stroke="#e5e7eb" stroke-width="1"/>
-<text x="46.5" y="437.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">150</text>
-<line x1="54.5" y1="397" x2="314.9" y2="397" stroke="#e5e7eb" stroke-width="1"/>
-<text x="46.5" y="401.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">200</text>
-<line x1="54.5" y1="361" x2="314.9" y2="361" stroke="#e5e7eb" stroke-width="1"/>
-<text x="46.5" y="365.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">250</text>
-<text x="72.5" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">1</text>
-<text x="147.3" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">4</text>
-<text x="222.1" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">8</text>
+<line x1="57.5" y1="541" x2="314.9" y2="541" stroke="#9ca3af" stroke-width="1"/>
+<text x="49.5" y="545.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="57.5" y1="505" x2="314.9" y2="505" stroke="#e5e7eb" stroke-width="1"/>
+<text x="49.5" y="509.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">50</text>
+<line x1="57.5" y1="469" x2="314.9" y2="469" stroke="#e5e7eb" stroke-width="1"/>
+<text x="49.5" y="473.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">100</text>
+<line x1="57.5" y1="433" x2="314.9" y2="433" stroke="#e5e7eb" stroke-width="1"/>
+<text x="49.5" y="437.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">150</text>
+<line x1="57.5" y1="397" x2="314.9" y2="397" stroke="#e5e7eb" stroke-width="1"/>
+<text x="49.5" y="401.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">200</text>
+<line x1="57.5" y1="361" x2="314.9" y2="361" stroke="#e5e7eb" stroke-width="1"/>
+<text x="49.5" y="365.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">250</text>
+<text x="75.5" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">1</text>
+<text x="149.3" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">4</text>
+<text x="223.1" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">8</text>
 <text x="296.9" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">16</text>
-<text x="184.7" y="574" font-size="12" text-anchor="middle" fill="#4b5563">clerks working non-stop</text>
-<polyline points="72.5,482.5 147.3,385.9 222.1,434.8 296.9,438.5" fill="none" stroke="#0072B2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="72.5,492 147.3,447.4 222.1,440.2 296.9,445.4" fill="none" stroke="#E69F00" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="72.5,490.2 147.3,427.3 222.1,430 296.9,434.7" fill="none" stroke="#CC79A7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<g><title>SQL Server, 1 clerk, different products: median 81.2 orders/min (lowest–highest run 74.9–83.5)</title><circle cx="72.5" cy="482.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="72.5" cy="482.5" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>SQL Server, 4 clerks, different products: median 215 orders/min (lowest–highest run 140–275)</title><circle cx="147.3" cy="385.9" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="147.3" cy="385.9" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>SQL Server, 8 clerks, different products: median 147 orders/min (lowest–highest run 133–162)</title><circle cx="222.1" cy="434.8" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="222.1" cy="434.8" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<text x="186.2" y="591" font-size="12" text-anchor="middle" fill="#4b5563">clerks working non-stop</text>
+<polyline points="75.5,482.5 149.3,385.9 223.1,434.8 296.9,438.5" fill="none" stroke="#0072B2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="75.5,492 149.3,447.4 223.1,440.2 296.9,445.4" fill="none" stroke="#E69F00" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="75.5,490.2 149.3,427.3 223.1,430 296.9,434.7" fill="none" stroke="#CC79A7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<g><title>SQL Server, 1 clerk, different products: median 81.2 orders/min (lowest–highest run 74.9–83.5, on this wall-clock basis)</title><circle cx="75.5" cy="482.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="75.5" cy="482.5" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>SQL Server, 4 clerks, different products: median 215 orders/min (lowest–highest run 140–275)</title><circle cx="149.3" cy="385.9" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="149.3" cy="385.9" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>SQL Server, 8 clerks, different products: median 147 orders/min (lowest–highest run 133–162)</title><circle cx="223.1" cy="434.8" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="223.1" cy="434.8" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
 <g><title>SQL Server, 16 clerks, different products: median 142 orders/min (lowest–highest run 133–189)</title><circle cx="296.9" cy="438.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="296.9" cy="438.5" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 1 clerk, different products: median 68.1 orders/min (lowest–highest run 66–80.4)</title><circle cx="72.5" cy="492" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="72.5" cy="492" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 4 clerks, different products: median 130 orders/min (lowest–highest run 121–154)</title><circle cx="147.3" cy="447.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="147.3" cy="447.4" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 8 clerks, different products: median 140 orders/min (lowest–highest run 125–144)</title><circle cx="222.1" cy="440.2" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="222.1" cy="440.2" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 1 clerk, different products: median 68.1 orders/min (lowest–highest run 66–80.4, on this wall-clock basis)</title><circle cx="75.5" cy="492" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="75.5" cy="492" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 4 clerks, different products: median 130 orders/min (lowest–highest run 121–154)</title><circle cx="149.3" cy="447.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="149.3" cy="447.4" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 8 clerks, different products: median 140 orders/min (lowest–highest run 125–144)</title><circle cx="223.1" cy="440.2" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="223.1" cy="440.2" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
 <g><title>MySQL, 16 clerks, different products: median 133 orders/min (lowest–highest run 127–162)</title><circle cx="296.9" cy="445.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="296.9" cy="445.4" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 1 clerk, different products: median 70.6 orders/min (lowest–highest run 68.3–75.3)</title><circle cx="72.5" cy="490.2" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="72.5" cy="490.2" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 4 clerks, different products: median 158 orders/min (lowest–highest run 139–182)</title><circle cx="147.3" cy="427.3" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="147.3" cy="427.3" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 8 clerks, different products: median 154 orders/min (lowest–highest run 139–158)</title><circle cx="222.1" cy="430" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="222.1" cy="430" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 1 clerk, different products: median 70.6 orders/min (lowest–highest run 68.3–75.3, on this wall-clock basis)</title><circle cx="75.5" cy="490.2" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="75.5" cy="490.2" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 4 clerks, different products: median 158 orders/min (lowest–highest run 139–182)</title><circle cx="149.3" cy="427.3" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="149.3" cy="427.3" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 8 clerks, different products: median 154 orders/min (lowest–highest run 139–158)</title><circle cx="223.1" cy="430" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="223.1" cy="430" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
 <g><title>PostgreSQL, 16 clerks, different products: median 148 orders/min (lowest–highest run 129–170)</title><circle cx="296.9" cy="434.7" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="296.9" cy="434.7" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<text x="307.9" y="455" font-size="12.5"><tspan font-weight="600" fill="#111827">SQL Server</tspan><tspan fill="#4b5563"> 142/min</tspan></text>
-<text x="307.9" y="471" font-size="12.5"><tspan font-weight="600" fill="#111827">MySQL</tspan><tspan fill="#4b5563"> 133/min</tspan></text>
-<text x="307.9" y="439" font-size="12.5"><tspan font-weight="600" fill="#111827">PostgreSQL</tspan><tspan fill="#4b5563"> 148/min</tspan></text>
+<text x="149.3" y="374.9" font-size="12" text-anchor="middle" fill="#4b5563" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke">runs varied 140–275/min</text>
+<text x="307.9" y="443.8" font-size="12.5"><tspan font-weight="600" fill="#111827">SQL Server</tspan><tspan fill="#4b5563"> 142/min</tspan></text>
+<text x="307.9" y="459.8" font-size="12.5"><tspan font-weight="600" fill="#111827">MySQL</tspan><tspan fill="#4b5563"> 133/min</tspan></text>
+<text x="307.9" y="427.8" font-size="12.5"><tspan font-weight="600" fill="#111827">PostgreSQL</tspan><tspan fill="#4b5563"> 148/min</tspan></text>
 <text x="500" y="328" font-size="14" font-weight="600" fill="#111827">Everyone sells the best-seller</text>
 <text x="500" y="345" font-size="12" fill="#4b5563">every order includes the same best-selling item</text>
-<line x1="530.5" y1="541" x2="790.9" y2="541" stroke="#9ca3af" stroke-width="1"/>
-<text x="522.5" y="545.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">0</text>
-<line x1="530.5" y1="505" x2="790.9" y2="505" stroke="#e5e7eb" stroke-width="1"/>
-<text x="522.5" y="509.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">50</text>
-<line x1="530.5" y1="469" x2="790.9" y2="469" stroke="#e5e7eb" stroke-width="1"/>
-<text x="522.5" y="473.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">100</text>
-<line x1="530.5" y1="433" x2="790.9" y2="433" stroke="#e5e7eb" stroke-width="1"/>
-<text x="522.5" y="437.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">150</text>
-<line x1="530.5" y1="397" x2="790.9" y2="397" stroke="#e5e7eb" stroke-width="1"/>
-<text x="522.5" y="401.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">200</text>
-<line x1="530.5" y1="361" x2="790.9" y2="361" stroke="#e5e7eb" stroke-width="1"/>
-<text x="522.5" y="365.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">250</text>
-<text x="548.5" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">1</text>
-<text x="548.5" y="574" font-size="12" text-anchor="middle" fill="#4b5563">no run</text>
-<text x="623.3" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">4</text>
-<text x="698.1" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">8</text>
+<line x1="533.5" y1="541" x2="790.9" y2="541" stroke="#9ca3af" stroke-width="1"/>
+<text x="525.5" y="545.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">0</text>
+<line x1="533.5" y1="505" x2="790.9" y2="505" stroke="#e5e7eb" stroke-width="1"/>
+<text x="525.5" y="509.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">50</text>
+<line x1="533.5" y1="469" x2="790.9" y2="469" stroke="#e5e7eb" stroke-width="1"/>
+<text x="525.5" y="473.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">100</text>
+<line x1="533.5" y1="433" x2="790.9" y2="433" stroke="#e5e7eb" stroke-width="1"/>
+<text x="525.5" y="437.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">150</text>
+<line x1="533.5" y1="397" x2="790.9" y2="397" stroke="#e5e7eb" stroke-width="1"/>
+<text x="525.5" y="401.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">200</text>
+<line x1="533.5" y1="361" x2="790.9" y2="361" stroke="#e5e7eb" stroke-width="1"/>
+<text x="525.5" y="365.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">250</text>
+<text x="551.5" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">1</text>
+<text x="551.5" y="574" font-size="12" text-anchor="middle" fill="#4b5563">not tested</text>
+<text x="625.3" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">4</text>
+<text x="699.1" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">8</text>
 <text x="772.9" y="559" font-size="12.5" text-anchor="middle" fill="#4b5563">16</text>
-<text x="660.7" y="574" font-size="12" text-anchor="middle" fill="#4b5563">clerks working non-stop</text>
-<polyline points="623.3,425.2 698.1,424.5 772.9,441.9" fill="none" stroke="#0072B2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="623.3,438.9 698.1,449.4 772.9,435.2" fill="none" stroke="#E69F00" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="623.3,429 698.1,431.7 772.9,429.2" fill="none" stroke="#CC79A7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<g><title>SQL Server, 4 clerks, everyone sells the best-seller: median 161 orders/min (lowest–highest run 140–166)</title><circle cx="623.3" cy="425.2" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="623.3" cy="425.2" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>SQL Server, 8 clerks, everyone sells the best-seller: median 162 orders/min (lowest–highest run 137–213)</title><circle cx="698.1" cy="424.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="698.1" cy="424.5" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<text x="662.2" y="591" font-size="12" text-anchor="middle" fill="#4b5563">clerks working non-stop</text>
+<polyline points="625.3,425.2 699.1,424.5 772.9,441.9" fill="none" stroke="#0072B2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="625.3,438.9 699.1,449.4 772.9,435.2" fill="none" stroke="#E69F00" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="625.3,429 699.1,431.7 772.9,429.2" fill="none" stroke="#CC79A7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<g><title>SQL Server, 4 clerks, everyone sells the best-seller: median 161 orders/min (lowest–highest run 140–166)</title><circle cx="625.3" cy="425.2" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="625.3" cy="425.2" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>SQL Server, 8 clerks, everyone sells the best-seller: median 162 orders/min (lowest–highest run 137–213)</title><circle cx="699.1" cy="424.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="699.1" cy="424.5" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
 <g><title>SQL Server, 16 clerks, everyone sells the best-seller: median 138 orders/min (lowest–highest run 135–151)</title><circle cx="772.9" cy="441.9" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="772.9" cy="441.9" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 4 clerks, everyone sells the best-seller: median 142 orders/min (lowest–highest run 124–177)</title><circle cx="623.3" cy="438.9" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="623.3" cy="438.9" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 8 clerks, everyone sells the best-seller: median 127 orders/min (lowest–highest run 121–141)</title><circle cx="698.1" cy="449.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="698.1" cy="449.4" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 4 clerks, everyone sells the best-seller: median 142 orders/min (lowest–highest run 124–177)</title><circle cx="625.3" cy="438.9" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="625.3" cy="438.9" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 8 clerks, everyone sells the best-seller: median 127 orders/min (lowest–highest run 121–141)</title><circle cx="699.1" cy="449.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="699.1" cy="449.4" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
 <g><title>MySQL, 16 clerks, everyone sells the best-seller: median 147 orders/min (lowest–highest run 123–166)</title><circle cx="772.9" cy="435.2" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="772.9" cy="435.2" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 4 clerks, everyone sells the best-seller: median 156 orders/min (lowest–highest run 131–229)</title><circle cx="623.3" cy="429" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="623.3" cy="429" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 8 clerks, everyone sells the best-seller: median 152 orders/min (lowest–highest run 134–185)</title><circle cx="698.1" cy="431.7" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="698.1" cy="431.7" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 4 clerks, everyone sells the best-seller: median 156 orders/min (lowest–highest run 131–229)</title><circle cx="625.3" cy="429" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="625.3" cy="429" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 8 clerks, everyone sells the best-seller: median 152 orders/min (lowest–highest run 134–185)</title><circle cx="699.1" cy="431.7" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="699.1" cy="431.7" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
 <g><title>PostgreSQL, 16 clerks, everyone sells the best-seller: median 155 orders/min (lowest–highest run 133–190)</title><circle cx="772.9" cy="429.2" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="772.9" cy="429.2" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<text x="783.9" y="465.5" font-size="12.5"><tspan font-weight="600" fill="#111827">SQL Server</tspan><tspan fill="#4b5563"> 138/min</tspan></text>
-<text x="783.9" y="449.5" font-size="12.5"><tspan font-weight="600" fill="#111827">MySQL</tspan><tspan fill="#4b5563"> 147/min</tspan></text>
-<text x="783.9" y="433.5" font-size="12.5"><tspan font-weight="600" fill="#111827">PostgreSQL</tspan><tspan fill="#4b5563"> 155/min</tspan></text>
-<text x="24" y="600" font-size="13" font-weight="600" fill="#111827">Would users notice the gap?</text>
-<text x="500" y="600" font-size="13" font-weight="600" fill="#111827">Would users notice the gap?</text>
-<line x1="24" y1="610" x2="936" y2="610" stroke="#e5e7eb" stroke-width="1"/>
-<text x="24" y="631.3" font-size="12.5" font-weight="600" fill="#111827">1 clerk</text>
-<text x="24" y="647" font-size="12" fill="#4b5563">per order</text>
-<rect x="98" y="616" width="127.5" height="22" rx="11" fill="#0072B2"/>
-<text x="161.8" y="631.3" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">SQL Server fastest</text>
-<rect x="98" y="644" width="130.4" height="22" rx="11" fill="#fbf0d6" stroke="#E69F00" stroke-width="1.5"/>
-<text x="163.2" y="659.3" font-size="12" font-weight="600" text-anchor="middle" fill="#111827">MySQL 20% slower</text>
-<text x="234.4" y="659.3" font-size="12" fill="#4b5563">+145 ms vs SQL Server</text>
-<rect x="98" y="672" width="157.8" height="22" rx="11" fill="#f7eaf1" stroke="#CC79A7" stroke-width="1.5"/>
-<text x="176.9" y="687.3" font-size="12" font-weight="600" text-anchor="middle" fill="#111827">PostgreSQL 15% slower</text>
-<text x="261.8" y="687.3" font-size="12" fill="#4b5563">+108 ms vs SQL Server</text>
-<text x="500" y="631.3" font-size="12.5" font-weight="600" fill="#111827">1 clerk</text>
-<text x="574" y="631.3" font-size="12" fill="#4b5563">no run</text>
-<line x1="24" y1="702" x2="936" y2="702" stroke="#e5e7eb" stroke-width="1"/>
-<text x="24" y="723.3" font-size="12.5" font-weight="600" fill="#111827">4 clerks</text>
-<rect x="98" y="708" width="32.7" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
-<text x="114.4" y="723.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">tie</text>
-<text x="136.7" y="723.3" font-size="12" fill="#4b5563">SQL Server’s runs varied 140–275/min</text>
-<text x="500" y="723.3" font-size="12.5" font-weight="600" fill="#111827">4 clerks</text>
-<rect x="574" y="708" width="32.7" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
-<text x="590.4" y="723.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">tie</text>
-<text x="612.7" y="723.3" font-size="12" fill="#4b5563">MySQL’s gap is within run-to-run swings</text>
-<line x1="24" y1="738" x2="936" y2="738" stroke="#e5e7eb" stroke-width="1"/>
-<text x="24" y="759.3" font-size="12.5" font-weight="600" fill="#111827">8 clerks</text>
-<rect x="98" y="744" width="161.7" height="22" rx="11" fill="#CC79A7"/>
-<text x="178.8" y="759.3" font-size="12" font-weight="600" text-anchor="middle" fill="#111827">PostgreSQL joint fastest</text>
-<rect x="98" y="772" width="130.4" height="22" rx="11" fill="#fbf0d6" stroke="#E69F00" stroke-width="1.5"/>
-<text x="163.2" y="787.3" font-size="12" font-weight="600" text-anchor="middle" fill="#111827">MySQL 10% slower</text>
-<text x="234.4" y="787.3" font-size="12" fill="#4b5563">vs PostgreSQL only</text>
-<text x="98" y="815.3" font-size="12" fill="#4b5563">SQL Server ties with both</text>
-<text x="500" y="759.3" font-size="12.5" font-weight="600" fill="#111827">8 clerks</text>
-<rect x="574" y="744" width="32.7" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
-<text x="590.4" y="759.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">tie</text>
-<text x="612.7" y="759.3" font-size="12" fill="#4b5563">SQL Server’s runs varied 137–213/min</text>
-<line x1="24" y1="830" x2="936" y2="830" stroke="#e5e7eb" stroke-width="1"/>
-<text x="24" y="851.3" font-size="12.5" font-weight="600" fill="#111827">16 clerks</text>
-<rect x="98" y="836" width="32.7" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
-<text x="114.4" y="851.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">tie</text>
-<text x="136.7" y="851.3" font-size="12" fill="#4b5563">MySQL’s gap is within run-to-run swings</text>
-<text x="500" y="851.3" font-size="12.5" font-weight="600" fill="#111827">16 clerks</text>
-<rect x="574" y="836" width="32.7" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
-<text x="590.4" y="851.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">tie</text>
-<text x="612.7" y="851.3" font-size="12" fill="#4b5563">SQL Server’s gap is within run-to-run swings</text>
-<line x1="24" y1="866" x2="936" y2="866" stroke="#e5e7eb" stroke-width="1"/>
-<text x="24" y="902" font-size="15" font-weight="600" fill="#111827">Wait per order: 95% of orders were saved within this many seconds – lower is better</text>
-<text x="24" y="920" font-size="12.5" fill="#4b5563">Descriptive only: the tie rule is applied to orders per minute, not to this wait. Same scale in both charts.</text>
-<text x="24" y="950" font-size="14" font-weight="600" fill="#111827">Different products</text>
-<line x1="57.5" y1="1116" x2="328.5" y2="1116" stroke="#9ca3af" stroke-width="1"/>
-<text x="49.5" y="1120.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">0 s</text>
-<line x1="57.5" y1="1066" x2="328.5" y2="1066" stroke="#e5e7eb" stroke-width="1"/>
-<text x="49.5" y="1070.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">5 s</text>
-<line x1="57.5" y1="1016" x2="328.5" y2="1016" stroke="#e5e7eb" stroke-width="1"/>
-<text x="49.5" y="1020.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">10 s</text>
-<line x1="57.5" y1="966" x2="328.5" y2="966" stroke="#e5e7eb" stroke-width="1"/>
-<text x="49.5" y="970.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">15 s</text>
-<text x="75.5" y="1134" font-size="12.5" text-anchor="middle" fill="#4b5563">1</text>
-<text x="153.8" y="1134" font-size="12.5" text-anchor="middle" fill="#4b5563">4</text>
-<text x="232.2" y="1134" font-size="12.5" text-anchor="middle" fill="#4b5563">8</text>
-<text x="310.5" y="1134" font-size="12.5" text-anchor="middle" fill="#4b5563">16</text>
-<text x="193" y="1149" font-size="12" text-anchor="middle" fill="#4b5563">clerks working non-stop</text>
-<polyline points="75.5,1107 153.8,1100.6 232.2,1064.4 310.5,1007.3" fill="none" stroke="#0072B2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="75.5,1105.9 153.8,1093.1 232.2,1068.5 310.5,987.6" fill="none" stroke="#E69F00" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="75.5,1106.4 153.8,1097.5 232.2,1072.3 310.5,997.1" fill="none" stroke="#CC79A7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<g><title>SQL Server, 1 clerk, different products: 95% of orders saved within 0.904 s (median of 6 runs)</title><circle cx="75.5" cy="1107" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="75.5" cy="1107" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>SQL Server, 4 clerks, different products: 95% of orders saved within 1.54 s (median of 6 runs)</title><circle cx="153.8" cy="1100.6" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="153.8" cy="1100.6" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>SQL Server, 8 clerks, different products: 95% of orders saved within 5.16 s (median of 6 runs)</title><circle cx="232.2" cy="1064.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="232.2" cy="1064.4" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>SQL Server, 16 clerks, different products: 95% of orders saved within 10.9 s (median of 6 runs)</title><circle cx="310.5" cy="1007.3" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="310.5" cy="1007.3" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 1 clerk, different products: 95% of orders saved within 1.01 s (median of 6 runs)</title><circle cx="75.5" cy="1105.9" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="75.5" cy="1105.9" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 4 clerks, different products: 95% of orders saved within 2.29 s (median of 6 runs)</title><circle cx="153.8" cy="1093.1" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="153.8" cy="1093.1" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 8 clerks, different products: 95% of orders saved within 4.75 s (median of 6 runs)</title><circle cx="232.2" cy="1068.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="232.2" cy="1068.5" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 16 clerks, different products: 95% of orders saved within 12.8 s (median of 6 runs)</title><circle cx="310.5" cy="987.6" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="310.5" cy="987.6" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 1 clerk, different products: 95% of orders saved within 0.962 s (median of 6 runs)</title><circle cx="75.5" cy="1106.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="75.5" cy="1106.4" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 4 clerks, different products: 95% of orders saved within 1.85 s (median of 6 runs)</title><circle cx="153.8" cy="1097.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="153.8" cy="1097.5" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 8 clerks, different products: 95% of orders saved within 4.37 s (median of 6 runs)</title><circle cx="232.2" cy="1072.3" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="232.2" cy="1072.3" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 16 clerks, different products: 95% of orders saved within 11.9 s (median of 6 runs)</title><circle cx="310.5" cy="997.1" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="310.5" cy="997.1" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<text x="321.5" y="1023.9" font-size="12.5"><tspan font-weight="600" fill="#111827">SQL Server</tspan><tspan fill="#4b5563"> 10.9 s</tspan></text>
-<text x="321.5" y="991.9" font-size="12.5"><tspan font-weight="600" fill="#111827">MySQL</tspan><tspan fill="#4b5563"> 12.8 s</tspan></text>
-<text x="321.5" y="1007.9" font-size="12.5"><tspan font-weight="600" fill="#111827">PostgreSQL</tspan><tspan fill="#4b5563"> 11.9 s</tspan></text>
-<text x="500" y="950" font-size="14" font-weight="600" fill="#111827">Everyone sells the best-seller</text>
-<line x1="533.5" y1="1116" x2="804.5" y2="1116" stroke="#9ca3af" stroke-width="1"/>
-<text x="525.5" y="1120.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">0 s</text>
-<line x1="533.5" y1="1066" x2="804.5" y2="1066" stroke="#e5e7eb" stroke-width="1"/>
-<text x="525.5" y="1070.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">5 s</text>
-<line x1="533.5" y1="1016" x2="804.5" y2="1016" stroke="#e5e7eb" stroke-width="1"/>
-<text x="525.5" y="1020.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">10 s</text>
-<line x1="533.5" y1="966" x2="804.5" y2="966" stroke="#e5e7eb" stroke-width="1"/>
-<text x="525.5" y="970.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">15 s</text>
-<text x="551.5" y="1134" font-size="12.5" text-anchor="middle" fill="#4b5563">1</text>
-<text x="551.5" y="1149" font-size="12" text-anchor="middle" fill="#4b5563">no run</text>
-<text x="629.8" y="1134" font-size="12.5" text-anchor="middle" fill="#4b5563">4</text>
-<text x="708.2" y="1134" font-size="12.5" text-anchor="middle" fill="#4b5563">8</text>
-<text x="786.5" y="1134" font-size="12.5" text-anchor="middle" fill="#4b5563">16</text>
-<text x="669" y="1149" font-size="12" text-anchor="middle" fill="#4b5563">clerks working non-stop</text>
-<polyline points="629.8,1097.4 708.2,1069 786.5,1000.5" fill="none" stroke="#0072B2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="629.8,1093.9 708.2,1067.6 786.5,994.3" fill="none" stroke="#E69F00" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<polyline points="629.8,1095.8 708.2,1071.7 786.5,1022.8" fill="none" stroke="#CC79A7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<g><title>SQL Server, 4 clerks, everyone sells the best-seller: 95% of orders saved within 1.86 s (median of 6 runs)</title><circle cx="629.8" cy="1097.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="629.8" cy="1097.4" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>SQL Server, 8 clerks, everyone sells the best-seller: 95% of orders saved within 4.7 s (median of 6 runs)</title><circle cx="708.2" cy="1069" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="708.2" cy="1069" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>SQL Server, 16 clerks, everyone sells the best-seller: 95% of orders saved within 11.5 s (median of 6 runs)</title><circle cx="786.5" cy="1000.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="786.5" cy="1000.5" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 4 clerks, everyone sells the best-seller: 95% of orders saved within 2.21 s (median of 6 runs)</title><circle cx="629.8" cy="1093.9" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="629.8" cy="1093.9" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 8 clerks, everyone sells the best-seller: 95% of orders saved within 4.84 s (median of 6 runs)</title><circle cx="708.2" cy="1067.6" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="708.2" cy="1067.6" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>MySQL, 16 clerks, everyone sells the best-seller: 95% of orders saved within 12.2 s (median of 6 runs)</title><circle cx="786.5" cy="994.3" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="786.5" cy="994.3" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 4 clerks, everyone sells the best-seller: 95% of orders saved within 2.02 s (median of 6 runs)</title><circle cx="629.8" cy="1095.8" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="629.8" cy="1095.8" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 8 clerks, everyone sells the best-seller: 95% of orders saved within 4.43 s (median of 6 runs)</title><circle cx="708.2" cy="1071.7" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="708.2" cy="1071.7" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<g><title>PostgreSQL, 16 clerks, everyone sells the best-seller: 95% of orders saved within 9.32 s (median of 6 runs)</title><circle cx="786.5" cy="1022.8" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="786.5" cy="1022.8" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
-<text x="797.5" y="1014.6" font-size="12.5"><tspan font-weight="600" fill="#111827">SQL Server</tspan><tspan fill="#4b5563"> 11.5 s</tspan></text>
-<text x="797.5" y="998.6" font-size="12.5"><tspan font-weight="600" fill="#111827">MySQL</tspan><tspan fill="#4b5563"> 12.2 s</tspan></text>
-<text x="797.5" y="1030.6" font-size="12.5"><tspan font-weight="600" fill="#111827">PostgreSQL</tspan><tspan fill="#4b5563"> 9.32 s</tspan></text>
-<text x="24" y="1179" font-size="12.5" fill="#4b5563">Medians of 6 runs. The 1-clerk point uses the same wall-clock basis as the others. The lowest and highest runs are in the tables above and in each</text>
-<text x="24" y="1196" font-size="12.5" fill="#4b5563">point’s hover text.</text>
+<text x="699.1" y="413.5" font-size="12" text-anchor="middle" fill="#4b5563" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke">runs varied 137–213/min</text>
+<text x="783.9" y="455.7" font-size="12.5"><tspan font-weight="600" fill="#111827">SQL Server</tspan><tspan fill="#4b5563"> 138/min</tspan></text>
+<text x="783.9" y="439.7" font-size="12.5"><tspan font-weight="600" fill="#111827">MySQL</tspan><tspan fill="#4b5563"> 147/min</tspan></text>
+<text x="783.9" y="423.7" font-size="12.5"><tspan font-weight="600" fill="#111827">PostgreSQL</tspan><tspan fill="#4b5563"> 155/min</tspan></text>
+<text x="24" y="617" font-size="13" font-weight="600" fill="#111827">Would users notice the gap?</text>
+<text x="500" y="617" font-size="13" font-weight="600" fill="#111827">Would users notice the gap?</text>
+<line x1="24" y1="627" x2="936" y2="627" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="648.3" font-size="12.5" font-weight="600" fill="#111827">1 clerk</text>
+<text x="24" y="664" font-size="12" fill="#4b5563">judged on</text>
+<text x="24" y="679" font-size="12" fill="#4b5563">time per order</text>
+<rect x="117.9" y="633" width="127.5" height="22" rx="11" fill="#0072B2"/>
+<text x="181.7" y="648.3" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">SQL Server fastest</text>
+<rect x="117.9" y="661" width="130.4" height="22" rx="11" fill="#fbf0d6" stroke="#E69F00" stroke-width="1.5"/>
+<text x="183.1" y="676.3" font-size="12" font-weight="600" text-anchor="middle" fill="#111827">MySQL 20% slower</text>
+<text x="254.3" y="676.3" font-size="12" fill="#4b5563">+145 ms vs SQL Server</text>
+<rect x="117.9" y="689" width="157.8" height="22" rx="11" fill="#f7eaf1" stroke="#CC79A7" stroke-width="1.5"/>
+<text x="196.8" y="704.3" font-size="12" font-weight="600" text-anchor="middle" fill="#111827">PostgreSQL 15% slower</text>
+<text x="281.7" y="704.3" font-size="12" fill="#4b5563">+108 ms vs SQL Server</text>
+<text x="500" y="648.3" font-size="12.5" font-weight="600" fill="#111827">1 clerk</text>
+<text x="593.9" y="648.3" font-size="12" fill="#4b5563">not tested</text>
+<line x1="24" y1="719" x2="936" y2="719" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="740.3" font-size="12.5" font-weight="600" fill="#111827">4 clerks</text>
+<rect x="117.9" y="725" width="32.7" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+<text x="134.3" y="740.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">tie</text>
+<text x="156.6" y="740.3" font-size="12" fill="#4b5563">SQL Server’s runs varied 140–275/min</text>
+<text x="500" y="740.3" font-size="12.5" font-weight="600" fill="#111827">4 clerks</text>
+<rect x="593.9" y="725" width="32.7" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+<text x="610.3" y="740.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">tie</text>
+<text x="632.6" y="740.3" font-size="12" fill="#4b5563">MySQL’s gap is within run-to-run swings</text>
+<line x1="24" y1="755" x2="936" y2="755" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="776.3" font-size="12.5" font-weight="600" fill="#111827">8 clerks</text>
+<rect x="117.9" y="761" width="161.7" height="22" rx="11" fill="#CC79A7"/>
+<text x="198.7" y="776.3" font-size="12" font-weight="600" text-anchor="middle" fill="#111827">PostgreSQL joint fastest</text>
+<rect x="117.9" y="789" width="157" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+<text x="196.4" y="804.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">SQL Server joint fastest</text>
+<text x="280.9" y="804.3" font-size="12" fill="#4b5563">ties with both</text>
+<rect x="117.9" y="817" width="130.4" height="22" rx="11" fill="#fbf0d6" stroke="#E69F00" stroke-width="1.5"/>
+<text x="183.1" y="832.3" font-size="12" font-weight="600" text-anchor="middle" fill="#111827">MySQL 10% slower</text>
+<text x="254.3" y="832.3" font-size="12" fill="#4b5563">vs PostgreSQL only</text>
+<text x="500" y="776.3" font-size="12.5" font-weight="600" fill="#111827">8 clerks</text>
+<rect x="593.9" y="761" width="32.7" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+<text x="610.3" y="776.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">tie</text>
+<text x="632.6" y="776.3" font-size="12" fill="#4b5563">SQL Server’s runs varied 137–213/min</text>
+<line x1="24" y1="847" x2="936" y2="847" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="868.3" font-size="12.5" font-weight="600" fill="#111827">16 clerks</text>
+<rect x="117.9" y="853" width="32.7" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+<text x="134.3" y="868.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">tie</text>
+<text x="156.6" y="868.3" font-size="12" fill="#4b5563">MySQL’s gap is within run-to-run swings</text>
+<text x="500" y="868.3" font-size="12.5" font-weight="600" fill="#111827">16 clerks</text>
+<rect x="593.9" y="853" width="32.7" height="22" rx="11" fill="#ffffff" stroke="#d1d5db" stroke-width="1"/>
+<text x="610.3" y="868.3" font-size="12" font-weight="600" text-anchor="middle" fill="#6b7280">tie</text>
+<text x="632.6" y="868.3" font-size="12" fill="#4b5563">SQL Server’s gap is within run-to-run swings</text>
+<line x1="24" y1="883" x2="936" y2="883" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="919" font-size="15" font-weight="600" fill="#111827">Wait per order: 95% of orders were saved within this many seconds – lower is better</text>
+<text x="24" y="937" font-size="12.5" fill="#4b5563">For information only: whether users would notice a gap is judged on orders per minute, not on this wait. Same scale in both charts.</text>
+<text x="24" y="967" font-size="14" font-weight="600" fill="#111827">Different products</text>
+<line x1="57.5" y1="1133" x2="314.9" y2="1133" stroke="#9ca3af" stroke-width="1"/>
+<text x="49.5" y="1137.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">0 s</text>
+<line x1="57.5" y1="1083" x2="314.9" y2="1083" stroke="#e5e7eb" stroke-width="1"/>
+<text x="49.5" y="1087.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">5 s</text>
+<line x1="57.5" y1="1033" x2="314.9" y2="1033" stroke="#e5e7eb" stroke-width="1"/>
+<text x="49.5" y="1037.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">10 s</text>
+<line x1="57.5" y1="983" x2="314.9" y2="983" stroke="#e5e7eb" stroke-width="1"/>
+<text x="49.5" y="987.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">15 s</text>
+<text x="75.5" y="1151" font-size="12.5" text-anchor="middle" fill="#4b5563">1</text>
+<text x="149.3" y="1151" font-size="12.5" text-anchor="middle" fill="#4b5563">4</text>
+<text x="223.1" y="1151" font-size="12.5" text-anchor="middle" fill="#4b5563">8</text>
+<text x="296.9" y="1151" font-size="12.5" text-anchor="middle" fill="#4b5563">16</text>
+<text x="186.2" y="1183" font-size="12" text-anchor="middle" fill="#4b5563">clerks working non-stop</text>
+<polyline points="75.5,1124 149.3,1117.6 223.1,1081.4 296.9,1024.3" fill="none" stroke="#0072B2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="75.5,1122.9 149.3,1110.1 223.1,1085.5 296.9,1004.6" fill="none" stroke="#E69F00" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="75.5,1123.4 149.3,1114.5 223.1,1089.3 296.9,1014.1" fill="none" stroke="#CC79A7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<g><title>SQL Server, 1 clerk, different products: 95% of orders saved within 0.904 s (median of 6 runs)</title><circle cx="75.5" cy="1124" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="75.5" cy="1124" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>SQL Server, 4 clerks, different products: 95% of orders saved within 1.54 s (median of 6 runs)</title><circle cx="149.3" cy="1117.6" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="149.3" cy="1117.6" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>SQL Server, 8 clerks, different products: 95% of orders saved within 5.16 s (median of 6 runs)</title><circle cx="223.1" cy="1081.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="223.1" cy="1081.4" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>SQL Server, 16 clerks, different products: 95% of orders saved within 10.9 s (median of 6 runs)</title><circle cx="296.9" cy="1024.3" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="296.9" cy="1024.3" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 1 clerk, different products: 95% of orders saved within 1.01 s (median of 6 runs)</title><circle cx="75.5" cy="1122.9" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="75.5" cy="1122.9" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 4 clerks, different products: 95% of orders saved within 2.29 s (median of 6 runs)</title><circle cx="149.3" cy="1110.1" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="149.3" cy="1110.1" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 8 clerks, different products: 95% of orders saved within 4.75 s (median of 6 runs)</title><circle cx="223.1" cy="1085.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="223.1" cy="1085.5" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 16 clerks, different products: 95% of orders saved within 12.8 s (median of 6 runs)</title><circle cx="296.9" cy="1004.6" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="296.9" cy="1004.6" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 1 clerk, different products: 95% of orders saved within 0.962 s (median of 6 runs)</title><circle cx="75.5" cy="1123.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="75.5" cy="1123.4" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 4 clerks, different products: 95% of orders saved within 1.85 s (median of 6 runs)</title><circle cx="149.3" cy="1114.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="149.3" cy="1114.5" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 8 clerks, different products: 95% of orders saved within 4.37 s (median of 6 runs)</title><circle cx="223.1" cy="1089.3" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="223.1" cy="1089.3" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 16 clerks, different products: 95% of orders saved within 11.9 s (median of 6 runs)</title><circle cx="296.9" cy="1014.1" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="296.9" cy="1014.1" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<text x="307.9" y="1034.6" font-size="12.5"><tspan font-weight="600" fill="#111827">SQL Server</tspan><tspan fill="#4b5563"> 10.9 s</tspan></text>
+<text x="307.9" y="1002.6" font-size="12.5"><tspan font-weight="600" fill="#111827">MySQL</tspan><tspan fill="#4b5563"> 12.8 s</tspan></text>
+<text x="307.9" y="1018.6" font-size="12.5"><tspan font-weight="600" fill="#111827">PostgreSQL</tspan><tspan fill="#4b5563"> 11.9 s</tspan></text>
+<text x="500" y="967" font-size="14" font-weight="600" fill="#111827">Everyone sells the best-seller</text>
+<line x1="533.5" y1="1133" x2="790.9" y2="1133" stroke="#9ca3af" stroke-width="1"/>
+<text x="525.5" y="1137.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">0 s</text>
+<line x1="533.5" y1="1083" x2="790.9" y2="1083" stroke="#e5e7eb" stroke-width="1"/>
+<text x="525.5" y="1087.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">5 s</text>
+<line x1="533.5" y1="1033" x2="790.9" y2="1033" stroke="#e5e7eb" stroke-width="1"/>
+<text x="525.5" y="1037.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">10 s</text>
+<line x1="533.5" y1="983" x2="790.9" y2="983" stroke="#e5e7eb" stroke-width="1"/>
+<text x="525.5" y="987.3" font-size="12.5" text-anchor="end" fill="#4b5563" style="font-variant-numeric: tabular-nums">15 s</text>
+<text x="551.5" y="1151" font-size="12.5" text-anchor="middle" fill="#4b5563">1</text>
+<text x="551.5" y="1166" font-size="12" text-anchor="middle" fill="#4b5563">not tested</text>
+<text x="625.3" y="1151" font-size="12.5" text-anchor="middle" fill="#4b5563">4</text>
+<text x="699.1" y="1151" font-size="12.5" text-anchor="middle" fill="#4b5563">8</text>
+<text x="772.9" y="1151" font-size="12.5" text-anchor="middle" fill="#4b5563">16</text>
+<text x="662.2" y="1183" font-size="12" text-anchor="middle" fill="#4b5563">clerks working non-stop</text>
+<polyline points="625.3,1114.4 699.1,1086 772.9,1017.5" fill="none" stroke="#0072B2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="625.3,1110.9 699.1,1084.6 772.9,1011.3" fill="none" stroke="#E69F00" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="625.3,1112.8 699.1,1088.7 772.9,1039.8" fill="none" stroke="#CC79A7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<g><title>SQL Server, 4 clerks, everyone sells the best-seller: 95% of orders saved within 1.86 s (median of 6 runs)</title><circle cx="625.3" cy="1114.4" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="625.3" cy="1114.4" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>SQL Server, 8 clerks, everyone sells the best-seller: 95% of orders saved within 4.7 s (median of 6 runs)</title><circle cx="699.1" cy="1086" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="699.1" cy="1086" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>SQL Server, 16 clerks, everyone sells the best-seller: 95% of orders saved within 11.5 s (median of 6 runs)</title><circle cx="772.9" cy="1017.5" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="772.9" cy="1017.5" r="5" fill="#0072B2" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 4 clerks, everyone sells the best-seller: 95% of orders saved within 2.21 s (median of 6 runs)</title><circle cx="625.3" cy="1110.9" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="625.3" cy="1110.9" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 8 clerks, everyone sells the best-seller: 95% of orders saved within 4.84 s (median of 6 runs)</title><circle cx="699.1" cy="1084.6" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="699.1" cy="1084.6" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>MySQL, 16 clerks, everyone sells the best-seller: 95% of orders saved within 12.2 s (median of 6 runs)</title><circle cx="772.9" cy="1011.3" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="772.9" cy="1011.3" r="5" fill="#E69F00" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 4 clerks, everyone sells the best-seller: 95% of orders saved within 2.02 s (median of 6 runs)</title><circle cx="625.3" cy="1112.8" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="625.3" cy="1112.8" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 8 clerks, everyone sells the best-seller: 95% of orders saved within 4.43 s (median of 6 runs)</title><circle cx="699.1" cy="1088.7" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="699.1" cy="1088.7" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<g><title>PostgreSQL, 16 clerks, everyone sells the best-seller: 95% of orders saved within 9.32 s (median of 6 runs)</title><circle cx="772.9" cy="1039.8" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="772.9" cy="1039.8" r="5" fill="#CC79A7" stroke="#ffffff" stroke-width="2"/></g>
+<text x="783.9" y="1026.7" font-size="12.5"><tspan font-weight="600" fill="#111827">SQL Server</tspan><tspan fill="#4b5563"> 11.5 s</tspan></text>
+<text x="783.9" y="1010.7" font-size="12.5"><tspan font-weight="600" fill="#111827">MySQL</tspan><tspan fill="#4b5563"> 12.2 s</tspan></text>
+<text x="783.9" y="1044.1" font-size="12.5"><tspan font-weight="600" fill="#111827">PostgreSQL</tspan><tspan fill="#4b5563"> 9.32 s</tspan></text>
+<text x="24" y="1213" font-size="12.5" fill="#4b5563">Medians of 6 runs. The 1-clerk point uses the same wall-clock basis as the others. The lowest and highest runs are in the result tables (for 1 clerk,</text>
+<text x="24" y="1230" font-size="12.5" fill="#4b5563">as the time per order).</text>
 </g>
 </svg>

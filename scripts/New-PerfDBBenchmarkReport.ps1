@@ -2635,14 +2635,30 @@ function Get-CardAxis {
 }
 
 function Get-CardNudged {
-    # Label centres at least Gap apart, in the order of Y, kept inside [Lo, Hi] when there is room.
+    # Label centres at least Gap apart, in the order of Y. Labels that would overlap are spread evenly around the mean of
+    # their own Y (the least total shift, so each label stays level with its own marker), then kept inside [Lo, Hi] when
+    # there is room.
     param([double[]]$Y, [double]$Gap, [double]$Lo, [double]$Hi)
     $n = $Y.Count
     $out = New-Object 'double[]' $n
     if ($n -eq 0) { return , $out }
     $order = @(0..($n - 1) | Sort-Object @{ Expression = { $Y[$_] } }, @{ Expression = { $_ } })
+    # groups of touching labels: first position in $order, count, and the sum of (Y - position in group * Gap), whose
+    # mean is the centre of the group's first label
+    $grp = New-Object System.Collections.ArrayList
+    for ($k = 0; $k -lt $n; $k++) {
+        [void]$grp.Add(@{ first = $k; count = 1; sum = [double]$Y[$order[$k]] })
+        while ($grp.Count -ge 2) {
+            $a = $grp[$grp.Count - 2]; $b = $grp[$grp.Count - 1]
+            if (($a.sum / $a.count) + $a.count * $Gap -le ($b.sum / $b.count) + 1e-9) { break }
+            $a.sum += $b.sum - $b.count * $a.count * $Gap
+            $a.count += $b.count
+            $grp.RemoveAt($grp.Count - 1)
+        }
+    }
+    foreach ($g in $grp) { $t0 = $g.sum / $g.count; for ($j = 0; $j -lt $g.count; $j++) { $out[$order[$g.first + $j]] = $t0 + $j * $Gap } }
     $prev = [double]::NegativeInfinity
-    foreach ($i in $order) { $v = [Math]::Max([Math]::Max($Y[$i], $Lo), $prev + $Gap); $out[$i] = $v; $prev = $v }
+    foreach ($i in $order) { $v = [Math]::Max([Math]::Max($out[$i], $Lo), $prev + $Gap); $out[$i] = $v; $prev = $v }
     $next = [double]::PositiveInfinity
     for ($k = $order.Count - 1; $k -ge 0; $k--) { $i = $order[$k]; $v = [Math]::Min([Math]::Min($out[$i], $Hi), $next - $Gap); $out[$i] = $v; $next = $v }
     return , $out
@@ -2673,28 +2689,42 @@ function Get-ScalingNoteText {
 function Get-ScalingVerdictItems {
     <#
       The verdict of one number of clerks, for the rows under the orders charts: the scorecard's states
-      (Get-ScorecardCellStates) with the database named in each chip. A noticeable difference gives coloured chips
-      ("SQL Server fastest", "MySQL 10% slower" with the scorecard's grey note "vs PostgreSQL only") and a grey line for a
-      database that ties with the others; otherwise one grey "tie" chip with the scorecard's notes on ties that look like
-      gaps. Failed saves or a different answer: "not ranked"; not comparable or results differ: "n/a" (all grey).
+      (Get-ScorecardCellStates) with the database named in each chip. A noticeable difference gives the scorecard's
+      chips: coloured "SQL Server fastest", an uncoloured "SQL Server joint fastest" for a database in the fastest group
+      that ties with every other one, tinted "MySQL 10% slower" with the grey note "vs PostgreSQL only", and a grey line
+      for a database that ties with the others; otherwise one grey "tie" chip with the scorecard's notes on ties that look
+      like gaps. Failed saves or a different answer: "not ranked"; not comparable or results differ: "n/a" (all grey).
+      No test at this number of clerks: "not tested".
     #>
     param($M)
-    if ($null -eq $M) { return @{ kind = 'text'; engine = ''; chip = ''; note = 'no run' } }
+    if ($null -eq $M) { return @{ kind = 'text'; engine = ''; chip = ''; note = 'not tested' } }
     if (-not $M.comparable) { return @{ kind = 'na'; engine = ''; chip = 'n/a'; note = ('not comparable: ' + [string]$M.verdict.reason) } }
     if ($M.resultsDiffer) { return @{ kind = 'na'; engine = ''; chip = 'n/a'; note = 'results differ: no speed verdict' } }
     $st = Get-ScorecardCellStates $M
     $ranked = @($M.ranked)
     $items = @()
     if (@($M.noticeablePairs).Count -gt 0) {
-        foreach ($k in @('fastest', 'slower')) {
-            foreach ($e in @($st.Keys | Where-Object { $st[$_].kind -eq $k })) { $items += @{ kind = $k; engine = $e; chip = ((Get-EngineName $e) + ' ' + $st[$e].chip); note = [string]$st[$e].note } }
+        # who a database ties with: "both", "all the others" or their names
+        $tiesWith = {
+            param([string]$E)
+            $others = @($ranked | Where-Object { $_ -ne $E })
+            $with = @($others | Where-Object { $q = Find-ChartPair $M $E $_; -not ($q -and $q.noticeable) })
+            if ($with.Count -eq 0) { return '' }
+            if ($with.Count -eq $others.Count -and $others.Count -eq 2) { return 'both' }
+            if ($with.Count -eq $others.Count -and $others.Count -gt 2) { return 'all the others' }
+            return (Join-EngineNames $with)
         }
-        foreach ($e in @($st.Keys | Where-Object { $st[$_].kind -eq 'joint' -or $st[$_].kind -eq 'tie' })) {
-            $others = @($ranked | Where-Object { $_ -ne $e })
-            $with = @($others | Where-Object { $q = Find-ChartPair $M $e $_; -not ($q -and $q.noticeable) })
-            if ($with.Count -eq 0) { continue }
-            $who = if ($with.Count -eq $others.Count -and $others.Count -eq 2) { 'both' } elseif ($with.Count -eq $others.Count -and $others.Count -gt 2) { 'all the others' } else { Join-EngineNames $with }
-            $items += @{ kind = 'text'; engine = $e; chip = ''; note = ((Get-EngineName $e) + ' ties with ' + $who) }
+        foreach ($k in @('fastest', 'joint', 'slower')) {
+            foreach ($e in @($st.Keys | Where-Object { $st[$_].kind -eq $k })) {
+                $note = [string]$st[$e].note
+                if ($k -eq 'joint') { $tw = & $tiesWith $e; if ($tw) { $note = (@(('ties with ' + $tw), $note) | Where-Object { $_ }) -join '; ' } }
+                $items += @{ kind = $k; engine = $e; chip = ((Get-EngineName $e) + ' ' + $st[$e].chip); note = $note }
+            }
+        }
+        foreach ($e in @($st.Keys | Where-Object { $st[$_].kind -eq 'tie' })) {
+            $tw = & $tiesWith $e
+            if (-not $tw) { continue }
+            $items += @{ kind = 'text'; engine = $e; chip = ''; note = (@(((Get-EngineName $e) + ' ties with ' + $tw), [string]$st[$e].note) | Where-Object { $_ }) -join '; ' }
         }
     }
     elseif ($ranked.Count -ge 2) {
@@ -2746,13 +2776,46 @@ function Get-ScalingVerdictFlow {
     return @{ svg = $sb.ToString(); height = ($cy + 11.0 - $Top) }
 }
 
+function Get-ScalingEnds {
+    # The end label of every line: the database name and the value at its last point.
+    param([hashtable]$P)
+    $SAFE = $script:CardSafe
+    $ends = @()
+    foreach ($e in @($P.engines)) {
+        $vals = $P.values[$e]
+        if (-not $vals) { continue }
+        $last = @(@($P.xs) | Where-Object { $vals.ContainsKey($_) }) | Select-Object -Last 1
+        if ($null -eq $last) { continue }
+        $vt = [string](& $P.fmt $vals[$last])
+        $ends += @{ engine = $e; users = $last; text = $vt; w = ((Get-CardTextWidth (Get-EngineName $e) 12.5 $true) + (Get-CardTextWidth (' ' + $vt) 12.5 $false)) * $SAFE }
+    }
+    return $ends
+}
+
+function Get-ScalingInsets {
+    # The room a scaling panel needs left of its plot (the value-axis labels) and right of it (the end labels).
+    # New-ScalingChart takes the largest over all panels, so every panel puts the numbers of clerks at the same x.
+    param([hashtable]$P)
+    $SAFE = $script:CardSafe
+    $ax = $P.axis
+    $nT = [int][Math]::Round($ax.max / $ax.step)
+    $tickW = 0.0
+    for ($k = 0; $k -le $nT; $k++) { $tickW = [Math]::Max($tickW, (Get-CardTextWidth ([string](& $P.tick ($k * $ax.step))) 12.5 $false) * $SAFE) }
+    $labW = 0.0
+    foreach ($l in @(Get-ScalingEnds $P)) { $labW = [Math]::Max($labW, $l.w) }
+    return @{ left = ($tickW + 8); right = ($labW + 12) }
+}
+
 function Get-ScalingPanel {
     <#
       One small multiple of the scaling chart: one solid 2 px line per database in its colour with 8 px markers (hover:
-      the exact value), the database name and last value at the line end (nudged apart), solid hairline gridlines from
-      zero, the numbers of clerks at shared ordinal positions and "no run" under a number of clerks this variant did not
-      run. P: x, top, width, plotH, axis (step, max), xs, engines, values (engine -> users -> value), ran (users -> $true),
-      fmt and tick (value and axis label scriptblocks), tips ('engine|users' -> hover text).
+      the exact value), the database name and last value at the line end (nudged apart, each level with its own line
+      where there is room), solid hairline gridlines from zero, the numbers of clerks at shared ordinal positions and
+      "not tested" under a number of clerks this variant did not run. P: x, top, width, plotH, axis (step, max), xs,
+      engines, values (engine -> users -> value), ran (users -> $true), fmt and tick (value and axis label scriptblocks),
+      tips ('engine|users' -> hover text). Optional: insets (left, right; the same for every panel), lowCaption (the
+      axis caption on its own line, as in a panel with "not tested"), notes ('engine|users' -> a short grey note beside
+      that point, such as "runs varied 140-275/min").
     #>
     param([hashtable]$P)
     $Pal = $script:CardColors; $SAFE = $script:CardSafe
@@ -2760,21 +2823,10 @@ function Get-ScalingPanel {
     $ax = $P.axis; $xs = @($P.xs); $engs = @($P.engines)
     $sb = New-Object System.Text.StringBuilder
     $nT = [int][Math]::Round($ax.max / $ax.step)
-    $tickW = 0.0
-    for ($k = 0; $k -le $nT; $k++) { $tickW = [Math]::Max($tickW, (Get-CardTextWidth ([string](& $P.tick ($k * $ax.step))) 12.5 $false) * $SAFE) }
-    $plotL = $x + $tickW + 8
-    # end labels: database name and the value at its last point
-    $ends = @()
-    foreach ($e in $engs) {
-        $vals = $P.values[$e]
-        if (-not $vals) { continue }
-        $last = @($xs | Where-Object { $vals.ContainsKey($_) }) | Select-Object -Last 1
-        if ($null -eq $last) { continue }
-        $vt = [string](& $P.fmt $vals[$last])
-        $ends += @{ engine = $e; users = $last; text = $vt; w = ((Get-CardTextWidth (Get-EngineName $e) 12.5 $true) + (Get-CardTextWidth (' ' + $vt) 12.5 $false)) * $SAFE }
-    }
-    $labW = 0.0; foreach ($l in $ends) { $labW = [Math]::Max($labW, $l.w) }
-    $plotR = $x + $pw - $labW - 12
+    $ins = if ($P.insets) { $P.insets } else { Get-ScalingInsets $P }
+    $plotL = $x + [double]$ins.left
+    $plotR = $x + $pw - [double]$ins.right
+    $ends = @(Get-ScalingEnds $P)
     $xpos = @{}
     for ($i = 0; $i -lt $xs.Count; $i++) { $xpos[$xs[$i]] = $(if ($xs.Count -le 1) { ($plotL + $plotR) / 2.0 } else { $plotL + 18 + $i * ($plotR - $plotL - 36) / ($xs.Count - 1) }) }
     $yOf = { param($v) $top + $ph - ([double]$v / [double]$ax.max) * $ph }
@@ -2786,20 +2838,16 @@ function Get-ScalingPanel {
         [void]$sb.Append(('<line x1="{0}" y1="{1}" x2="{2}" y2="{1}" stroke="{3}" stroke-width="1"/>' -f (Format-SvgNum $plotL), (Format-SvgNum $gy), (Format-SvgNum $plotR), $stroke) + "`n")
         [void]$sb.Append((Get-CardText ($plotL - 8) ($gy + 4.3) ([string](& $P.tick ($k * $ax.step))) 12.5 $Pal.ink2 '' 'end' ' style="font-variant-numeric: tabular-nums"'))
     }
-    # numbers of clerks; "no run" where this variant has no run
+    # numbers of clerks; "not tested" where this variant has no run. The caption then goes on its own line, in every
+    # panel of the row (lowCaption), so it never reads as one phrase with "not tested".
     $by = $top + $ph + 18
-    $noRun = @()
+    $noRun = 0
     foreach ($u in $xs) {
         [void]$sb.Append((Get-CardText $xpos[$u] $by ([string]$u) 12.5 $Pal.ink2 '' 'middle'))
-        if (-not $P.ran.ContainsKey($u)) { [void]$sb.Append((Get-CardText $xpos[$u] ($by + 15) 'no run' 12 $Pal.ink2 '' 'middle')); $noRun += $xpos[$u] }
+        if (-not $P.ran.ContainsKey($u)) { [void]$sb.Append((Get-CardText $xpos[$u] ($by + 15) 'not tested' 12 $Pal.ink2 '' 'middle')); $noRun++ }
     }
-    $cap = 'clerks working non-stop'
-    $capW = (Get-CardTextWidth $cap 12 $false) * $SAFE
-    $capX = ($plotL + $plotR) / 2.0
-    $runW = (Get-CardTextWidth 'no run' 12 $false) * $SAFE
-    $capY = $by + 15
-    foreach ($nx in $noRun) { if ([Math]::Abs($nx - $capX) -lt ($capW + $runW) / 2.0 + 8) { $capY = $by + 30 } }
-    [void]$sb.Append((Get-CardText $capX $capY $cap 12 $Pal.ink2 '' 'middle'))
+    $capY = if ($P.lowCaption -or $noRun -gt 0) { $by + 32 } else { $by + 15 }
+    [void]$sb.Append((Get-CardText (($plotL + $plotR) / 2.0) $capY 'clerks working non-stop' 12 $Pal.ink2 '' 'middle'))
 
     # lines (broken where a value is missing), then markers on top
     foreach ($e in $engs) {
@@ -2819,6 +2867,30 @@ function Get-ScalingPanel {
             if (-not $vals.ContainsKey($u)) { continue }
             $mx = Format-SvgNum $xpos[$u]; $my = Format-SvgNum (& $yOf $vals[$u])
             [void]$sb.Append(('<g><title>{0}</title><circle cx="{1}" cy="{2}" r="11" fill="#ffffff" fill-opacity="0"/><circle cx="{1}" cy="{2}" r="5" fill="{3}" stroke="{4}" stroke-width="2"/></g>' -f (ConvertTo-XmlText ([string]$P.tips[$e + '|' + $u])), $mx, $my, (Get-EngineColor $e), $Pal.surface) + "`n")
+        }
+    }
+    # grey notes beside single points ("runs varied 140-275/min"): above the marker, or below it when another marker
+    # or the top of the plot is in the way; a card-coloured halo keeps them readable where a line passes
+    if ($P.notes) {
+        foreach ($key in @($P.notes.Keys | Sort-Object)) {
+            $parts = ([string]$key).Split('|'); $e = $parts[0]; $u = [int]$parts[1]
+            $vals = $P.values[$e]
+            if (-not $vals -or -not $vals.ContainsKey($u) -or -not $xpos.ContainsKey($u)) { continue }
+            $nt = [string]$P.notes[$key]
+            $mx = [double]$xpos[$u]; $my = [double](& $yOf $vals[$u])
+            $anc = 'middle'; $tx = $mx
+            if ($u -eq $xs[0]) { $anc = 'start'; $tx = $mx - 6 }
+            elseif ($u -eq $xs[-1]) { $anc = 'end'; $tx = $mx + 6 }
+            $others = @($engs | Where-Object { $_ -ne $e -and $P.values[$_] -and $P.values[$_].ContainsKey($u) } | ForEach-Object { [double](& $yOf $P.values[$_][$u]) })
+            $base = $null
+            foreach ($cand in @(($my - 11), ($my + 21))) {
+                $bt = $cand - 10; $bb = $cand + 3
+                if ($bt -lt $top - 4 -or $bb -gt $top + $ph) { continue }
+                if (@($others | Where-Object { $_ -ge $bt - 7 -and $_ -le $bb + 7 }).Count -gt 0) { continue }
+                $base = $cand; break
+            }
+            if ($null -eq $base) { $base = $my - 11 }
+            [void]$sb.Append((Get-CardText $tx $base $nt 12 $Pal.ink2 '' $anc (' stroke="' + $Pal.surface + '" stroke-width="3" stroke-linejoin="round" paint-order="stroke"')))
         }
     }
     # end labels, nudged apart in the order of the line ends
@@ -2857,7 +2929,8 @@ function Get-ScalingHeadline {
         if ($o.ContainsKey($u0) -and $o.ContainsKey($u1) -and $o[$u0] -gt 0) { $rise += ($o[$u1] / $o[$u0]) }
         foreach ($u in $later) { if ($o.ContainsKey($u)) { $after += $o[$u] } }
     }
-    $flat = $null
+    # fell: a database and variant whose later medians drop the same share or more below its own second-step value
+    $flat = $null; $fell = $false
     if ($later.Count -gt 0) {
         $n = 0; $flat = $true
         foreach ($k in $ordK) {
@@ -2867,6 +2940,7 @@ function Get-ScalingHeadline {
             if ($lv.Count -eq 0) { continue }
             $n++
             if (100.0 * ([double]($lv | Measure-Object -Maximum).Maximum / $o[$u1] - 1.0) -ge $rel) { $flat = $false }
+            if (100.0 * (1.0 - [double]($lv | Measure-Object -Minimum).Minimum / $o[$u1]) -ge $rel) { $fell = $true }
         }
         if ($n -eq 0) { $flat = $null }
     }
@@ -2881,7 +2955,8 @@ function Get-ScalingHeadline {
     $second = $null
     if ($flat -eq $true -and $after.Count -gt 0) {
         $second = 'more clerks did not raise it by another ' + (Format-Pct $rel) + ' on any database (' + (Format-CardRange $after $sig) + ' per minute with ' + $lw + ')'
-        $s1 = $(if ($first) { $first + ', but ' + $second } else { (Get-CardCapitalized $second) }) + '.'
+        if ($fell) { $s1 = $(if ($first) { $first + ', then levelled off or fell back: ' + $second } else { 'Orders per minute levelled off or fell back after ' + (Get-ClerksText $u1) + ': ' + $second }) + '.' }
+        else { $s1 = $(if ($first) { $first + ', but ' + $second } else { (Get-CardCapitalized $second) }) + '.' }
     }
     elseif ($after.Count -gt 0) {
         $second = 'with ' + $lw + ' the databases saved ' + (Format-CardRange $after $sig) + ' orders per minute'
@@ -2980,24 +3055,37 @@ function New-ScalingChart {
         [void]$out.Append((Get-CardText ($x + 20) $y (Get-EngineName $e) 13 $Pal.ink '600'))
         $x += 20 + (Get-CardTextWidth (Get-EngineName $e) 13 $true) * $SAFE + 22
     }
-    $leg = 'Line colour = database (identity, not a verdict). The rows under each orders chart say whether users would notice the gap at that number of clerks.'
+    $leg = 'Line colour only tells the databases apart; it is not a verdict. The rows under each orders chart say whether users would notice the gap at that number of clerks.'
     $y += 6
     foreach ($l in (Get-CardWrap $leg 13 $false $INNER)) { $y += 19; [void]$out.Append((Get-CardText $PAD $y $l 13 $Pal.ink2)) }
     $y += 16
     [void]$out.Append(('<line x1="{0}" y1="{1}" x2="{2}" y2="{1}" stroke="{3}" stroke-width="1.5"/>' -f $PAD, (Format-SvgNum $y), ($W - $PAD), $Pal.ink) + "`n")
 
-    $engTips = @{}
-    foreach ($e in $engs) { $engTips[$e] = Get-EngineName $e }
     $rows = @(
         @{ key = 'ord'; axis = $axOrd; plotH = 180.0
             head = ('Orders per minute, whole team ' + $script:NDASH + ' higher is better'); note = 'Same scale in both charts.'
             fmt = { param($v) (Format-Sig3 $v) + '/min' }; tick = { param($v) Format-Sig3 $v } },
         @{ key = 'wait'; axis = $axWait; plotH = 150.0
             head = ('Wait per order: 95% of orders were saved within this many seconds ' + $script:NDASH + ' lower is better')
-            note = 'Descriptive only: the tie rule is applied to orders per minute, not to this wait. Same scale in both charts.'
+            note = 'For information only: whether users would notice a gap is judged on orders per minute, not on this wait. Same scale in both charts.'
             fmt = { param($v) (Format-Sig3 $v) + ' s' }; tick = { param($v) (Format-Sig3 $v) + ' s' } }
     )
     if ($nV -eq 1) { foreach ($r in $rows) { $r.note = $r.note.Replace(' Same scale in both charts.', '').Replace('Same scale in both charts.', '') } }
+    # the values of every panel; one pair of insets for all panels, so the numbers of clerks line up in all four; the
+    # axis caption on its own line in every panel when any variant has a number of clerks it did not run
+    $panelVals = @{}
+    $insL = 0.0; $insR = 0.0
+    foreach ($row in $rows) {
+        foreach ($v in $variants) {
+            $values = @{}
+            foreach ($e in $engs) { $k = $row.key + '|' + $v.key + '|' + $e; if ($val.ContainsKey($k)) { $values[$e] = $val[$k] } }
+            $panelVals[$row.key + '|' + $v.key] = $values
+            $ins = Get-ScalingInsets @{ axis = $row.axis; tick = $row.tick; fmt = $row.fmt; xs = $xs; engines = $engs; values = $values }
+            $insL = [Math]::Max($insL, $ins.left); $insR = [Math]::Max($insR, $ins.right)
+        }
+    }
+    $insets = @{ left = $insL; right = $insR }
+    $lowCap = @($variants | Where-Object { $rk = $ran[$_.key]; @($xs | Where-Object { -not $rk.ContainsKey($_) }).Count -gt 0 }).Count -gt 0
     $descParts = @()
     foreach ($row in $rows) {
         # row title
@@ -3012,8 +3100,7 @@ function New-ScalingChart {
             $py = $y + 16
             [void]$out.Append((Get-CardText $px $py $v.head 14 $Pal.ink '600'))
             if ($row.key -eq 'ord') { $py += 17; [void]$out.Append((Get-CardText $px $py $v.sub 12 $Pal.ink2)) }
-            $values = @{}
-            foreach ($e in $engs) { $k = $row.key + '|' + $v.key + '|' + $e; if ($val.ContainsKey($k)) { $values[$e] = $val[$k] } }
+            $values = $panelVals[$row.key + '|' + $v.key]
             # hover text of every marker: the exact median, and for orders per minute the lowest and highest run
             $tips = @{}
             foreach ($e in @($values.Keys)) {
@@ -3023,12 +3110,22 @@ function New-ScalingChart {
                     if ($row.key -eq 'wait') { $t += '95% of orders saved within ' + (Format-Sig3 $values[$e][$u]) + ' s (median of ' + [string]$pt.n + ' runs)' }
                     else {
                         $t += 'median ' + (Format-Sig3 $values[$e][$u]) + ' orders/min'
-                        if ($null -ne $pt.min -and $null -ne $pt.max) { $t += ' (lowest' + $script:NDASH + 'highest run ' + (Format-Sig3 $pt.min) + $script:NDASH + (Format-Sig3 $pt.max) + ')' }
+                        if ($null -ne $pt.min -and $null -ne $pt.max) { $t += ' (lowest' + $script:NDASH + 'highest run ' + (Format-Sig3 $pt.min) + $script:NDASH + (Format-Sig3 $pt.max) + $(if ($pt.basis) { ', on this wall-clock basis' } else { '' }) + ')' }
                     }
                     $tips[$e + '|' + $u] = $t
                 }
             }
-            $panel = Get-ScalingPanel @{ x = $px; top = ($py + 16); width = $PW; plotH = $row.plotH; axis = $row.axis; xs = $xs; engines = $engs; values = $values; ran = $ran[$v.key]; fmt = $row.fmt; tick = $row.tick; tips = $tips }
+            # a grey note beside a point whose own runs varied widely, in the scorecard's words (orders per minute only)
+            $notes = @{}
+            if ($row.key -eq 'ord') {
+                foreach ($u in $xs) {
+                    $m = $models[$v.key + '|' + $u]
+                    if (-not $m -or -not $m.higher -or -not $m.comparable -or $m.resultsDiffer) { continue }
+                    $st = Get-ScorecardCellStates $m
+                    foreach ($e in @($values.Keys)) { if ($values[$e].ContainsKey($u) -and $st.Contains($e) -and ([string]$st[$e].note) -like 'runs varied*') { $notes[$e + '|' + $u] = [string]$st[$e].note } }
+                }
+            }
+            $panel = Get-ScalingPanel @{ x = $px; top = ($py + 16); width = $PW; plotH = $row.plotH; axis = $row.axis; xs = $xs; engines = $engs; values = $values; ran = $ran[$v.key]; fmt = $row.fmt; tick = $row.tick; tips = $tips; insets = $insets; lowCaption = $lowCap; notes = $notes }
             [void]$out.Append($panel.svg)
             $bottom = [Math]::Max($bottom, $panel.bottom)
             foreach ($e in $engs) {
@@ -3039,8 +3136,15 @@ function New-ScalingChart {
         $y = $bottom
 
         if ($row.key -eq 'ord') {
-            # the verdict rows: one line per number of clerks, aligned across the columns
+            # the verdict rows: one line per number of clerks, aligned across the columns. A verdict judged on another
+            # measure (the 1-clerk Order entry test: time per order) says so under the number of clerks.
+            $subOf = {
+                param($M)
+                if (-not $M -or $M.higher) { return @() }
+                return @('judged on', ('time per ' + ((([string]$M.spec.per) -replace '^per\s+', '') -split ' ')[0]))
+            }
             $LABEL_W = 74.0
+            foreach ($mk in @($models.Keys)) { foreach ($sl in @(& $subOf $models[$mk])) { $LABEL_W = [Math]::Max($LABEL_W, (Get-CardTextWidth $sl 12 $false) * $SAFE + 10) } }
             $y += 22
             for ($vi = 0; $vi -lt $nV; $vi++) { [void]$out.Append((Get-CardText ($PAD + $vi * ($PW + $GAP)) $y 'Would users notice the gap?' 13 $Pal.ink '600')) }
             $y += 10
@@ -3052,16 +3156,16 @@ function New-ScalingChart {
                     $items = @(Get-ScalingVerdictItems $m)
                     $px = $PAD + $vi * ($PW + $GAP)
                     $lay = Get-ScalingVerdictFlow $items ($px + $LABEL_W) ($y + 6) ($PW - $LABEL_W)
-                    $sl = $(if ($m -and -not $m.higher) { 'per ' + ((([string]$m.spec.per) -replace '^per\s+', '') -split ' ')[0] } else { '' })
+                    $sl = @(& $subOf $m)
                     $lays += @{ x = $px; lay = $lay; sub = $sl }
-                    # the content starts 6 px below the separator; a sub-label ("per order") ends at about 41 px
-                    $h = [Math]::Max($h, [Math]::Max(6 + $lay.height, $(if ($sl) { 41.0 } else { 0.0 })))
-                    if ($m) { $descParts += ($v.head + ', ' + (Get-ClerksText $u) + ' verdict' + $(if ($sl) { ' (' + $sl + ')' } else { '' }) + ': ' + (Get-ScalingVerdictText $items)) }
+                    # the content starts 6 px below the separator; each sub-label line adds 15 px below the clerks (at 21 px)
+                    $h = [Math]::Max($h, [Math]::Max(6 + $lay.height, $(if ($sl.Count) { 26.0 + 15 * $sl.Count } else { 0.0 })))
+                    if ($m) { $descParts += ($v.head + ', ' + (Get-ClerksText $u) + ' verdict' + $(if ($sl.Count) { ' (' + ($sl -join ' ') + ')' } else { '' }) + ': ' + (Get-ScalingVerdictText $items)) }
                 }
                 [void]$out.Append(('<line x1="{0}" y1="{1}" x2="{2}" y2="{1}" stroke="{3}" stroke-width="1"/>' -f $PAD, (Format-SvgNum $y), ($W - $PAD), $Pal.hair) + "`n")
                 foreach ($l in $lays) {
                     [void]$out.Append((Get-CardText $l.x ($y + 21.3) (Get-ClerksText $u) 12.5 $Pal.ink '600'))
-                    if ($l.sub) { [void]$out.Append((Get-CardText $l.x ($y + 37) $l.sub 12 $Pal.ink2)) }
+                    for ($si = 0; $si -lt @($l.sub).Count; $si++) { [void]$out.Append((Get-CardText $l.x ($y + 37 + 15 * $si) ([string]@($l.sub)[$si]) 12 $Pal.ink2)) }
                     [void]$out.Append($l.lay.svg)
                 }
                 $y += $h + 8
@@ -3073,8 +3177,8 @@ function New-ScalingChart {
 
     # footnote
     $y += 26
-    $foot = 'Medians of ' + $runs + '. The 1-clerk point uses the same wall-clock basis as the others. The lowest and highest runs are in the tables above and in each point' + $ap + 's hover text.'
-    if (-not $ran.Count -or -not (@($ran.Values | Where-Object { $_.ContainsKey(1) }).Count)) { $foot = 'Medians of ' + $runs + '. The lowest and highest runs are in the tables above and in each point' + $ap + 's hover text.' }
+    $foot = 'Medians of ' + $runs + '. The 1-clerk point uses the same wall-clock basis as the others. The lowest and highest runs are in the result tables (for 1 clerk, as the time per order).'
+    if (-not $ran.Count -or -not (@($ran.Values | Where-Object { $_.ContainsKey(1) }).Count)) { $foot = 'Medians of ' + $runs + '. The lowest and highest runs are in the result tables.' }
     foreach ($l in (Get-CardWrap $foot 12.5 $false $INNER)) { [void]$out.Append((Get-CardText $PAD $y $l 12.5 $Pal.ink2)); $y += 17 }
     $H = [int][Math]::Ceiling($y - 17 + $PAD)
 
@@ -3100,12 +3204,14 @@ function New-SpeedupChart {
     $tests = [ordered]@{}; foreach ($t in @($A.tests)) { $tests[[string]$t.code] = $t }
     $cellOf = { param([string]$Code, [string]$Engine) if ($A.cells -and $Code) { @(@($A.cells[$Code]) | Where-Object { $_ -and $_.engine -eq $Engine })[0] } }
 
-    # the operations: those with a speed-up, then any other platform-basics pair of 1- and 8-worker tests
-    $prefixes = @($rows | ForEach-Object { [string]$_.prefix } | Select-Object -Unique)
+    # the operations in the catalog's order (as on the family chart): every platform-basics pair of 1- and 8-worker
+    # tests, then any speed-up whose tests are not in the catalog
+    $prefixes = @()
     foreach ($code in @($tests.Keys)) {
         $t = $tests[$code]
         if ($t.family -eq 'Core' -and $code -match '^(.+)_1U$') { $px = $Matches[1]; if ($tests.Contains($px + '_8U') -and $prefixes -notcontains $px) { $prefixes += $px } }
     }
+    foreach ($px in @($rows | ForEach-Object { [string]$_.prefix } | Select-Object -Unique)) { if ($prefixes -notcontains $px) { $prefixes += $px } }
     $ops = @(); $models = @()
     foreach ($px in $prefixes) {
         $t1 = $tests[$px + '_1U']; $t8 = $tests[$px + '_8U']
@@ -3136,7 +3242,8 @@ function New-SpeedupChart {
             }
             $vals[$e] = @{ s = $s; r = $r; why = $why }
         }
-        $ops += [pscustomobject]@{ prefix = $px; name = $name; n1 = $n1; n8 = $n8; spec1 = $s1; spec8 = $s8; vals = $vals }
+        $per = if ($s1) { [string]$s1.per } elseif ($s8) { [string]$s8.per } else { '' }
+        $ops += [pscustomobject]@{ prefix = $px; name = $name; n1 = $n1; n8 = $n8; spec1 = $s1; spec8 = $s8; per = $per; vals = $vals }
     }
     $nW = 8; $n1 = 1
     if ($ops.Count) { $nW = [int](@($ops | ForEach-Object { $_.n8 }) | Measure-Object -Maximum).Maximum; $n1 = [int](@($ops | ForEach-Object { $_.n1 }) | Measure-Object -Minimum).Minimum }
@@ -3170,14 +3277,23 @@ function New-SpeedupChart {
 
     # headline
     $workersTxt = 'with one job shared by ' + $nW + ' workers'
+    # jobs (operation and database) without a speed-up: the headline's range covers only the others and says so
+    $missing = @($ops | ForEach-Object { $o = $_; @($o.vals.Values | Where-Object { $null -eq $_.s -and $_.why -ne 'no result' }) })
+    $nJobs = @($ops | ForEach-Object { $o = $_; @($o.vals.Values | Where-Object { $_.why -ne 'no result' }) }).Count
     if ($finite.Count -eq 0) { $headline = 'No speed-up could be computed: no job has a result with both ' + $w1 + ' and ' + $nW + ' workers.' }
     else {
         $lo = [double]($finite | Measure-Object -Minimum).Minimum; $hi = [double]($finite | Measure-Object -Maximum).Maximum
         $rng = (Format-CardRange $finite { param($v) Format-Dec1 $v }) + $script:TIMES
         $perfect = ' (' + $nW + $script:TIMES + ' would be a perfect split)'
-        if ($lo -ge 1.05 -and $hi -lt $nW / 2.0) { $headline = 'Yes, but far from ' + $nW + $script:TIMES + ': ' + $workersTxt + ', each job finished ' + $rng + ' faster than with ' + $w1 + $perfect + '.' }
-        elseif ($lo -ge 1.05) { $headline = 'Yes: ' + $workersTxt + ', each job finished ' + $rng + ' faster than with ' + $w1 + $perfect + '.' }
+        $each = if ($missing.Count) { 'each job with a result for both finished' } else { 'each job finished' }
+        if ($lo -ge 1.05 -and $hi -lt $nW / 2.0) { $headline = 'Yes, but far from ' + $nW + $script:TIMES + ': ' + $workersTxt + ', ' + $each + ' ' + $rng + ' faster than with ' + $w1 + $perfect + '.' }
+        elseif ($lo -ge 1.05) { $headline = 'Yes: ' + $workersTxt + ', ' + $each + ' ' + $rng + ' faster than with ' + $w1 + $perfect + '.' }
         else { $headline = 'Not always: ' + $workersTxt + ', jobs finished at ' + $rng + ' the speed of ' + $w1 + $perfect + '; below 1' + $script:TIMES + ' is slower.' }
+        if ($missing.Count) {
+            $whys = @($missing | ForEach-Object { [string]$_.why } | Where-Object { $_ -and $_ -ne 'no speed-up' } | Select-Object -Unique)
+            if ($whys.Count -and @($missing | Where-Object { [string]$_.why -eq 'no speed-up' }).Count) { $whys += 'no valid speed-up' }
+            $headline += ' ' + $missing.Count + ' of ' + $nJobs + ' jobs have no speed-up' + $(if ($whys.Count) { ' (' + ($whys -join '; ') + ')' } else { '' }) + '.'
+        }
         $cores = Get-AppCoresPhrase $A
         if ($cores) { $headline += ' Acumatica ran on ' + $cores + ', which limits the gain.' }
     }
@@ -3188,14 +3304,14 @@ function New-SpeedupChart {
     [void]$out.Append((Get-CardText $PAD $y $title 21 $Pal.ink '600'))
     $y += 4
     foreach ($l in (Get-CardWrap $headline 16 $true ($W - 2 * $PAD))) { $y += 22; [void]$out.Append((Get-CardText $PAD $y $l 16 $Pal.ink '600')) }
-    $sub = 'Acumatica 2026 R2 ' + $script:MIDDOT + ' median of ' + (Get-RunsText $models) + ' per test and database ' + $script:MIDDOT + ' one shared scale from zero ' + $script:MIDDOT + ' higher is better'
+    $sub = 'Acumatica 2026 R2 ' + $script:MIDDOT + ' median of ' + (Get-RunsText $models) + ' per test and database ' + $script:MIDDOT + ' one shared scale from zero ' + $script:MIDDOT + ' a longer bar means more gain from ' + $nW + ' workers, not a faster database'
     $y += 4
     foreach ($l in (Get-CardWrap $sub 13 $false ($W - 2 * $PAD))) { $y += 20; [void]$out.Append((Get-CardText $PAD $y $l 13 $Pal.ink2)) }
     # legend: one neutral colour, and why
     $y += 30
     $core = $null; if ($A.families) { $f = $A.families['Core']; if ($f) { $core = [string]$f.displayName } }
     $q1 = [string][char]0x201C; $q2 = [string][char]0x201D
-    $leg = 'Speed-ups are not ranked: the tie rule compares times, not speed-ups. Which database was faster with ' + $n1 + ' and with ' + $nW + ' workers is in the ' + $(if ($core) { $q1 + $core + $q2 + ' chart above.' } else { 'result tables.' })
+    $leg = 'Speed-ups are not ranked: the verdicts compare times, not speed-ups. Which database was faster with ' + $n1 + ' and with ' + $nW + ' workers is in the ' + $(if ($core) { $q1 + $core + $q2 + ' chart above.' } else { 'result tables.' })
     [void]$out.Append(('<rect x="{0}" y="{1}" width="15" height="14" rx="3" fill="{2}"/>' -f $PAD, (Format-SvgNum ($y - 11)), $BAR) + "`n")
     $hd = 'One colour for every bar:'
     $hw = (Get-CardTextWidth $hd 13 $true) * $SAFE + 5
@@ -3215,12 +3331,18 @@ function New-SpeedupChart {
     [void]$axisHead.Append((& $refText $nW 'perfect split' ''))
     $tickRow = {
         param([double]$TY)
+        $refs = @(@(1, $nW) | Select-Object -Unique)
+        $refHalf = { param([int]$R) ((Get-CardTextWidth ([string]$R + $script:TIMES) 12 $true) * $SAFE) / 2.0 }
         $s = ''
         for ($t = 0; $t -le $axisMax + 1e-9; $t += $tickStep) {
-            $isRef = ($t -eq 1 -or $t -eq $nW)
+            $isRef = $refs -contains $t
+            if (-not $isRef) {
+                $hw = ((Get-CardTextWidth ([string]$t + $script:TIMES) 12 $false) * $SAFE) / 2.0
+                if (@($refs | Where-Object { [Math]::Abs((& $sx $_) - (& $sx $t)) -lt (& $refHalf $_) + $hw + 4 }).Count -gt 0) { continue }
+            }
             $s += Get-CardText (& $sx $t) $TY ([string]$t + $script:TIMES) 12 $(if ($isRef) { $Pal.ink } else { $Pal.ink2 }) $(if ($isRef) { '600' } else { '' }) 'middle' ' style="font-variant-numeric: tabular-nums"'
         }
-        if ($tickStep -gt 1 -and (($nW % $tickStep) -ne 0)) { $s += Get-CardText (& $sx $nW) $TY ([string]$nW + $script:TIMES) 12 $Pal.ink '600' 'middle' }
+        foreach ($r in $refs) { if (($r % $tickStep) -ne 0) { $s += Get-CardText (& $sx $r) $TY ([string]$r + $script:TIMES) 12 $Pal.ink '600' 'middle' ' style="font-variant-numeric: tabular-nums"' } }
         return $s
     }
     [void]$axisHead.Append((& $tickRow $tickY))
@@ -3236,10 +3358,15 @@ function New-SpeedupChart {
         $ly = $top + 14
         foreach ($l in (Get-CardWrap $o.name 14 $true $LEFT_W)) { [void]$blocks.Append((Get-CardText $PAD $ly $l 14 $Pal.ink '600')); $ly += 18 }
         $ov = [double[]]@($o.vals.Values | Where-Object { $null -ne $_.s } | ForEach-Object { [double]$_.s })
-        if ($ov.Count -eq 0) { $sum = 'No speed-up: no database has both results' }
+        $whys = @($o.vals.Values | ForEach-Object { [string]$_.why } | Select-Object -Unique)
+        if ($ov.Count -eq 0 -and $whys.Count -eq 1 -and $whys[0]) { $sum = 'No speed-up: ' + $whys[0] + ' on every database' }
+        elseif ($ov.Count -eq 0) { $sum = 'No speed-up: no database has both results' }
         elseif ([double]($ov | Measure-Object -Minimum).Minimum -ge 1.05) { $sum = [string]$o.n8 + ' workers: ' + (Format-CardRange $ov { param($v) Format-Dec1 $v }) + $script:TIMES + ' faster' }
         else { $sum = [string]$o.n8 + ' workers: ' + (Format-CardRange $ov { param($v) Format-Dec1 $v }) + $script:TIMES + ' the speed of ' + $o.n1 + ' worker' + $(if ($o.n1 -ne 1) { 's' } else { '' }) }
         foreach ($l in (Get-CardWrap $sum 13 $false $LEFT_W)) { [void]$blocks.Append((Get-CardText $PAD $ly $l 13 $Pal.ink2)); $ly += 17 }
+        # the unit of the times in the labels, as on the family chart ("per list page", "per 10,000-record job")
+        $unitTxt = if ($o.per) { 'Times ' + $o.per } else { '' }
+        if ($unitTxt) { foreach ($l in (Get-CardWrap $unitTxt 13 $false $LEFT_W)) { [void]$blocks.Append((Get-CardText $PAD $ly $l 13 $Pal.ink2)); $ly += 17 } }
         $leftH = $ly - $top - 4
         $by = $top + 2
         $dItems = @()
@@ -3256,11 +3383,12 @@ function New-SpeedupChart {
             }
             $len = (& $sx $v.s) - $X0
             $lb = & $labOf $o $v
-            $tipText = (Get-EngineName $e) + ', ' + $o.name + ': ' + $lb.head + $(if ($lb.tail) { ' (' + $w1 + ' ' + $script:ARROW + ' ' + $o.n8 + ' workers' + $lb.tail.Replace($sepDot, ': ') + ')' } else { '' })
+            $perTail = if ($lb.tail -and $o.per) { ' ' + $o.per } else { '' }
+            $tipText = (Get-EngineName $e) + ', ' + $o.name + ': ' + $lb.head + $(if ($lb.tail) { ' (' + $w1 + ' ' + $script:ARROW + ' ' + $o.n8 + ' workers' + $lb.tail.Replace($sepDot, ': ') + $perTail + ')' } else { '' })
             [void]$blocks.Append((Get-CardBar ($X0 + 0.5) $by $len $BAR_H $BAR $tipText))
             [void]$blocks.Append((& $backing ($X0 + $len + 8) $cy (((Get-CardTextWidth $lb.head 13 $true) + (Get-CardTextWidth $lb.tail 13 $false)) * $SAFE)))
             [void]$blocks.Append(('<text x="{0}" y="{1}" font-size="13" fill="{2}">' -f (Format-SvgNum ($X0 + $len + 8)), (Format-SvgNum $cy), $Pal.ink) + (Get-CardSpan $lb.head 0 '' '600') + $(if ($lb.tail) { Get-CardSpan $lb.tail 0 $Pal.ink2 } else { '' }) + '</text>' + "`n")
-            $dItems += ((Get-EngineName $e) + ' ' + $lb.head + $lb.tail.Replace($sepDot, ', '))
+            $dItems += ((Get-EngineName $e) + ' ' + $lb.head + $lb.tail.Replace($sepDot, ', ') + $perTail)
             $by += $BAR_PITCH
         }
         $rightH = 2 + ([Math]::Max(1, $engs.Count) - 1) * $BAR_PITCH + $BAR_H
@@ -3476,7 +3604,11 @@ function Invoke-SelfTest {
     $h2 = Get-ScalingHeadline @{ 'ord|spread|SQLServer' = @{ 1 = 80.0; 4 = 200.0; 8 = 230.0; 16 = 185.0 }; 'ord|spread|MySQL' = @{ 1 = 70.0; 4 = 150.0; 8 = 160.0; 16 = 155.0 }; 'wait|spread|SQLServer' = @{ 4 = 1.5; 16 = 10.0 } } ([int[]]@(1, 4, 8, 16))
     & $check 'C2' 'scaling headline falls back to plain wording when a database gains 10% or more after 4 clerks' ($h2 -notmatch 'did not raise|mostly added waiting' -and $h2 -match 'with 8 and 16 clerks the databases saved 155') $h2
     $nu = Get-CardNudged ([double[]]@(100, 104, 50)) 16 0 200
-    & $check 'C3' 'end labels nudged at least 16 px apart, order kept' ($nu[0] -eq 100 -and $nu[1] -eq 116 -and $nu[2] -eq 50) ($nu -join ', ')
+    $nb = Get-CardNudged ([double[]]@(429.2, 441.9, 435.2)) 16 300 700
+    $nc = Get-CardNudged ([double[]]@(5, 2)) 16 6 200
+    & $check 'C3' 'end labels at least 16 px apart, order kept, spread around their own markers, kept inside the plot' ($nu[0] -eq 94 -and $nu[1] -eq 110 -and $nu[2] -eq 50 -and [Math]::Abs($nb[0] - 419.43) -lt 0.01 -and [Math]::Abs($nb[2] - 435.43) -lt 0.01 -and [Math]::Abs($nb[1] - 451.43) -lt 0.01 -and $nc[1] -eq 6 -and $nc[0] -eq 22) (($nu -join ', ') + ' | ' + (($nb | ForEach-Object { $_.ToString('0.##', $script:Inv) }) -join ', ') + ' | ' + ($nc -join ', '))
+    $h3 = Get-ScalingHeadline @{ 'ord|spread|SQLServer' = @{ 1 = 80.0; 4 = 215.0; 8 = 147.0; 16 = 142.0 }; 'ord|spread|MySQL' = @{ 1 = 70.0; 4 = 130.0; 8 = 140.0; 16 = 133.0 } } ([int[]]@(1, 4, 8, 16))
+    & $check 'C11' 'scaling headline says "levelled off or fell back" when a database drops 10% or more after 4 clerks' ($h3 -like '*from 1 to 4 clerks, then levelled off or fell back: more clerks did not raise it by another 10% on any database (133*') $h3
 
     $stEng = @('SQLServer', 'MySQL', 'PostgreSQL')
     $mkT = {
@@ -3561,9 +3693,13 @@ function Invoke-SelfTest {
     try { $sc = New-ScalingChart $stA } catch { $scErr = $_.Exception.Message }
     $bad = if ($sc) { & $svgOk $sc } else { 'no chart: ' + $scErr }
     & $check 'C4' 'scaling chart: well-formed SVG, solid lines only, all text >= 12 px' ($sc -and -not $bad) $(if ($bad) { $bad } else { ([string]$sc.Length) + ' characters' })
-    $want = @('no run', 'per order', 'MySQL not ranked', '3 failed saves', 'not comparable: fewer than 5 valid runs on PostgreSQL', 'SQL Server joint fastest', 'MySQL 33% slower', 'Different products', 'Everyone sells the best-seller')
+    $want = @('not tested', 'judged on', 'time per order', 'MySQL not ranked', '3 failed saves', 'not comparable: fewer than 5 valid runs on PostgreSQL', 'SQL Server joint fastest', 'MySQL 33% slower', 'Different products', 'Everyone sells the best-seller')
     $miss = @($want | Where-Object { -not $sc -or $sc.IndexOf((ConvertTo-XmlText $_)) -lt 0 })
-    & $check 'C5' 'scaling chart: verdict rows (no run, per order, not ranked, not comparable, coloured chips)' ($sc -and $miss.Count -eq 0) $(if ($miss.Count) { 'missing: ' + ($miss -join ' | ') } else { 'all present' })
+    if ($sc -and $sc -match 'hover') { $miss += 'footer promises hover text' }
+    & $check 'C5' 'scaling chart: verdict rows (not tested, judged on time per order, not ranked, not comparable, chips)' ($sc -and $miss.Count -eq 0) $(if ($miss.Count) { 'missing: ' + ($miss -join ' | ') } else { 'all present' })
+    # the numbers of clerks at the same x in the orders and the wait chart of each column
+    $x16 = @([regex]::Matches([string]$sc, '<text x="([0-9.]+)" y="[0-9.]+" font-size="12.5" text-anchor="middle" fill="#[0-9a-f]{6}">16</text>') | ForEach-Object { $_.Groups[1].Value })
+    & $check 'C12' 'scaling chart: every panel of a column puts the numbers of clerks at the same x' ($x16.Count -eq 4 -and @($x16 | Select-Object -Unique).Count -eq 2) ($x16 -join ', ')
     $hd = if ($sc) { ([regex]::Match($sc, '<desc id="scaling-orders-desc">([^<]*)')).Groups[1].Value } else { '' }
     & $check 'C6' 'scaling chart: plain headline when a database still gains 10% after 4 clerks' ($hd -match '^Orders per minute rose 2\.3' -and $hd -notmatch 'did not raise') ($hd.Substring(0, [Math]::Min(150, $hd.Length)))
     $mk = @([regex]::Matches([string]$sc, '<circle cx="[0-9.]+" cy="[0-9.]+" r="([0-9.]+)" fill="#[0-9A-Fa-f]{6}" stroke'))
@@ -3572,10 +3708,27 @@ function Invoke-SelfTest {
     try { $sp = New-SpeedupChart $stA } catch { $spErr = $_.Exception.Message }
     $bad = if ($sp) { & $svgOk $sp } else { 'no chart: ' + $spErr }
     & $check 'C8' 'speed-up chart: well-formed SVG, solid reference lines, all text >= 12 px' ($sp -and -not $bad) $(if ($bad) { $bad } else { ([string]$sp.Length) + ' characters' })
-    $want = @('no gain', 'perfect split', ('10' + $tx), ('10.00' + $tx + ' faster'), ('0.80' + $tx + ' (slower with 8 workers)'), 'n/a: over the time limit with 8 workers', 'n/a: no result', ('118 ms ' + $script:ARROW + ' 52.5 ms'), 'Stock availability list, all columns', '10,000 records or 80 list pages split 8 ways', 'Not always')
+    $want = @('no gain', 'perfect split', ('10' + $tx), ('10.00' + $tx + ' faster'), 'Times per list page', 'Times per 10,000-record job', ('0.80' + $tx + ' (slower with 8 workers)'), 'n/a: over the time limit with 8 workers', 'n/a: no result', ('118 ms ' + $script:ARROW + ' 52.5 ms'), 'Stock availability list, all columns', '10,000 records or 80 list pages split 8 ways', 'Not always')
     $miss = @($want | Where-Object { -not $sp -or $sp.IndexOf((ConvertTo-XmlText $_)) -lt 0 })
     & $check 'C9' 'speed-up chart: axis past 8x, below 1x, over the limit, no result, values in the test unit' ($sp -and $miss.Count -eq 0) $(if ($miss.Count) { 'missing: ' + ($miss -join ' | ') } else { 'all present' })
-    & $check 'C10' 'speed-up chart: one neutral colour, no database colour' ($sp -and $sp -notmatch '(?i)#0072B2|#E69F00|#CC79A7' -and $sp.Contains($script:CardSpeedupBar)) ''
+    & $check 'C10' 'speed-up chart: one neutral colour, no database colour, no "higher is better"' ($sp -and $sp -notmatch '(?i)#0072B2|#E69F00|#CC79A7|higher is better' -and $sp.Contains($script:CardSpeedupBar)) ''
+    # an operation without any speed-up keeps its catalog place; the axis past 10x (ticks every 2x) still labels 1x
+    $stB = [ordered]@{}; foreach ($k in @($stA.Keys)) { $stB[$k] = $stA[$k] }
+    $spRows = @()
+    foreach ($r in @($stA.derived.speedup1Uto8U)) {
+        if ($r.prefix -eq 'CORE_DELETE') { continue }
+        $c = [ordered]@{}; foreach ($k in @($r.Keys)) { $c[$k] = $r[$k] }
+        if ($r.prefix -eq 'CORE_READ' -and $r.engine -eq 'MySQL') { $c.speedup = 13.4 }
+        $spRows += $c
+    }
+    $stB['derived'] = [ordered]@{ scaling = $stA.derived.scaling; hotItemPenalty = $stA.derived.hotItemPenalty; speedup1Uto8U = $spRows; steadyState = $stA.derived.steadyState }
+    $sp2 = $null; $sp2Err = ''
+    try { $sp2 = New-SpeedupChart $stB } catch { $sp2Err = $_.Exception.Message }
+    $iL = if ($sp2) { $sp2.IndexOf('>Load 10,000 records<') } else { -1 }
+    $iD = if ($sp2) { $sp2.IndexOf('>Delete 10,000 records<') } else { -1 }
+    $iS = if ($sp2) { $sp2.IndexOf('>Stock availability list, all columns<') } else { -1 }
+    $ok2 = $sp2 -and $iL -ge 0 -and $iL -lt $iD -and $iD -lt $iS -and $sp2.Contains('font-weight="600" text-anchor="middle" fill="#111827" style="font-variant-numeric: tabular-nums">1' + $tx + '<') -and $sp2.Contains('>14' + $tx + '<') -and $sp2.Contains('each job with a result for both finished') -and -not (& $svgOk $sp2)
+    & $check 'C13' 'speed-up chart: catalog order kept, 1x labelled past 10x, headline qualified for jobs without a speed-up' $ok2 $(if ($sp2) { 'positions ' + $iL + ' < ' + $iD + ' < ' + $iS } else { 'no chart: ' + $sp2Err })
     Remove-Variable -Name stT, stC -Scope Script -ErrorAction SilentlyContinue
 
     $script:selfRows | Format-Table -AutoSize | Out-String -Width 220 | Write-Host
