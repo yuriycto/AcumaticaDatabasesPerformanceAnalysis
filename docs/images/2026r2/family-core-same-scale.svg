@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1916" viewBox="0 0 960 1916" role="img" aria-labelledby="family-core-same-scale-title family-core-same-scale-desc">
+<title id="family-core-same-scale-title">Platform basics: bulk record work on shared scales — Noticeable differences in 8 of 12 tests</title>
+<desc id="family-core-same-scale-desc">Platform basics: bulk record work on shared scales: Noticeable differences in 8 of 12 tests. Median per test for SQL Server, MySQL and PostgreSQL; tests measured the same way share one axis from zero, so bar lengths compare across tests; tests of very different size get separate axes. Scale 1 of 2 · Same scale for these 6 tests: 0 to 40 s: Save 10,000 new records – 1 worker, Save 10,000 new records – one job shared by 8 parallel workers, Change 10,000 records – 1 worker, Change 10,000 records – one job shared by 8 parallel workers, Delete 10,000 records – 1 worker and Delete 10,000 records – one job shared by 8 parallel workers. Scale 2 of 2 · Same scale for these 6 tests: 0 to 300 ms (= 0.3 s): Load 10,000 records – 1 worker, Load 10,000 records – one job shared by 8 parallel workers, Stock availability list, all columns – 1 worker, Stock availability list, all columns – one job shared by 8 parallel workers, Stock availability list, only the needed columns – 1 worker and Stock availability list, only the needed columns – one job shared by 8 parallel workers. Coloured bars mark differences a user would notice, grey bars ties and differences too small to notice. Load 10,000 records – 1 worker: SQL Server and MySQL noticeably slower than PostgreSQL. Load 10,000 records – one job shared by 8 parallel workers: Tie: no real winner. Save 10,000 new records – 1 worker: MySQL and PostgreSQL noticeably slower than SQL Server. Save 10,000 new records – one job shared by 8 parallel workers: PostgreSQL noticeably slower than MySQL. Change 10,000 records – 1 worker: MySQL and PostgreSQL noticeably slower than SQL Server. Change 10,000 records – one job shared by 8 parallel workers: Tie: no real winner. Delete 10,000 records – 1 worker: MySQL and PostgreSQL noticeably slower than SQL Server. Delete 10,000 records – one job shared by 8 parallel workers: MySQL noticeably slower than SQL Server. Stock availability list, all columns – 1 worker: Tie: no real winner. Stock availability list, all columns – one job shared by 8 parallel workers: Tie: no real winner. Stock availability list, only the needed columns – 1 worker: MySQL and PostgreSQL noticeably slower than SQL Server. Stock availability list, only the needed columns – one job shared by 8 parallel workers: MySQL noticeably slower than both.</desc>
+<rect x="0.5" y="0.5" width="959" height="1915" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+<g font-family="-apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, &#39;Helvetica Neue&#39;, Helvetica, Arial, &#39;Liberation Sans&#39;, sans-serif">
+<text x="24" y="46"><tspan font-size="21" font-weight="600" fill="#111827">Platform basics: bulk record work on shared scales</tspan><tspan font-size="15" fill="#111827" dx="14">Noticeable differences in 8 of 12 tests</tspan></text>
+<text x="24" y="68" font-size="13" fill="#4b5563">Acumatica 2026 R2 · median of 6 runs per test and database · tests measured the same way share one axis from zero, so bar lengths</text>
+<text x="24" y="90" font-size="13" fill="#4b5563">compare across tests; tests of very different size get separate axes</text>
+<rect x="24" y="109" width="14" height="14" rx="3" fill="#0072B2"/>
+<text x="44" y="120" font-size="13" font-weight="600" fill="#111827">SQL Server</text>
+<rect x="142.7" y="109" width="14" height="14" rx="3" fill="#E69F00"/>
+<text x="162.7" y="120" font-size="13" font-weight="600" fill="#111827">MySQL</text>
+<rect x="234.8" y="109" width="14" height="14" rx="3" fill="#CC79A7"/>
+<text x="254.8" y="120" font-size="13" font-weight="600" fill="#111827">PostgreSQL</text>
+<rect x="24" y="135" width="5" height="14" fill="#0072B2"/>
+<rect x="29" y="135" width="5" height="14" fill="#E69F00"/>
+<rect x="34" y="135" width="5" height="14" fill="#CC79A7"/>
+<text x="48" y="146" font-size="13"><tspan font-weight="600" fill="#111827">Coloured bar:</tspan><tspan fill="#4b5563"> this database is on one side of a difference you would notice: noticeably faster or noticeably slower than another</tspan></text>
+<text x="48" y="164" font-size="13" fill="#4b5563">database in the same test.</text>
+<rect x="24" y="175" width="15" height="14" rx="3" fill="#c9c8c0"/>
+<text x="48" y="186" font-size="13"><tspan font-weight="600" fill="#111827">Grey bar:</tspan><tspan fill="#4b5563"> no difference you would notice against the others. “tie” means inside the test’s noise margin; “not noticeable” means real</tspan></text>
+<text x="48" y="204" font-size="13" fill="#4b5563">but too small to feel (under 10%).</text>
+<line x1="24" y1="240" x2="936" y2="240" stroke="#111827" stroke-width="1.5"/>
+<rect x="24" y="252" width="912" height="52" rx="6" fill="#f6f8fa"/>
+<text x="36" y="273" font-size="14" font-weight="600" fill="#111827">Scale 1 of 2 · Same scale for these 6 tests: 0 to 40 s</text>
+<text x="458.5" y="295" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">0</text>
+<text x="518.5" y="295" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">10 s</text>
+<text x="578.5" y="295" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">20 s</text>
+<text x="638.5" y="295" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">30 s</text>
+<text x="698.5" y="295" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">40 s</text>
+<text x="24" y="324" font-size="14" font-weight="600" fill="#111827">Save 10,000 new records – 1 worker</text>
+<text x="24" y="344" font-size="13.5" font-weight="600" fill="#111827">MySQL and PostgreSQL noticeably slower than</text>
+<text x="24" y="362" font-size="13.5" font-weight="600" fill="#111827">SQL Server</text>
+<text x="24" y="380" font-size="13" fill="#4b5563">Per 10,000-record job: MySQL 1.77 s more (23%</text>
+<text x="24" y="397" font-size="13" fill="#4b5563">slower) and PostgreSQL 4.25 s more (56% slower).</text>
+<text x="458" y="322" font-size="12.5" fill="#4b5563">s per 10,000-record job · lower is better</text>
+<line x1="518.5" y1="329" x2="518.5" y2="395" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="578.5" y1="329" x2="578.5" y2="395" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="638.5" y1="329" x2="638.5" y2="395" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="329" x2="698.5" y2="395" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="329" x2="458" y2="395" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="344.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,332 H499.9 A4,4 0 0 1 503.9,336 V344 A4,4 0 0 1 499.9,348 H458.5 Z" fill="#0072B2"><title>SQL Server, Save 10,000 new records – 1 worker: median 7.57 (6.6–8.02) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="508.4" y="332.5" width="101.9" height="16" fill="#ffffff"/>
+<text x="511.4" y="344.5" font-size="13" fill="#111827"><tspan font-weight="600">7.57 s</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<text x="450" y="366.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,354 H510.5 A4,4 0 0 1 514.5,358 V366 A4,4 0 0 1 510.5,370 H458.5 Z" fill="#E69F00"><title>MySQL, Save 10,000 new records – 1 worker: median 9.34 (9.07–10.2) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="519" y="354.5" width="210.7" height="16" fill="#ffffff"/>
+<text x="522" y="366.5" font-size="13" fill="#111827"><tspan font-weight="600">9.34 s</tspan><tspan fill="#4b5563"> · 23% slower · noticeable</tspan></text>
+<text x="450" y="388.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,376 H525.4 A4,4 0 0 1 529.4,380 V388 A4,4 0 0 1 525.4,392 H458.5 Z" fill="#CC79A7"><title>PostgreSQL, Save 10,000 new records – 1 worker: median 11.8 (10.5–12.3) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="533.9" y="376.5" width="210.7" height="16" fill="#ffffff"/>
+<text x="536.9" y="388.5" font-size="13" fill="#111827"><tspan font-weight="600">11.8 s</tspan><tspan fill="#4b5563"> · 56% slower · noticeable</tspan></text>
+<line x1="24" y1="422" x2="936" y2="422" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="452" font-size="14" font-weight="600" fill="#111827">Save 10,000 new records –</text>
+<text x="24" y="470" font-size="14" font-weight="600" fill="#111827">one job shared by 8 parallel workers</text>
+<text x="24" y="490" font-size="13.5" font-weight="600" fill="#111827">PostgreSQL noticeably slower than MySQL</text>
+<text x="24" y="508" font-size="13" fill="#4b5563">1.01 s more per 10,000-record job (23% slower).</text>
+<text x="24" y="525" font-size="13" fill="#4b5563">SQL Server ties with both.</text>
+<text x="458" y="450" font-size="12.5" fill="#4b5563">s per 10,000-record job · lower is better</text>
+<line x1="518.5" y1="457" x2="518.5" y2="523" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="578.5" y1="457" x2="578.5" y2="523" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="638.5" y1="457" x2="638.5" y2="523" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="457" x2="698.5" y2="523" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="457" x2="458" y2="523" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="472.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,460 H481.5 A4,4 0 0 1 485.5,464 V472 A4,4 0 0 1 481.5,476 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Save 10,000 new records – one job shared by 8 parallel workers: median 4.51 (4.16–5.19) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="490" y="460.5" width="164.2" height="16" fill="#ffffff"/>
+<text x="493" y="472.5" font-size="13" fill="#4b5563"><tspan font-weight="600">4.51 s</tspan><tspan fill="#4b5563"> · 1.9% slower · tie</tspan></text>
+<text x="450" y="494.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,482 H481 A4,4 0 0 1 485,486 V494 A4,4 0 0 1 481,498 H458.5 Z" fill="#E69F00"><title>MySQL, Save 10,000 new records – one job shared by 8 parallel workers: median 4.42 (2.83–4.77) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="489.5" y="482.5" width="101.9" height="16" fill="#ffffff"/>
+<text x="492.5" y="494.5" font-size="13" fill="#111827"><tspan font-weight="600">4.42 s</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<text x="450" y="516.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,504 H487.1 A4,4 0 0 1 491.1,508 V516 A4,4 0 0 1 487.1,520 H458.5 Z" fill="#CC79A7"><title>PostgreSQL, Save 10,000 new records – one job shared by 8 parallel workers: median 5.44 (4.91–5.84) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="495.6" y="504.5" width="210.7" height="16" fill="#ffffff"/>
+<text x="498.6" y="516.5" font-size="13" fill="#111827"><tspan font-weight="600">5.44 s</tspan><tspan fill="#4b5563"> · 23% slower · noticeable</tspan></text>
+<line x1="24" y1="550" x2="936" y2="550" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="580" font-size="14" font-weight="600" fill="#111827">Change 10,000 records – 1 worker</text>
+<text x="24" y="600" font-size="13.5" font-weight="600" fill="#111827">MySQL and PostgreSQL noticeably slower than</text>
+<text x="24" y="618" font-size="13.5" font-weight="600" fill="#111827">SQL Server</text>
+<text x="24" y="636" font-size="13" fill="#4b5563">Per 10,000-record job: MySQL 1.3 s more (23%</text>
+<text x="24" y="653" font-size="13" fill="#4b5563">slower) and PostgreSQL 2.5 s more (44% slower).</text>
+<text x="458" y="578" font-size="12.5" fill="#4b5563">s per 10,000-record job · lower is better</text>
+<line x1="518.5" y1="585" x2="518.5" y2="651" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="578.5" y1="585" x2="578.5" y2="651" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="638.5" y1="585" x2="638.5" y2="651" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="585" x2="698.5" y2="651" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="585" x2="458" y2="651" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="600.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,588 H488.9 A4,4 0 0 1 492.9,592 V600 A4,4 0 0 1 488.9,604 H458.5 Z" fill="#0072B2"><title>SQL Server, Change 10,000 records – 1 worker: median 5.73 (5.56–6.48) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="497.4" y="588.5" width="101.9" height="16" fill="#ffffff"/>
+<text x="500.4" y="600.5" font-size="13" fill="#111827"><tspan font-weight="600">5.73 s</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<text x="450" y="622.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,610 H496.7 A4,4 0 0 1 500.7,614 V622 A4,4 0 0 1 496.7,626 H458.5 Z" fill="#E69F00"><title>MySQL, Change 10,000 records – 1 worker: median 7.03 (6.82–7.46) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="505.2" y="610.5" width="210.7" height="16" fill="#ffffff"/>
+<text x="508.2" y="622.5" font-size="13" fill="#111827"><tspan font-weight="600">7.03 s</tspan><tspan fill="#4b5563"> · 23% slower · noticeable</tspan></text>
+<text x="450" y="644.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,632 H503.9 A4,4 0 0 1 507.9,636 V644 A4,4 0 0 1 503.9,648 H458.5 Z" fill="#CC79A7"><title>PostgreSQL, Change 10,000 records – 1 worker: median 8.23 (7.73–8.54) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="512.4" y="632.5" width="210.7" height="16" fill="#ffffff"/>
+<text x="515.4" y="644.5" font-size="13" fill="#111827"><tspan font-weight="600">8.23 s</tspan><tspan fill="#4b5563"> · 44% slower · noticeable</tspan></text>
+<line x1="24" y1="678" x2="936" y2="678" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="708" font-size="14" font-weight="600" fill="#111827">Change 10,000 records –</text>
+<text x="24" y="726" font-size="14" font-weight="600" fill="#111827">one job shared by 8 parallel workers</text>
+<text x="24" y="746" font-size="13.5" font-weight="600" fill="#4b5563">Tie: no real winner</text>
+<text x="24" y="764" font-size="13" fill="#4b5563">All within 15%, inside the 20% noise margin.</text>
+<text x="458" y="706" font-size="12.5" fill="#4b5563">s per 10,000-record job · lower is better</text>
+<line x1="518.5" y1="713" x2="518.5" y2="779" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="578.5" y1="713" x2="578.5" y2="779" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="638.5" y1="713" x2="638.5" y2="779" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="713" x2="698.5" y2="779" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="713" x2="458" y2="779" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="728.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,716 H473.4 A4,4 0 0 1 477.4,720 V728 A4,4 0 0 1 473.4,732 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Change 10,000 records – one job shared by 8 parallel workers: median 3.15 (2.72–3.44) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="481.9" y="716.5" width="164.1" height="16" fill="#ffffff"/>
+<text x="484.9" y="728.5" font-size="13" fill="#4b5563"><tspan font-weight="600">3.15 s</tspan><tspan fill="#4b5563"> · 2.9% slower · tie</tspan></text>
+<text x="450" y="750.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,738 H472.9 A4,4 0 0 1 476.9,742 V750 A4,4 0 0 1 472.9,754 H458.5 Z" fill="#c9c8c0"><title>MySQL, Change 10,000 records – one job shared by 8 parallel workers: median 3.06 (2.85–3.55) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="481.4" y="738.5" width="99.7" height="16" fill="#ffffff"/>
+<text x="484.4" y="750.5" font-size="13" fill="#4b5563"><tspan font-weight="600">3.06 s</tspan><tspan fill="#4b5563"> · lowest</tspan></text>
+<text x="450" y="772.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,760 H475.6 A4,4 0 0 1 479.6,764 V772 A4,4 0 0 1 475.6,776 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Change 10,000 records – one job shared by 8 parallel workers: median 3.51 (3.18–3.71) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="484.1" y="760.5" width="160.2" height="16" fill="#ffffff"/>
+<text x="487.1" y="772.5" font-size="13" fill="#4b5563"><tspan font-weight="600">3.51 s</tspan><tspan fill="#4b5563"> · 15% slower · tie</tspan></text>
+<line x1="24" y1="789" x2="936" y2="789" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="819" font-size="14" font-weight="600" fill="#111827">Delete 10,000 records – 1 worker</text>
+<text x="24" y="839" font-size="13.5" font-weight="600" fill="#111827">MySQL and PostgreSQL noticeably slower than</text>
+<text x="24" y="857" font-size="13.5" font-weight="600" fill="#111827">SQL Server</text>
+<text x="24" y="875" font-size="13" fill="#4b5563">Per 10,000-record job: MySQL 12.9 s more (54%</text>
+<text x="24" y="892" font-size="13" fill="#4b5563">slower) and PostgreSQL 13.3 s more (55% slower).</text>
+<text x="458" y="817" font-size="12.5" fill="#4b5563">s per 10,000-record job · lower is better</text>
+<line x1="518.5" y1="824" x2="518.5" y2="890" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="578.5" y1="824" x2="578.5" y2="890" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="638.5" y1="824" x2="638.5" y2="890" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="824" x2="698.5" y2="890" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="824" x2="458" y2="890" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="839.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,827 H598.8 A4,4 0 0 1 602.8,831 V839 A4,4 0 0 1 598.8,843 H458.5 Z" fill="#0072B2"><title>SQL Server, Delete 10,000 records – 1 worker: median 24.1 (23.1–26.1) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="607.3" y="827.5" width="101.9" height="16" fill="#ffffff"/>
+<text x="610.3" y="839.5" font-size="13" fill="#111827"><tspan font-weight="600">24.1 s</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<text x="450" y="861.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,849 H676.1 A4,4 0 0 1 680.1,853 V861 A4,4 0 0 1 676.1,865 H458.5 Z" fill="#E69F00"><title>MySQL, Delete 10,000 records – 1 worker: median 36.9 (35.7–40) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="684.6" y="849.5" width="210.7" height="16" fill="#ffffff"/>
+<text x="687.6" y="861.5" font-size="13" fill="#111827"><tspan font-weight="600">36.9 s</tspan><tspan fill="#4b5563"> · 54% slower · noticeable</tspan></text>
+<text x="450" y="883.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,871 H678.8 A4,4 0 0 1 682.8,875 V883 A4,4 0 0 1 678.8,887 H458.5 Z" fill="#CC79A7"><title>PostgreSQL, Delete 10,000 records – 1 worker: median 37.4 (35.9–41.9) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="687.3" y="871.5" width="210.7" height="16" fill="#ffffff"/>
+<text x="690.3" y="883.5" font-size="13" fill="#111827"><tspan font-weight="600">37.4 s</tspan><tspan fill="#4b5563"> · 55% slower · noticeable</tspan></text>
+<line x1="24" y1="917" x2="936" y2="917" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="947" font-size="14" font-weight="600" fill="#111827">Delete 10,000 records –</text>
+<text x="24" y="965" font-size="14" font-weight="600" fill="#111827">one job shared by 8 parallel workers</text>
+<text x="24" y="985" font-size="13.5" font-weight="600" fill="#111827">MySQL noticeably slower than SQL Server</text>
+<text x="24" y="1003" font-size="13" fill="#4b5563">2.94 s more per 10,000-record job (22% slower).</text>
+<text x="24" y="1020" font-size="13" fill="#4b5563">PostgreSQL ties with both.</text>
+<text x="458" y="945" font-size="12.5" fill="#4b5563">s per 10,000-record job · lower is better</text>
+<line x1="518.5" y1="952" x2="518.5" y2="1018" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="578.5" y1="952" x2="578.5" y2="1018" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="638.5" y1="952" x2="638.5" y2="1018" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="952" x2="698.5" y2="1018" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="952" x2="458" y2="1018" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="967.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,955 H535 A4,4 0 0 1 539,959 V967 A4,4 0 0 1 535,971 H458.5 Z" fill="#0072B2"><title>SQL Server, Delete 10,000 records – one job shared by 8 parallel workers: median 13.4 (12.8–16.2) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="543.5" y="955.5" width="101.9" height="16" fill="#ffffff"/>
+<text x="546.5" y="967.5" font-size="13" fill="#111827"><tspan font-weight="600">13.4 s</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<text x="450" y="989.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,977 H552.7 A4,4 0 0 1 556.7,981 V989 A4,4 0 0 1 552.7,993 H458.5 Z" fill="#E69F00"><title>MySQL, Delete 10,000 records – one job shared by 8 parallel workers: median 16.4 (15.7–16.8) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="561.2" y="977.5" width="210.7" height="16" fill="#ffffff"/>
+<text x="564.2" y="989.5" font-size="13" fill="#111827"><tspan font-weight="600">16.4 s</tspan><tspan fill="#4b5563"> · 22% slower · noticeable</tspan></text>
+<text x="450" y="1011.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,999 H542.7 A4,4 0 0 1 546.7,1003 V1011 A4,4 0 0 1 542.7,1015 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Delete 10,000 records – one job shared by 8 parallel workers: median 14.7 (13.1–17.3) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="551.2" y="999.5" width="164.2" height="16" fill="#ffffff"/>
+<text x="554.2" y="1011.5" font-size="13" fill="#4b5563"><tspan font-weight="600">14.7 s</tspan><tspan fill="#4b5563"> · 9.5% slower · tie</tspan></text>
+<rect x="24" y="1055" width="912" height="52" rx="6" fill="#f6f8fa"/>
+<text x="36" y="1076" font-size="14" font-weight="600" fill="#111827">Scale 2 of 2 · Same scale for these 6 tests: 0 to 300 ms (= 0.3 s)</text>
+<text x="458.5" y="1098" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">0</text>
+<text x="538.5" y="1098" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">100 ms</text>
+<text x="618.5" y="1098" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">200 ms</text>
+<text x="698.5" y="1098" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">300 ms</text>
+<text x="24" y="1127" font-size="14" font-weight="600" fill="#111827">Load 10,000 records – 1 worker</text>
+<text x="24" y="1147" font-size="13.5" font-weight="600" fill="#111827">SQL Server and MySQL noticeably slower</text>
+<text x="24" y="1165" font-size="13.5" font-weight="600" fill="#111827">than PostgreSQL</text>
+<text x="24" y="1183" font-size="13" fill="#4b5563">Per 10,000-record job: SQL Server 0.108 s more</text>
+<text x="24" y="1200" font-size="13" fill="#4b5563">(1.98× slower) and MySQL 0.148 s more</text>
+<text x="24" y="1217" font-size="13" fill="#4b5563">(2.33× slower).</text>
+<text x="458" y="1125" font-size="12.5" fill="#4b5563">s per 10,000-record job · lower is better</text>
+<line x1="538.5" y1="1132" x2="538.5" y2="1198" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="618.5" y1="1132" x2="618.5" y2="1198" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="1132" x2="698.5" y2="1198" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="1132" x2="458" y2="1198" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="1147.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,1135 H629.7 A4,4 0 0 1 633.7,1139 V1147 A4,4 0 0 1 629.7,1151 H458.5 Z" fill="#0072B2"><title>SQL Server, Load 10,000 records – 1 worker: median 0.219 (0.193–0.263) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="638.2" y="1135.5" width="227.6" height="16" fill="#ffffff"/>
+<text x="641.2" y="1147.5" font-size="13" fill="#111827"><tspan font-weight="600">0.219 s</tspan><tspan fill="#4b5563"> · 1.98× slower · noticeable</tspan></text>
+<text x="450" y="1169.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,1157 H661.3 A4,4 0 0 1 665.3,1161 V1169 A4,4 0 0 1 661.3,1173 H458.5 Z" fill="#E69F00"><title>MySQL, Load 10,000 records – 1 worker: median 0.259 (0.148–0.342), noisy s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="669.8" y="1157.5" width="227.6" height="16" fill="#ffffff"/>
+<text x="672.8" y="1169.5" font-size="13" fill="#111827"><tspan font-weight="600">0.259 s</tspan><tspan fill="#4b5563"> · 2.33× slower · noticeable</tspan></text>
+<text x="450" y="1191.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,1179 H543.2 A4,4 0 0 1 547.2,1183 V1191 A4,4 0 0 1 543.2,1195 H458.5 Z" fill="#CC79A7"><title>PostgreSQL, Load 10,000 records – 1 worker: median 0.111 (0.0865–0.115) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="551.7" y="1179.5" width="110" height="16" fill="#ffffff"/>
+<text x="554.7" y="1191.5" font-size="13" fill="#111827"><tspan font-weight="600">0.111 s</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<line x1="24" y1="1242" x2="936" y2="1242" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="1272" font-size="14" font-weight="600" fill="#111827">Load 10,000 records –</text>
+<text x="24" y="1290" font-size="14" font-weight="600" fill="#111827">one job shared by 8 parallel workers</text>
+<text x="24" y="1310" font-size="13.5" font-weight="600" fill="#4b5563">Tie: no real winner</text>
+<text x="24" y="1328" font-size="13" fill="#4b5563">All within 88%, inside the 97% noise margin.</text>
+<text x="458" y="1270" font-size="12.5" fill="#4b5563">s per 10,000-record job · lower is better</text>
+<line x1="538.5" y1="1277" x2="538.5" y2="1343" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="618.5" y1="1277" x2="618.5" y2="1343" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="1277" x2="698.5" y2="1343" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="1277" x2="458" y2="1343" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="1292.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,1280 H501.9 A4,4 0 0 1 505.9,1284 V1292 A4,4 0 0 1 501.9,1296 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Load 10,000 records – one job shared by 8 parallel workers: median 0.0592 (0.0445–0.0747), noisy s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="510.4" y="1280.5" width="176.4" height="16" fill="#ffffff"/>
+<text x="513.4" y="1292.5" font-size="13" fill="#4b5563"><tspan font-weight="600">0.0592 s</tspan><tspan fill="#4b5563"> · 13% slower · tie</tspan></text>
+<text x="450" y="1314.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,1302 H533.3 A4,4 0 0 1 537.3,1306 V1314 A4,4 0 0 1 533.3,1318 H458.5 Z" fill="#c9c8c0"><title>MySQL, Load 10,000 records – one job shared by 8 parallel workers: median 0.0985 (0.0659–0.25), noisy s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="541.8" y="1302.5" width="176.4" height="16" fill="#ffffff"/>
+<text x="544.8" y="1314.5" font-size="13" fill="#4b5563"><tspan font-weight="600">0.0985 s</tspan><tspan fill="#4b5563"> · 88% slower · tie</tspan></text>
+<text x="450" y="1336.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,1324 H496.5 A4,4 0 0 1 500.5,1328 V1336 A4,4 0 0 1 496.5,1340 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Load 10,000 records – one job shared by 8 parallel workers: median 0.0525 (0.0421–0.0567) s per 10,000-record job (lowest–highest run in brackets)</title></path>
+<rect x="505" y="1324.5" width="115.8" height="16" fill="#ffffff"/>
+<text x="508" y="1336.5" font-size="13" fill="#4b5563"><tspan font-weight="600">0.0525 s</tspan><tspan fill="#4b5563"> · lowest</tspan></text>
+<line x1="24" y1="1353" x2="936" y2="1353" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="1383" font-size="14" font-weight="600" fill="#111827">Stock availability list, all columns – 1 worker</text>
+<text x="24" y="1403" font-size="13.5" font-weight="600" fill="#4b5563">Tie: no real winner</text>
+<text x="24" y="1421" font-size="13" fill="#4b5563">All within 5.7%, inside the 19% noise margin.</text>
+<text x="458" y="1381" font-size="12.5" fill="#4b5563">ms per list page · lower is better</text>
+<line x1="538.5" y1="1388" x2="538.5" y2="1454" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="618.5" y1="1388" x2="618.5" y2="1454" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="1388" x2="698.5" y2="1454" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="1388" x2="458" y2="1454" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="1403.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,1391 H549.1 A4,4 0 0 1 553.1,1395 V1403 A4,4 0 0 1 549.1,1407 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Stock availability list, all columns – 1 worker: median 118 (107–131) ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="557.6" y="1391.5" width="173.1" height="16" fill="#ffffff"/>
+<text x="560.6" y="1403.5" font-size="13" fill="#4b5563"><tspan font-weight="600">118 ms</tspan><tspan fill="#4b5563"> · 5.7% slower · tie</tspan></text>
+<text x="450" y="1425.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,1413 H547.2 A4,4 0 0 1 551.2,1417 V1425 A4,4 0 0 1 547.2,1429 H458.5 Z" fill="#c9c8c0"><title>MySQL, Stock availability list, all columns – 1 worker: median 116 (96.5–127) ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="555.7" y="1413.5" width="173.1" height="16" fill="#ffffff"/>
+<text x="558.7" y="1425.5" font-size="13" fill="#4b5563"><tspan font-weight="600">116 ms</tspan><tspan fill="#4b5563"> · 3.5% slower · tie</tspan></text>
+<text x="450" y="1447.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,1435 H544 A4,4 0 0 1 548,1439 V1447 A4,4 0 0 1 544,1451 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Stock availability list, all columns – 1 worker: median 112 (103–113) ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="552.5" y="1435.5" width="108.6" height="16" fill="#ffffff"/>
+<text x="555.5" y="1447.5" font-size="13" fill="#4b5563"><tspan font-weight="600">112 ms</tspan><tspan fill="#4b5563"> · lowest</tspan></text>
+<line x1="24" y1="1463" x2="936" y2="1463" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="1493" font-size="14" font-weight="600" fill="#111827">Stock availability list, all columns –</text>
+<text x="24" y="1511" font-size="14" font-weight="600" fill="#111827">one job shared by 8 parallel workers</text>
+<text x="24" y="1531" font-size="13.5" font-weight="600" fill="#4b5563">Tie: no real winner</text>
+<text x="24" y="1549" font-size="13" fill="#4b5563">All within 10%, inside the 33% noise margin.</text>
+<text x="458" y="1491" font-size="12.5" fill="#4b5563">ms per list page · lower is better</text>
+<line x1="538.5" y1="1498" x2="538.5" y2="1564" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="618.5" y1="1498" x2="618.5" y2="1564" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="1498" x2="698.5" y2="1564" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="1498" x2="458" y2="1564" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="1513.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,1501 H496.9 A4,4 0 0 1 500.9,1505 V1513 A4,4 0 0 1 496.9,1517 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Stock availability list, all columns – one job shared by 8 parallel workers: median 53 (44.7–59.5) ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="505.4" y="1501.5" width="161.1" height="16" fill="#ffffff"/>
+<text x="508.4" y="1513.5" font-size="13" fill="#4b5563"><tspan font-weight="600">53 ms</tspan><tspan fill="#4b5563"> · 10% slower · tie</tspan></text>
+<text x="450" y="1535.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,1523 H493 A4,4 0 0 1 497,1527 V1535 A4,4 0 0 1 493,1539 H458.5 Z" fill="#c9c8c0"><title>MySQL, Stock availability list, all columns – one job shared by 8 parallel workers: median 48.1 (40.1–58), noisy ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="501.5" y="1523.5" width="112.5" height="16" fill="#ffffff"/>
+<text x="504.5" y="1535.5" font-size="13" fill="#4b5563"><tspan font-weight="600">48.1 ms</tspan><tspan fill="#4b5563"> · lowest</tspan></text>
+<text x="450" y="1557.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,1545 H495.7 A4,4 0 0 1 499.7,1549 V1557 A4,4 0 0 1 495.7,1561 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Stock availability list, all columns – one job shared by 8 parallel workers: median 51.4 (43.6–52.5) ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="504.2" y="1545.5" width="165.3" height="16" fill="#ffffff"/>
+<text x="507.2" y="1557.5" font-size="13" fill="#4b5563"><tspan font-weight="600">51.4 ms</tspan><tspan fill="#4b5563"> · 7% slower · tie</tspan></text>
+<line x1="24" y1="1574" x2="936" y2="1574" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="1604" font-size="14" font-weight="600" fill="#111827">Stock availability list, only the needed</text>
+<text x="24" y="1622" font-size="14" font-weight="600" fill="#111827">columns – 1 worker</text>
+<text x="24" y="1642" font-size="13.5" font-weight="600" fill="#111827">MySQL and PostgreSQL noticeably slower than</text>
+<text x="24" y="1660" font-size="13.5" font-weight="600" fill="#111827">SQL Server</text>
+<text x="24" y="1678" font-size="13" fill="#4b5563">Per list page: MySQL 8.89 ms more (37% slower)</text>
+<text x="24" y="1695" font-size="13" fill="#4b5563">and PostgreSQL 10.2 ms more (43% slower).</text>
+<text x="458" y="1602" font-size="12.5" fill="#4b5563">ms per list page · lower is better</text>
+<line x1="538.5" y1="1609" x2="538.5" y2="1675" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="618.5" y1="1609" x2="618.5" y2="1675" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="1609" x2="698.5" y2="1675" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="1609" x2="458" y2="1675" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="1624.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,1612 H473.5 A4,4 0 0 1 477.5,1616 V1624 A4,4 0 0 1 473.5,1628 H458.5 Z" fill="#0072B2"><title>SQL Server, Stock availability list, only the needed columns – 1 worker: median 23.8 (18.7–25.4) ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="482" y="1612.5" width="114.7" height="16" fill="#ffffff"/>
+<text x="485" y="1624.5" font-size="13" fill="#111827"><tspan font-weight="600">23.8 ms</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<text x="450" y="1646.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,1634 H480.7 A4,4 0 0 1 484.7,1638 V1646 A4,4 0 0 1 480.7,1650 H458.5 Z" fill="#E69F00"><title>MySQL, Stock availability list, only the needed columns – 1 worker: median 32.7 (31.1–35.3) ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="489.2" y="1634.5" width="223.6" height="16" fill="#ffffff"/>
+<text x="492.2" y="1646.5" font-size="13" fill="#111827"><tspan font-weight="600">32.7 ms</tspan><tspan fill="#4b5563"> · 37% slower · noticeable</tspan></text>
+<text x="450" y="1668.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,1656 H481.7 A4,4 0 0 1 485.7,1660 V1668 A4,4 0 0 1 481.7,1672 H458.5 Z" fill="#CC79A7"><title>PostgreSQL, Stock availability list, only the needed columns – 1 worker: median 34 (27.3–34.4) ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="490.2" y="1656.5" width="211.6" height="16" fill="#ffffff"/>
+<text x="493.2" y="1668.5" font-size="13" fill="#111827"><tspan font-weight="600">34 ms</tspan><tspan fill="#4b5563"> · 43% slower · noticeable</tspan></text>
+<line x1="24" y1="1720" x2="936" y2="1720" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="1750" font-size="14" font-weight="600" fill="#111827">Stock availability list, only the needed</text>
+<text x="24" y="1768" font-size="14" font-weight="600" fill="#111827">columns –</text>
+<text x="24" y="1786" font-size="14" font-weight="600" fill="#111827">one job shared by 8 parallel workers</text>
+<text x="24" y="1806" font-size="13.5" font-weight="600" fill="#111827">MySQL noticeably slower than both</text>
+<text x="24" y="1824" font-size="13" fill="#4b5563">5.87 ms more per list page (48% slower).</text>
+<text x="24" y="1841" font-size="13" fill="#4b5563">PostgreSQL and SQL Server tie.</text>
+<text x="458" y="1748" font-size="12.5" fill="#4b5563">ms per list page · lower is better</text>
+<line x1="538.5" y1="1755" x2="538.5" y2="1821" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="618.5" y1="1755" x2="618.5" y2="1821" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="1755" x2="698.5" y2="1821" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="1755" x2="458" y2="1821" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="1770.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,1758 H465.4 A4,4 0 0 1 469.4,1762 V1770 A4,4 0 0 1 465.4,1774 H458.5 Z" fill="#0072B2"><title>SQL Server, Stock availability list, only the needed columns – one job shared by 8 parallel workers: median 13.7 (12.1–14) ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="473.9" y="1758.5" width="292.6" height="16" fill="#ffffff"/>
+<text x="476.9" y="1770.5" font-size="13" fill="#111827"><tspan font-weight="600">13.7 ms</tspan><tspan fill="#4b5563"> · 11% slower · ties with PostgreSQL</tspan></text>
+<text x="450" y="1792.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,1780 H469.1 A4,4 0 0 1 473.1,1784 V1792 A4,4 0 0 1 469.1,1796 H458.5 Z" fill="#E69F00"><title>MySQL, Stock availability list, only the needed columns – one job shared by 8 parallel workers: median 18.2 (14.1–20.9) ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="477.6" y="1780.5" width="223.6" height="16" fill="#ffffff"/>
+<text x="480.6" y="1792.5" font-size="13" fill="#111827"><tspan font-weight="600">18.2 ms</tspan><tspan fill="#4b5563"> · 48% slower · noticeable</tspan></text>
+<text x="450" y="1814.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,1802 H464.4 A4,4 0 0 1 468.4,1806 V1814 A4,4 0 0 1 464.4,1818 H458.5 Z" fill="#CC79A7"><title>PostgreSQL, Stock availability list, only the needed columns – one job shared by 8 parallel workers: median 12.3 (7.18–14.6), noisy ms per list page (lowest–highest run in brackets)</title></path>
+<rect x="472.9" y="1802.5" width="114.7" height="16" fill="#ffffff"/>
+<text x="475.9" y="1814.5" font-size="13" fill="#111827"><tspan font-weight="600">12.3 ms</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<text x="24" y="1892" font-size="12.5" fill="#4b5563">The lowest and highest of the 6 runs and the exact tie rule are in the table below the chart.</text>
+</g>
+</svg>

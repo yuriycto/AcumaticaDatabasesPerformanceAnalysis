@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="762" viewBox="0 0 960 762" role="img" aria-labelledby="family-screens-same-scale-title family-screens-same-scale-desc">
+<title id="family-screens-same-scale-title">Everyday screens on one scale — No noticeable difference in any of the 4 tests</title>
+<desc id="family-screens-same-scale-desc">Everyday screens on one scale: No noticeable difference in any of the 4 tests. Median per test for SQL Server, MySQL and PostgreSQL; all 4 tests share one axis from zero, so bar lengths compare across tests. Same scale for all 4 tests: 0 to 80 ms: Open a sales order, A customer&#39;s order history, Who bought this item? and Find a customer by part of the name. Coloured bars mark differences a user would notice, grey bars ties and differences too small to notice. Open a sales order: No noticeable difference. A customer&#39;s order history: No noticeable difference. Who bought this item?: Tie: no real winner. Find a customer by part of the name: No noticeable difference.</desc>
+<rect x="0.5" y="0.5" width="959" height="761" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+<g font-family="-apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, &#39;Helvetica Neue&#39;, Helvetica, Arial, &#39;Liberation Sans&#39;, sans-serif">
+<text x="24" y="46"><tspan font-size="21" font-weight="600" fill="#111827">Everyday screens on one scale</tspan><tspan font-size="15" fill="#111827" dx="14">No noticeable difference in any of the 4 tests</tspan></text>
+<text x="24" y="68" font-size="13" fill="#4b5563">Acumatica 2026 R2 · median of 6 runs per test and database · all 4 tests share one axis from zero, so bar lengths compare across tests</text>
+<rect x="24" y="87" width="14" height="14" rx="3" fill="#0072B2"/>
+<text x="44" y="98" font-size="13" font-weight="600" fill="#111827">SQL Server</text>
+<rect x="142.7" y="87" width="14" height="14" rx="3" fill="#E69F00"/>
+<text x="162.7" y="98" font-size="13" font-weight="600" fill="#111827">MySQL</text>
+<rect x="234.8" y="87" width="14" height="14" rx="3" fill="#CC79A7"/>
+<text x="254.8" y="98" font-size="13" font-weight="600" fill="#111827">PostgreSQL</text>
+<rect x="24" y="113" width="5" height="14" fill="#0072B2"/>
+<rect x="29" y="113" width="5" height="14" fill="#E69F00"/>
+<rect x="34" y="113" width="5" height="14" fill="#CC79A7"/>
+<text x="48" y="124" font-size="13"><tspan font-weight="600" fill="#111827">Coloured bar:</tspan><tspan fill="#4b5563"> this database is on one side of a difference you would notice: noticeably faster or noticeably slower than another</tspan></text>
+<text x="48" y="142" font-size="13" fill="#4b5563">database in the same test.</text>
+<rect x="24" y="153" width="15" height="14" rx="3" fill="#c9c8c0"/>
+<text x="48" y="164" font-size="13"><tspan font-weight="600" fill="#111827">Grey bar:</tspan><tspan fill="#4b5563"> no difference you would notice against the others. “tie” means inside the test’s noise margin; “not noticeable” means real</tspan></text>
+<text x="48" y="182" font-size="13" fill="#4b5563">but too small to feel (under 100 ms per screen action).</text>
+<line x1="24" y1="218" x2="936" y2="218" stroke="#111827" stroke-width="1.5"/>
+<rect x="24" y="230" width="912" height="52" rx="6" fill="#f6f8fa"/>
+<text x="36" y="251" font-size="14" font-weight="600" fill="#111827">Same scale for all 4 tests: 0 to 80 ms</text>
+<text x="458.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">0</text>
+<text x="518.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">20 ms</text>
+<text x="578.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">40 ms</text>
+<text x="638.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">60 ms</text>
+<text x="698.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">80 ms</text>
+<text x="24" y="302" font-size="14" font-weight="600" fill="#111827">Open a sales order</text>
+<text x="24" y="322" font-size="13.5" font-weight="600" fill="#4b5563">No noticeable difference</text>
+<text x="24" y="340" font-size="13" fill="#4b5563">MySQL is 29% slower, but that is only 16.4 ms more</text>
+<text x="24" y="357" font-size="13" fill="#4b5563">per order opened (noticeable from 100 ms).</text>
+<text x="458" y="300" font-size="12.5" fill="#4b5563">ms per order opened · lower is better</text>
+<line x1="518.5" y1="307" x2="518.5" y2="373" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="578.5" y1="307" x2="578.5" y2="373" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="638.5" y1="307" x2="638.5" y2="373" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="307" x2="698.5" y2="373" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="307" x2="458" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="322.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,310 H623.8 A4,4 0 0 1 627.8,314 V322 A4,4 0 0 1 623.8,326 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Open a sales order: median 56.4 (55.7–61.3) ms per order opened (lowest–highest run in brackets)</title></path>
+<rect x="632.3" y="310.5" width="114.8" height="16" fill="#ffffff"/>
+<text x="635.3" y="322.5" font-size="13" fill="#4b5563"><tspan font-weight="600">56.4 ms</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<text x="450" y="344.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,332 H672.9 A4,4 0 0 1 676.9,336 V344 A4,4 0 0 1 672.9,348 H458.5 Z" fill="#c9c8c0"><title>MySQL, Open a sales order: median 72.8 (70.8–79.1) ms per order opened (lowest–highest run in brackets)</title></path>
+<rect x="681.4" y="332.5" width="248.4" height="16" fill="#ffffff"/>
+<text x="684.4" y="344.5" font-size="13" fill="#4b5563"><tspan font-weight="600">72.8 ms</tspan><tspan fill="#4b5563"> · 29% slower · not noticeable</tspan></text>
+<text x="450" y="366.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,354 H661.8 A4,4 0 0 1 665.8,358 V366 A4,4 0 0 1 661.8,370 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Open a sales order: median 69.1 (66.2–78.1) ms per order opened (lowest–highest run in brackets)</title></path>
+<rect x="670.3" y="354.5" width="248.4" height="16" fill="#ffffff"/>
+<text x="673.3" y="366.5" font-size="13" fill="#4b5563"><tspan font-weight="600">69.1 ms</tspan><tspan fill="#4b5563"> · 22% slower · not noticeable</tspan></text>
+<line x1="24" y1="382" x2="936" y2="382" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="412" font-size="14" font-weight="600" fill="#111827">A customer&#39;s order history</text>
+<text x="24" y="432" font-size="13.5" font-weight="600" fill="#4b5563">No noticeable difference</text>
+<text x="24" y="450" font-size="13" fill="#4b5563">PostgreSQL is 35% slower, but that is only 6.05 ms</text>
+<text x="24" y="467" font-size="13" fill="#4b5563">more per lookup (noticeable from 100 ms).</text>
+<text x="458" y="410" font-size="12.5" fill="#4b5563">ms per lookup · lower is better</text>
+<line x1="518.5" y1="417" x2="518.5" y2="483" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="578.5" y1="417" x2="578.5" y2="483" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="638.5" y1="417" x2="638.5" y2="483" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="417" x2="698.5" y2="483" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="417" x2="458" y2="483" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="432.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,420 H505.8 A4,4 0 0 1 509.8,424 V432 A4,4 0 0 1 505.8,436 H458.5 Z" fill="#c9c8c0"><title>SQL Server, A customer&#39;s order history: median 17.1 (15.3–17.7) ms per lookup (lowest–highest run in brackets)</title></path>
+<rect x="514.3" y="420.5" width="114.7" height="16" fill="#ffffff"/>
+<text x="517.3" y="432.5" font-size="13" fill="#4b5563"><tspan font-weight="600">17.1 ms</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<text x="450" y="454.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,442 H515.1 A4,4 0 0 1 519.1,446 V454 A4,4 0 0 1 515.1,458 H458.5 Z" fill="#c9c8c0"><title>MySQL, A customer&#39;s order history: median 20.2 (17.9–22.2) ms per lookup (lowest–highest run in brackets)</title></path>
+<rect x="523.6" y="442.5" width="248.4" height="16" fill="#ffffff"/>
+<text x="526.6" y="454.5" font-size="13" fill="#4b5563"><tspan font-weight="600">20.2 ms</tspan><tspan fill="#4b5563"> · 18% slower · not noticeable</tspan></text>
+<text x="450" y="476.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,464 H524 A4,4 0 0 1 528,468 V476 A4,4 0 0 1 524,480 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, A customer&#39;s order history: median 23.2 (18.6–24.9) ms per lookup (lowest–highest run in brackets)</title></path>
+<rect x="532.5" y="464.5" width="248.4" height="16" fill="#ffffff"/>
+<text x="535.5" y="476.5" font-size="13" fill="#4b5563"><tspan font-weight="600">23.2 ms</tspan><tspan fill="#4b5563"> · 35% slower · not noticeable</tspan></text>
+<line x1="24" y1="492" x2="936" y2="492" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="522" font-size="14" font-weight="600" fill="#111827">Who bought this item?</text>
+<text x="24" y="542" font-size="13.5" font-weight="600" fill="#4b5563">Tie: no real winner</text>
+<text x="24" y="560" font-size="13" fill="#4b5563">All within 8.9%, inside the 11% noise margin.</text>
+<text x="458" y="520" font-size="12.5" fill="#4b5563">ms per lookup · lower is better</text>
+<line x1="518.5" y1="527" x2="518.5" y2="593" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="578.5" y1="527" x2="578.5" y2="593" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="638.5" y1="527" x2="638.5" y2="593" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="527" x2="698.5" y2="593" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="527" x2="458" y2="593" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="542.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,530 H595.8 A4,4 0 0 1 599.8,534 V542 A4,4 0 0 1 595.8,546 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Who bought this item?: median 47.1 (43.8–50.4) ms per lookup (lowest–highest run in brackets)</title></path>
+<rect x="604.3" y="530.5" width="112.5" height="16" fill="#ffffff"/>
+<text x="607.3" y="542.5" font-size="13" fill="#4b5563"><tspan font-weight="600">47.1 ms</tspan><tspan fill="#4b5563"> · lowest</tspan></text>
+<text x="450" y="564.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,552 H608.3 A4,4 0 0 1 612.3,556 V564 A4,4 0 0 1 608.3,568 H458.5 Z" fill="#c9c8c0"><title>MySQL, Who bought this item?: median 51.3 (47–53.4) ms per lookup (lowest–highest run in brackets)</title></path>
+<rect x="616.8" y="552.5" width="177" height="16" fill="#ffffff"/>
+<text x="619.8" y="564.5" font-size="13" fill="#4b5563"><tspan font-weight="600">51.3 ms</tspan><tspan fill="#4b5563"> · 8.9% slower · tie</tspan></text>
+<text x="450" y="586.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,574 H607.2 A4,4 0 0 1 611.2,578 V586 A4,4 0 0 1 607.2,590 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Who bought this item?: median 50.9 (48.9–51.3) ms per lookup (lowest–highest run in brackets)</title></path>
+<rect x="615.7" y="574.5" width="177" height="16" fill="#ffffff"/>
+<text x="618.7" y="586.5" font-size="13" fill="#4b5563"><tspan font-weight="600">50.9 ms</tspan><tspan fill="#4b5563"> · 8.1% slower · tie</tspan></text>
+<line x1="24" y1="602" x2="936" y2="602" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="632" font-size="14" font-weight="600" fill="#111827">Find a customer by part of the name</text>
+<text x="24" y="652" font-size="13.5" font-weight="600" fill="#4b5563">No noticeable difference</text>
+<text x="24" y="670" font-size="13" fill="#4b5563">MySQL is 42% slower, but that is only 0.829 ms</text>
+<text x="24" y="687" font-size="13" fill="#4b5563">more per search (noticeable from 100 ms).</text>
+<text x="458" y="630" font-size="12.5" fill="#4b5563">ms per search · lower is better</text>
+<line x1="518.5" y1="637" x2="518.5" y2="703" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="578.5" y1="637" x2="578.5" y2="703" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="638.5" y1="637" x2="638.5" y2="703" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="637" x2="698.5" y2="703" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="637" x2="458" y2="703" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="652.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,640 H460.4 A4,4 0 0 1 464.4,644 V652 A4,4 0 0 1 460.4,656 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Find a customer by part of the name: median 1.97 (1.77–2.24) ms per search (lowest–highest run in brackets)</title></path>
+<rect x="468.9" y="640.5" width="114.7" height="16" fill="#ffffff"/>
+<text x="471.9" y="652.5" font-size="13" fill="#4b5563"><tspan font-weight="600">1.97 ms</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<text x="450" y="674.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,662 H462.9 A4,4 0 0 1 466.9,666 V674 A4,4 0 0 1 462.9,678 H458.5 Z" fill="#c9c8c0"><title>MySQL, Find a customer by part of the name: median 2.79 (2.71–2.9) ms per search (lowest–highest run in brackets)</title></path>
+<rect x="471.4" y="662.5" width="248.4" height="16" fill="#ffffff"/>
+<text x="474.4" y="674.5" font-size="13" fill="#4b5563"><tspan font-weight="600">2.79 ms</tspan><tspan fill="#4b5563"> · 42% slower · not noticeable</tspan></text>
+<text x="450" y="696.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,684 H462 A4,4 0 0 1 466,688 V696 A4,4 0 0 1 462,700 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Find a customer by part of the name: median 2.5 (2.15–2.7) ms per search (lowest–highest run in brackets)</title></path>
+<rect x="470.5" y="684.5" width="240.3" height="16" fill="#ffffff"/>
+<text x="473.5" y="696.5" font-size="13" fill="#4b5563"><tspan font-weight="600">2.5 ms</tspan><tspan fill="#4b5563"> · 27% slower · not noticeable</tspan></text>
+<text x="24" y="738" font-size="12.5" fill="#4b5563">The lowest and highest of the 6 runs and the exact tie rule are in the table below the chart.</text>
+</g>
+</svg>

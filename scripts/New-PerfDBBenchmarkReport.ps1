@@ -10,7 +10,8 @@
         <OutDir>\analysis.json                       cells, verdicts, families, derived values, diagnostics
         <OutDir>\PerfDBBenchmark-<CampaignId>.html   self-contained report (inline CSS and SVG, no script)
         <OutDir>\README-results.md                   the README fragments of SPEC section 7
-        <OutDir>\charts\*.svg                        at-a-glance, one chart per family, scaling, speed-up
+        <OutDir>\charts\*.svg                        at-a-glance, one chart per family (and its same-scale version
+                                                     where two or more tests share an axis), scaling, speed-up
 
     Every threshold of the tie rule is in the $TieRule hashtable at the top of this script and is mirrored into
     analysis.json (tieRule). The statistics live only here; the in-app comparison on AC301000 is indicative only.
@@ -2479,6 +2480,120 @@ function Get-CardBar {
     return ('<path d="M{0},{1} H{2} A{3},{3} 0 0 1 {4},{5} V{6} A{3},{3} 0 0 1 {2},{7} H{0} Z" fill="{8}"{9}>{10}</path>' -f (Format-SvgNum $X), (Format-SvgNum $Y), (Format-SvgNum ($x1 - $r)), (Format-SvgNum $r), (Format-SvgNum $x1), (Format-SvgNum ($Y + $r)), (Format-SvgNum ($Y + $H - $r)), (Format-SvgNum ($Y + $H)), $Fill, $Extra, $t) + "`n"
 }
 
+function Get-FamilyChartGeometry {
+    # The layout of the family charts (the family chart and its same-scale version): verdict column on the left, the
+    # database names right-aligned at ENGINE_RIGHT, bars from X0.
+    param([int]$Width = 960)
+    $PAD = 24
+    return @{ W = $Width; PAD = $PAD; LEFT_W = 338.0; ENGINE_RIGHT = 450.0; X0 = 458.0; RIGHT = $Width - $PAD; BAR_H = 16; BAR_PITCH = 22 }
+}
+
+function Add-FamilyChartHead {
+    # The top of a family chart: title and score on one line, the subtitle, the legend (database colours, what a
+    # coloured and a grey bar mean) and the rule under it. Returns the y just under the rule.
+    param([System.Text.StringBuilder]$Out, [string]$Name, [string]$Score, [string]$Sub, [object[]]$Engines, [object[]]$Models, [string]$FamilyKey, $G)
+    $Pal = $script:CardColors; $SAFE = $script:CardSafe
+    $W = $G.W; $PAD = $G.PAD; $RIGHT = $G.RIGHT
+    $engs = $Engines
+    $y = $PAD + 22
+    if (((Get-CardTextWidth $Name 21 $true) + 14 + (Get-CardTextWidth $Score 15 $false)) * $SAFE -le ($W - 2 * $PAD)) {
+        [void]$Out.Append(('<text x="{0}" y="{1}">' -f $PAD, (Format-SvgNum $y)) + (Get-CardSpan $Name 21 $Pal.ink '600') + (Get-CardSpan $Score 15 $Pal.ink '' 14) + '</text>' + "`n")
+    }
+    else {
+        [void]$Out.Append((Get-CardText $PAD $y $Name 21 $Pal.ink '600'))
+        foreach ($l in (Get-CardWrap $Score 15 $false ($W - 2 * $PAD))) { $y += 21; [void]$Out.Append((Get-CardText $PAD $y $l 15 $Pal.ink)) }
+    }
+    foreach ($l in (Get-CardWrap $Sub 13 $false ($W - 2 * $PAD))) { $y += 22; [void]$Out.Append((Get-CardText $PAD $y $l 13 $Pal.ink2)) }
+
+    # legend row 1: engine identity
+    $y += 30
+    $x = $PAD
+    foreach ($e in $engs) {
+        [void]$Out.Append(('<rect x="{0}" y="{1}" width="14" height="14" rx="3" fill="{2}"/>' -f (Format-SvgNum $x), (Format-SvgNum ($y - 11)), (Get-EngineColor $e)) + "`n")
+        [void]$Out.Append((Get-CardText ($x + 20) $y (Get-EngineName $e) 13 $Pal.ink '600'))
+        $x += 20 + (Get-CardTextWidth (Get-EngineName $e) 13 $true) * $SAFE + 22
+    }
+    # legend rows 2-3: what colour and grey mean (head and body share one <text>)
+    $y += 26
+    $under = Get-FamilyUnderText $Models $FamilyKey
+    $q1 = [string][char]0x201C; $q2 = [string][char]0x201D
+    $rules = @(
+        @('colour', 'Coloured bar:', 'this database is on one side of a difference you would notice: noticeably faster or noticeably slower than another database in the same test.'),
+        @('grey', 'Grey bar:', ('no difference you would notice against the others. ' + $q1 + 'tie' + $q2 + ' means inside the test' + [string][char]0x2019 + 's noise margin; ' + $q1 + 'not noticeable' + $q2 + ' means real but too small to feel' + $(if ($under) { ' (' + $under + ')' } else { '' }) + '.'))
+    )
+    $tx = $PAD + 24
+    foreach ($rule in $rules) {
+        if ($rule[0] -eq 'colour') {
+            for ($k = 0; $k -lt $engs.Count; $k++) { [void]$Out.Append(('<rect x="{0}" y="{1}" width="5" height="14" fill="{2}"/>' -f ($PAD + $k * 5), (Format-SvgNum ($y - 11)), (Get-EngineColor $engs[$k])) + "`n") }
+        }
+        else { [void]$Out.Append(('<rect x="{0}" y="{1}" width="15" height="14" rx="3" fill="{2}"/>' -f $PAD, (Format-SvgNum ($y - 11)), $Pal.greyBar) + "`n") }
+        $hw = (Get-CardTextWidth $rule[1] 13 $true) * $SAFE + 5
+        $lines = @(Get-CardWrap $rule[2] 13 $false ($RIGHT - $tx - 40) $hw)
+        [void]$Out.Append(('<text x="{0}" y="{1}" font-size="13">' -f $tx, (Format-SvgNum $y)) + (Get-CardSpan $rule[1] 0 $Pal.ink '600') + (Get-CardSpan (' ' + $lines[0]) 0 $Pal.ink2) + '</text>' + "`n")
+        $y += 18
+        for ($li = 1; $li -lt $lines.Count; $li++) { [void]$Out.Append((Get-CardText $tx $y $lines[$li] 13 $Pal.ink2)); $y += 18 }
+        $y += 4
+    }
+    $y += 14
+    [void]$Out.Append(('<line x1="{0}" y1="{1}" x2="{2}" y2="{1}" stroke="{3}" stroke-width="1.5"/>' -f $PAD, (Format-SvgNum $y), $RIGHT, $Pal.ink) + "`n")
+    $y += 2
+    return $y
+}
+
+function Add-FamilyBlock {
+    <#
+      One test of a family chart, starting under Y: name, verdict and sentence on the left; the unit line and one bar per
+      database on the right, each labelled after its end. Lengths: the bar length per database. The same-scale chart
+      also passes GridX (solid gridlines drawn under the bars) and Backing (each label on a card-coloured backing, so
+      gridlines stop short of its text). Returns the y under the block.
+    #>
+    param([System.Text.StringBuilder]$Out, $Tv, $Y, [hashtable]$Lengths, [object[]]$Engines, $G, [double[]]$GridX = @(), [bool]$Backing = $false)
+    $Pal = $script:CardColors; $SAFE = $script:CardSafe
+    $PAD = $G.PAD; $LEFT_W = $G.LEFT_W; $ENGINE_RIGHT = $G.ENGINE_RIGHT; $X0 = $G.X0; $BAR_H = $G.BAR_H; $BAR_PITCH = $G.BAR_PITCH
+    $engs = $Engines
+    $sepDot = ' ' + $script:MIDDOT + ' '
+    $tv = $Tv; $m = $tv.model
+    $backingOf = { param([double]$LX, [double]$CY, [double]$LW) ('<rect x="{0}" y="{1}" width="{2}" height="16" fill="{3}"/>' -f (Format-SvgNum ($LX - 3)), (Format-SvgNum ($CY - 12)), (Format-SvgNum ($LW + 6)), $Pal.surface) + "`n" }
+    $top = $Y + 16
+    # left: name, verdict, sentence
+    $ly = $top + 14
+    foreach ($l in (Get-TestNameLines $m 14 $LEFT_W)) { [void]$Out.Append((Get-CardText $PAD $ly $l 14 $Pal.ink '600')); $ly += 18 }
+    $ly += 2
+    # a noticeable verdict is primary ink; "Tie" and "No noticeable difference" recede
+    $vcol = if ($tv.noticeable) { $Pal.ink } else { $Pal.ink2 }
+    foreach ($l in (Get-CardWrap $tv.verdict 13.5 $true $LEFT_W)) { [void]$Out.Append((Get-CardText $PAD $ly $l 13.5 $vcol '600')); $ly += 18 }
+    if ($tv.detail) { foreach ($l in (Get-CardWrap $tv.detail 13 $false $LEFT_W)) { [void]$Out.Append((Get-CardText $PAD $ly $l 13 $Pal.ink2)); $ly += 17 } }
+    $leftH = $ly - $top - 4
+    # right: caption and bars
+    [void]$Out.Append((Get-CardText $X0 ($top + 12) $tv.caption 12.5 $Pal.ink2))
+    $by = $top + 22
+    $nRows = [Math]::Max(1, $engs.Count)
+    foreach ($gx in $GridX) { [void]$Out.Append(('<line x1="{0}" y1="{1}" x2="{0}" y2="{2}" stroke="{3}" stroke-width="1"/>' -f (Format-SvgNum $gx), (Format-SvgNum ($by - 3)), (Format-SvgNum ($by + ($nRows - 1) * $BAR_PITCH + $BAR_H + 3)), $Pal.hair) + "`n") }
+    [void]$Out.Append(('<line x1="{0}" y1="{1}" x2="{0}" y2="{2}" stroke="{3}" stroke-width="1"/>' -f $X0, (Format-SvgNum ($by - 3)), (Format-SvgNum ($by + ($nRows - 1) * $BAR_PITCH + $BAR_H + 3)), $Pal.baseline) + "`n")
+    foreach ($e in $engs) {
+        $r = $tv.rows[$e]
+        $cy = $by + $BAR_H / 2 + 4.5
+        [void]$Out.Append((Get-CardText $ENGINE_RIGHT $cy (Get-EngineName $e) 13 $Pal.ink '' 'end'))
+        if (-not $r) {
+            if ($Backing) { [void]$Out.Append((& $backingOf ($X0 + 6) $cy ((Get-CardTextWidth 'no result' 13 $false) * $SAFE))) }
+            [void]$Out.Append((Get-CardText ($X0 + 6) $cy 'no result' 13 $Pal.ink2)); $by += $BAR_PITCH; continue
+        }
+        $len = $Lengths[$e]
+        $col = Get-EngineColor $e
+        $fill = if ($r.colour) { $col } else { $Pal.greyBar }
+        $extra = ''
+        if ($r.capped) { $fill = if ($r.colour) { Get-CardBlend $col 0.35 } else { $Pal.greyBar }; if ($r.colour) { $extra = ' stroke="' + $col + '" stroke-width="1.5"' } }
+        [void]$Out.Append((Get-CardBar ($X0 + 0.5) $by $len $BAR_H $fill (Get-CardTooltip $m $e) $extra))
+        $vink = if ($r.colour) { $Pal.ink } else { $Pal.ink2 }
+        $tagSpan = if ($r.tag) { Get-CardSpan ($sepDot + $r.tag) 0 $Pal.ink2 } else { '' }
+        if ($Backing) { [void]$Out.Append((& $backingOf ($X0 + $len + 8) $cy (((Get-CardTextWidth $r.display 13 $true) + (Get-CardTextWidth $(if ($r.tag) { $sepDot + $r.tag } else { '' }) 13 $false)) * $SAFE))) }
+        [void]$Out.Append(('<text x="{0}" y="{1}" font-size="13" fill="{2}">' -f (Format-SvgNum ($X0 + $len + 8)), (Format-SvgNum $cy), $vink) + (Get-CardSpan $r.display 0 '' '600') + $tagSpan + '</text>' + "`n")
+        $by += $BAR_PITCH
+    }
+    $rightH = 22 + ($nRows - 1) * $BAR_PITCH + $BAR_H
+    return ($top + [Math]::Max($leftH, $rightH) + 12)
+}
+
 function New-FamilyValueChart {
     <#
       Family chart (family-*.svg), "real numbers, verdict first": per test a verdict column on the left and the median of
@@ -2491,8 +2606,8 @@ function New-FamilyValueChart {
     $engs = @($A.engines)
     $models = @($A.tests | Where-Object { $_.family -eq $FamilyKey } | ForEach-Object { Get-ChartTestModel $A $_ })
     $views = @($models | ForEach-Object { Get-FamilyTestView $_ })
-    $W = $Width; $PAD = 24; $LEFT_W = 338.0; $ENGINE_RIGHT = 450.0; $X0 = 458.0; $RIGHT = $W - $PAD
-    $BAR_H = 16; $BAR_PITCH = 22
+    $G = Get-FamilyChartGeometry $Width
+    $W = $G.W; $PAD = $G.PAD; $X0 = $G.X0; $RIGHT = $G.RIGHT
     $sepDot = ' ' + $script:MIDDOT + ' '
 
     # one bar length for every test of the family: the longest bar-end label must still fit inside the card
@@ -2509,85 +2624,14 @@ function New-FamilyValueChart {
     $out = New-Object System.Text.StringBuilder
     $name = [string]$fam.displayName
     $score = Get-FamilyScoreText $models
-    $y = $PAD + 22
-    if (((Get-CardTextWidth $name 21 $true) + 14 + (Get-CardTextWidth $score 15 $false)) * $SAFE -le ($W - 2 * $PAD)) {
-        [void]$out.Append(('<text x="{0}" y="{1}">' -f $PAD, (Format-SvgNum $y)) + (Get-CardSpan $name 21 $Pal.ink '600') + (Get-CardSpan $score 15 $Pal.ink '' 14) + '</text>' + "`n")
-    }
-    else {
-        [void]$out.Append((Get-CardText $PAD $y $name 21 $Pal.ink '600'))
-        foreach ($l in (Get-CardWrap $score 15 $false ($W - 2 * $PAD))) { $y += 21; [void]$out.Append((Get-CardText $PAD $y $l 15 $Pal.ink)) }
-    }
     $sub = 'Acumatica 2026 R2 ' + $script:MIDDOT + ' median of ' + (Get-RunsText $models) + ' per test and database ' + $script:MIDDOT + ' each test has its own scale, starting at zero'
-    foreach ($l in (Get-CardWrap $sub 13 $false ($W - 2 * $PAD))) { $y += 22; [void]$out.Append((Get-CardText $PAD $y $l 13 $Pal.ink2)) }
-
-    # legend row 1: engine identity
-    $y += 30
-    $x = $PAD
-    foreach ($e in $engs) {
-        [void]$out.Append(('<rect x="{0}" y="{1}" width="14" height="14" rx="3" fill="{2}"/>' -f (Format-SvgNum $x), (Format-SvgNum ($y - 11)), (Get-EngineColor $e)) + "`n")
-        [void]$out.Append((Get-CardText ($x + 20) $y (Get-EngineName $e) 13 $Pal.ink '600'))
-        $x += 20 + (Get-CardTextWidth (Get-EngineName $e) 13 $true) * $SAFE + 22
-    }
-    # legend rows 2-3: what colour and grey mean (head and body share one <text>)
-    $y += 26
-    $under = Get-FamilyUnderText $models $FamilyKey
-    $q1 = [string][char]0x201C; $q2 = [string][char]0x201D
-    $rules = @(
-        @('colour', 'Coloured bar:', 'this database is on one side of a difference you would notice: noticeably faster or noticeably slower than another database in the same test.'),
-        @('grey', 'Grey bar:', ('no difference you would notice against the others. ' + $q1 + 'tie' + $q2 + ' means inside the test' + [string][char]0x2019 + 's noise margin; ' + $q1 + 'not noticeable' + $q2 + ' means real but too small to feel' + $(if ($under) { ' (' + $under + ')' } else { '' }) + '.'))
-    )
-    $tx = $PAD + 24
-    foreach ($rule in $rules) {
-        if ($rule[0] -eq 'colour') {
-            for ($k = 0; $k -lt $engs.Count; $k++) { [void]$out.Append(('<rect x="{0}" y="{1}" width="5" height="14" fill="{2}"/>' -f ($PAD + $k * 5), (Format-SvgNum ($y - 11)), (Get-EngineColor $engs[$k])) + "`n") }
-        }
-        else { [void]$out.Append(('<rect x="{0}" y="{1}" width="15" height="14" rx="3" fill="{2}"/>' -f $PAD, (Format-SvgNum ($y - 11)), $Pal.greyBar) + "`n") }
-        $hw = (Get-CardTextWidth $rule[1] 13 $true) * $SAFE + 5
-        $lines = @(Get-CardWrap $rule[2] 13 $false ($RIGHT - $tx - 40) $hw)
-        [void]$out.Append(('<text x="{0}" y="{1}" font-size="13">' -f $tx, (Format-SvgNum $y)) + (Get-CardSpan $rule[1] 0 $Pal.ink '600') + (Get-CardSpan (' ' + $lines[0]) 0 $Pal.ink2) + '</text>' + "`n")
-        $y += 18
-        for ($li = 1; $li -lt $lines.Count; $li++) { [void]$out.Append((Get-CardText $tx $y $lines[$li] 13 $Pal.ink2)); $y += 18 }
-        $y += 4
-    }
-    $y += 14
-    [void]$out.Append(('<line x1="{0}" y1="{1}" x2="{2}" y2="{1}" stroke="{3}" stroke-width="1.5"/>' -f $PAD, (Format-SvgNum $y), $RIGHT, $Pal.ink) + "`n")
-    $y += 2
+    $y = Add-FamilyChartHead $out $name $score $sub $engs $models $FamilyKey $G
 
     for ($ti = 0; $ti -lt $views.Count; $ti++) {
-        $tv = $views[$ti]; $m = $tv.model
-        $top = $y + 16
-        # left: name, verdict, sentence
-        $ly = $top + 14
-        foreach ($l in (Get-TestNameLines $m 14 $LEFT_W)) { [void]$out.Append((Get-CardText $PAD $ly $l 14 $Pal.ink '600')); $ly += 18 }
-        $ly += 2
-        # a noticeable verdict is primary ink; "Tie" and "No noticeable difference" recede
-        $vcol = if ($tv.noticeable) { $Pal.ink } else { $Pal.ink2 }
-        foreach ($l in (Get-CardWrap $tv.verdict 13.5 $true $LEFT_W)) { [void]$out.Append((Get-CardText $PAD $ly $l 13.5 $vcol '600')); $ly += 18 }
-        if ($tv.detail) { foreach ($l in (Get-CardWrap $tv.detail 13 $false $LEFT_W)) { [void]$out.Append((Get-CardText $PAD $ly $l 13 $Pal.ink2)); $ly += 17 } }
-        $leftH = $ly - $top - 4
-        # right: caption and bars
-        [void]$out.Append((Get-CardText $X0 ($top + 12) $tv.caption 12.5 $Pal.ink2))
-        $by = $top + 22
-        $nRows = [Math]::Max(1, $engs.Count)
-        [void]$out.Append(('<line x1="{0}" y1="{1}" x2="{0}" y2="{2}" stroke="{3}" stroke-width="1"/>' -f $X0, (Format-SvgNum ($by - 3)), (Format-SvgNum ($by + ($nRows - 1) * $BAR_PITCH + $BAR_H + 3)), $Pal.baseline) + "`n")
-        foreach ($e in $engs) {
-            $r = $tv.rows[$e]
-            $cy = $by + $BAR_H / 2 + 4.5
-            [void]$out.Append((Get-CardText $ENGINE_RIGHT $cy (Get-EngineName $e) 13 $Pal.ink '' 'end'))
-            if (-not $r) { [void]$out.Append((Get-CardText ($X0 + 6) $cy 'no result' 13 $Pal.ink2)); $by += $BAR_PITCH; continue }
-            $len = $lmax * $r.frac
-            $col = Get-EngineColor $e
-            $fill = if ($r.colour) { $col } else { $Pal.greyBar }
-            $extra = ''
-            if ($r.capped) { $fill = if ($r.colour) { Get-CardBlend $col 0.35 } else { $Pal.greyBar }; if ($r.colour) { $extra = ' stroke="' + $col + '" stroke-width="1.5"' } }
-            [void]$out.Append((Get-CardBar ($X0 + 0.5) $by $len $BAR_H $fill (Get-CardTooltip $m $e) $extra))
-            $vink = if ($r.colour) { $Pal.ink } else { $Pal.ink2 }
-            $tagSpan = if ($r.tag) { Get-CardSpan ($sepDot + $r.tag) 0 $Pal.ink2 } else { '' }
-            [void]$out.Append(('<text x="{0}" y="{1}" font-size="13" fill="{2}">' -f (Format-SvgNum ($X0 + $len + 8)), (Format-SvgNum $cy), $vink) + (Get-CardSpan $r.display 0 '' '600') + $tagSpan + '</text>' + "`n")
-            $by += $BAR_PITCH
-        }
-        $rightH = 22 + ($nRows - 1) * $BAR_PITCH + $BAR_H
-        $y = $top + [Math]::Max($leftH, $rightH) + 12
+        $tv = $views[$ti]
+        $lens = @{}
+        foreach ($e in @($tv.rows.Keys)) { $lens[$e] = $lmax * $tv.rows[$e].frac }
+        $y = Add-FamilyBlock $out $tv $y $lens $engs $G
         if ($ti -lt $views.Count - 1) { [void]$out.Append(('<line x1="{0}" y1="{1}" x2="{2}" y2="{1}" stroke="{3}" stroke-width="1"/>' -f $PAD, (Format-SvgNum $y), $RIGHT, $Pal.hair) + "`n") }
     }
     $y += 26
@@ -2598,6 +2642,306 @@ function New-FamilyValueChart {
     $desc = $name + ': ' + $score + '. Median per test for ' + (Join-EngineNames $engs) + ', each on its own scale from zero; coloured bars mark differences a user would notice, grey bars ties and differences too small to notice. ' + ((@($views | ForEach-Object { $_.model.name + ': ' + $_.verdict + '.' + $(if ($_.detail) { ' ' + $_.detail } else { '' }) })) -join ' ')
     $id = 'family-' + ($FamilyKey.ToLowerInvariant() -replace '[^a-z0-9]+', '-')
     return (New-CardSvg $id $W $H ($name + ' ' + $script:MDASH + ' ' + $score) $desc $out.ToString())
+}
+
+function Get-SameScaleGroups {
+    <#
+      The scale groups of a same-scale family chart. Items, in the family's test order: key (what the test measures:
+      'time' or 'rate'; tests with different keys never share an axis), max (the test's largest finite median in the
+      key's base unit: ms per reader unit, or per minute; $null when it has none) and order. Inside a key the tests are
+      taken from the largest max down: a test joins the current group while its max is at least the group's axis end /
+      Split (so its longest bar stays visible), otherwise it starts a new group. The axis end is the nice ceiling of the
+      group's largest max (Get-CardAxis). An item marked alone (a test with a run over the time limit, whose bar only
+      says "longer than its own finished bars") gets a group of its own and never takes others; a test without a
+      finite median gets a group of its own without an axis. Groups come key by key (in the order of each key's first
+      test), largest first; a group's tests in family order.
+    #>
+    param([object[]]$Items, [double]$Split = 30)
+    $keys = @()
+    foreach ($it in $Items) { if ($keys -notcontains [string]$it.key) { $keys += [string]$it.key } }
+    $groups = New-Object System.Collections.ArrayList
+    foreach ($k in $keys) {
+        $mine = @($Items | Where-Object { [string]$_.key -eq $k })
+        $scaled = @($mine | Where-Object { $null -ne $_.max -and [double]$_.max -gt 0 } | Sort-Object @{ Expression = { [double]$_.max }; Descending = $true }, @{ Expression = { [int]$_.order }; Descending = $false })
+        $cur = $null
+        foreach ($it in $scaled) {
+            if ($it.alone) {
+                $g = [pscustomobject]@{ key = $k; axis = (Get-CardAxis ([double]$it.max)); max = [double]$it.max; items = (New-Object System.Collections.ArrayList) }
+                [void]$g.items.Add($it)
+                [void]$groups.Add($g)
+                continue
+            }
+            if ($cur -and [double]$it.max -ge [double]$cur.axis.max / $Split) { [void]$cur.items.Add($it); continue }
+            $cur = [pscustomobject]@{ key = $k; axis = (Get-CardAxis ([double]$it.max)); max = [double]$it.max; items = (New-Object System.Collections.ArrayList) }
+            [void]$cur.items.Add($it)
+            [void]$groups.Add($cur)
+        }
+        foreach ($it in @($mine | Where-Object { $null -eq $_.max -or [double]$_.max -le 0 })) {
+            $g = [pscustomobject]@{ key = $k; axis = $null; max = $null; items = (New-Object System.Collections.ArrayList) }
+            [void]$g.items.Add($it)
+            [void]$groups.Add($g)
+        }
+    }
+    foreach ($g in $groups) {
+        $sorted = @($g.items | Sort-Object { [int]$_.order })
+        $g.items.Clear()
+        foreach ($s in $sorted) { [void]$g.items.Add($s) }
+    }
+    return $groups.ToArray()
+}
+
+function Get-SameScaleUnit {
+    # How a group's axis is labelled: times in ms, or in s from a 1 s axis end ("0", "20 ms", "10 s"); rates as plain
+    # numbers ("50", "100"), their unit is in the range ("0 to 250 orders per minute") and on every test's unit line.
+    param($Group)
+    if ($Group.key -eq 'rate') {
+        $pers = @(@($Group.items) | ForEach-Object { [string]$_.view.model.spec.per } | Select-Object -Unique)
+        return @{ div = 1.0; tick = ''; range = ' ' + $(if ($pers.Count -eq 1 -and $pers[0]) { $pers[0] } else { 'per minute' }) }
+    }
+    if ($Group.axis -and [double]$Group.axis.max -ge 1000) { return @{ div = 1000.0; tick = ' s'; range = ' s' } }
+    return @{ div = 1.0; tick = ' ms'; range = ' ms' }
+}
+
+function Get-SameScaleRatioText {
+    # Why a test has an axis of its own: "about 185x longer than any other test here" (computed from the largest
+    # medians of the nearest tests of the same kind), or "the only per-minute test here". Tests with a run over the
+    # time limit (on axes of their own) are left out of the comparison, and the text says so.
+    param($Group, [object[]]$Groups)
+    $it = $Group.items[0]
+    $rate = $Group.key -eq 'rate'
+    $same = @(@($Groups | Where-Object { $_.key -eq $Group.key }) | ForEach-Object { @($_.items) } | Where-Object { $_.order -ne $it.order })
+    $others = @($same | Where-Object { -not $_.alone -and $null -ne $_.max -and [double]$_.max -gt 0 })
+    $qual = if (@($same | Where-Object { $_.alone }).Count) { ' (not counting tests over the time limit)' } else { '' }
+    if ($others.Count -eq 0 -or $null -eq $it.max) { return $(if ($rate) { 'the only per-minute test here' } else { 'the only timed test here' }) + $qual }
+    $fmt = { param([double]$R) $(if ($R -ge 10) { ([Math]::Round($R, 0, [MidpointRounding]::AwayFromZero)).ToString('#,0', $script:Inv) } else { Format-Sig3 $R }) + $script:TIMES }
+    $mx = [double]$it.max
+    $bigger = @($others | Where-Object { [double]$_.max -gt $mx } | ForEach-Object { [double]$_.max })
+    $smaller = @($others | Where-Object { [double]$_.max -le $mx } | ForEach-Object { [double]$_.max })
+    $up = if ($rate) { 'higher' } else { 'longer' }; $down = if ($rate) { 'lower' } else { 'shorter' }
+    if ($bigger.Count -eq 0) { return 'about ' + (& $fmt ($mx / [double]($smaller | Measure-Object -Maximum).Maximum)) + ' ' + $up + ' than any other test here' + $qual }
+    $nextUp = [double]($bigger | Measure-Object -Minimum).Minimum
+    if ($smaller.Count -eq 0) { return 'about ' + (& $fmt ($nextUp / $mx)) + ' ' + $down + ' than any other test here' + $qual }
+    return 'about ' + (& $fmt ($nextUp / $mx)) + ' ' + $down + ' than the next ' + $up + ' test and ' + (& $fmt ($mx / [double]($smaller | Measure-Object -Maximum).Maximum)) + ' ' + $up + ' than the next ' + $down + ' one' + $qual
+}
+
+function Get-SameScaleTicks {
+    # The ticks of a group's axis every Step from 0 to the axis end: value (base unit) and label ("0", "20 ms", "10 s").
+    param($Group, [double]$Step)
+    $ticks = @()
+    $nT = [int][Math]::Round([double]$Group.axis.max / $Step)
+    for ($k = 0; $k -le $nT; $k++) {
+        $t = $k * $Step
+        $ticks += [pscustomobject]@{ value = $t; text = $(if ($k -eq 0) { '0' } else { (Format-Sig3 ($t / $Group.unit.div)) + $Group.unit.tick }) }
+    }
+    return $ticks
+}
+
+function Get-SameScaleSteps {
+    # The tick steps a group's axis can use, finest first: its own step, then every coarser step that ends exactly on
+    # the axis end (a whole number of its own steps, such as 40 on 0-80 by 20, or 1, 2, 2.5 or 5 x 10^k, such as 250 or
+    # 500 on 0-1,000 by 200); the last one is the axis end itself (only 0 and the end). Every step labels the end.
+    param([double]$Step, [double]$Max)
+    $cand = @()
+    $nT = [int][Math]::Round($Max / $Step)
+    for ($d = 1; $d -le $nT; $d++) { if ($nT % $d -eq 0) { $cand += $d * $Step } }
+    $mag = [Math]::Pow(10, [Math]::Floor([Math]::Log10($Step)))
+    for ($p = 0; $p -le 3; $p++) {
+        foreach ($f in @(1, 2, 2.5, 5)) {
+            $s = $f * $mag * [Math]::Pow(10, $p)
+            if ($s -le $Step * (1 + 1e-9) -or $s -gt $Max * (1 + 1e-9)) { continue }
+            $n = $Max / $s
+            if ([Math]::Abs($n - [Math]::Round($n)) -lt 1e-6) { $cand += $s }
+        }
+    }
+    $out = @()
+    foreach ($s in @($cand | Sort-Object)) { if ($out.Count -eq 0 -or $s -gt $out[-1] * (1 + 1e-9)) { $out += $s } }
+    return $out
+}
+
+function Get-FamilySameScalePlan {
+    <#
+      What the same-scale version of a family chart shows: the family's test models and views, one item per test (key
+      'time' or 'rate', its largest finite median in the key's base unit, alone when a database did not finish it within
+      the time limit) and the scale groups (Get-SameScaleGroups). Reordered: the groups list the tests in another order
+      than the family chart. $null when no group holds two or more tests (then there is no same-scale chart).
+    #>
+    param($A, [string]$FamilyKey)
+    $models = @($A.tests | Where-Object { $_.family -eq $FamilyKey } | ForEach-Object { Get-ChartTestModel $A $_ })
+    if ($models.Count -lt 2) { return $null }
+    $views = @($models | ForEach-Object { Get-FamilyTestView $_ })
+    # each test's values in its key's base unit (factor: from the row value to ms per reader unit, or per minute)
+    $items = @()
+    for ($i = 0; $i -lt $views.Count; $i++) {
+        $m = $views[$i].model
+        $f = if ($m.higher) { 1.0 } else { $(if ([string]$m.spec.unit -eq 's') { 1000.0 } else { 1.0 }) / [double]$m.spec.divisor }
+        $fin = @($views[$i].rows.Values | Where-Object { -not $_.capped -and $null -ne $_.value -and -not (Test-Inf $_.value) -and [double]$_.value -gt 0 } | ForEach-Object { [double]$_.value * $f })
+        $mx = if ($fin.Count) { [double]($fin | Measure-Object -Maximum).Maximum } else { $null }
+        $alone = @($views[$i].rows.Values | Where-Object { $_.capped }).Count -gt 0
+        $items += [pscustomobject]@{ key = $(if ($m.higher) { 'rate' } else { 'time' }); max = $mx; order = $i; view = $views[$i]; factor = $f; alone = $alone }
+    }
+    $groups = @(Get-SameScaleGroups $items)
+    if (@($groups | Where-Object { $_.axis -and $_.items.Count -ge 2 }).Count -eq 0) { return $null }
+    $shown = @($groups | ForEach-Object { @($_.items) } | ForEach-Object { [int]$_.order })
+    return [pscustomobject]@{ models = $models; views = $views; items = $items; groups = $groups; reordered = (($shown -join ',') -ne ((0..($views.Count - 1)) -join ',')) }
+}
+
+function Get-SameScaleLeadIn {
+    # The sentence before a same-scale chart in the README fragments and the HTML report. Scales: its number of scale
+    # groups; Reordered: its tests are listed in another order than the family chart above it.
+    param([int]$Scales, [bool]$Reordered)
+    if ($Scales -le 1) { return '**The same results on one scale.** Above, each test has its own scale; here tests measured the same way share one axis, so you can compare sizes across tests.' }
+    return '**The same results on shared scales.** Above, each test has its own scale; here tests measured the same way share one axis where their sizes allow, so you can compare sizes within each group. Tests of very different size get separate axes' + $(if ($Reordered) { ', and the chart lists the tests group by group, so their order differs from the chart above.' } else { '.' })
+}
+
+function New-FamilySameScaleChart {
+    <#
+      Same-scale family chart (family-*-same-scale.svg), shown after the family chart: the same blocks, words, colours
+      and labels, but tests measured the same way share one axis from zero, so bar lengths compare across tests (on the
+      family chart each test has its own scale). Scale groups come from Get-FamilySameScalePlan; each group starts with
+      a header band (its range, or why a test has an axis of its own) and the tick labels, with solid gridlines through
+      its bar areas at the labelled ticks. A bar is at least 3 px long. A test with a run over the time limit keeps the
+      family chart's treatment on an axis of its own (its over-the-limit bar runs past the end of that axis), so it
+      never claims a size against other tests. Returns $null when no group holds two or more tests (then the family
+      chart already shows everything).
+    #>
+    param($A, [string]$FamilyKey, [int]$Width = 960)
+    $Pal = $script:CardColors; $SAFE = $script:CardSafe
+    $fam = $A.families[$FamilyKey]
+    $engs = @($A.engines)
+    $plan = Get-FamilySameScalePlan $A $FamilyKey
+    if (-not $plan) { return $null }
+    $models = @($plan.models); $views = @($plan.views); $groups = @($plan.groups)
+    $geo = Get-FamilyChartGeometry $Width
+    $W = $geo.W; $PAD = $geo.PAD; $X0 = $geo.X0; $RIGHT = $geo.RIGHT
+    $sepDot = ' ' + $script:MIDDOT + ' '
+    $MIN_BAR = 3.0; $CAP_SHARE = 0.85
+
+    foreach ($g in $groups) {
+        $g | Add-Member -NotePropertyName unit -NotePropertyValue (Get-SameScaleUnit $g)
+        $g | Add-Member -NotePropertyName hasCap -NotePropertyValue (@(@($g.items) | ForEach-Object { @($_.view.rows.Values | Where-Object { $_.capped }) }).Count -gt 0)
+        $ticks = @()
+        if ($g.axis) { $ticks = @(Get-SameScaleTicks $g ([double]$g.axis.step)) }
+        $g | Add-Member -NotePropertyName ticks -NotePropertyValue $ticks
+        # a time axis in ms over a test shown in s (or the other way round) also gives its end in that unit
+        $alt = ''
+        if ($g.axis -and $g.key -eq 'time') {
+            $axisS = [double]$g.unit.div -eq 1000.0
+            if (@(@($g.items) | Where-Object { ([string]$_.view.model.spec.unit -eq 's') -ne $axisS }).Count) {
+                $alt = ' (= ' + $(if ($axisS) { (Format-Sig3 ([double]$g.axis.max)) + ' ms' } else { (Format-Sig3 ([double]$g.axis.max / 1000.0)) + ' s' }) + ')'
+            }
+        }
+        $g | Add-Member -NotePropertyName range -NotePropertyValue $(if ($g.axis) { '0 to ' + (Format-Sig3 ([double]$g.axis.max / $g.unit.div)) + $g.unit.range + $alt } else { '' })
+    }
+
+    # one axis length for the whole chart: every bar-end label and the last tick label must fit inside the card
+    $frac = {
+        param($Grp, $Item, $Row)
+        if ($Row.capped) { return 1.0 }
+        if (-not $Grp.axis -or $null -eq $Row.value -or (Test-Inf $Row.value)) { return 0.0 }
+        return ([double]$Row.value * $Item.factor / [double]$Grp.axis.max) * $(if ($Grp.hasCap) { $CAP_SHARE } else { 1.0 })
+    }
+    $lmax = 240.0
+    foreach ($g in $groups) {
+        $cf = if ($g.hasCap) { $CAP_SHARE } else { 1.0 }
+        if ($g.axis) { $lmax = [Math]::Min($lmax, ($RIGHT - $X0 - 0.5 - ((Get-CardTextWidth $g.ticks[-1].text 12 $false) * $SAFE) / 2.0) / $cf) }
+        foreach ($it in $g.items) {
+            foreach ($r in $it.view.rows.Values) {
+                $fr = & $frac $g $it $r
+                if ($fr -le 0) { continue }
+                $lw = ((Get-CardTextWidth $r.display 13 $true) + (Get-CardTextWidth $(if ($r.tag) { $sepDot + $r.tag } else { '' }) 13 $false)) * $SAFE
+                $lmax = [Math]::Min($lmax, ($RIGHT - 8 - 3 - $lw - $X0) / $fr)
+            }
+        }
+    }
+    $lmax = [Math]::Max($lmax, 60.0)
+
+    $out = New-Object System.Text.StringBuilder
+    $name = [string]$fam.displayName
+    $score = Get-FamilyScoreText $models
+    $kinds = @($groups | ForEach-Object { $_.key } | Select-Object -Unique)
+    if ($groups.Count -eq 1) { $rule = $(if ($models.Count -eq 2) { 'both tests' } else { 'all ' + $models.Count + ' tests' }) + ' share one axis from zero, so bar lengths compare across tests' }
+    else {
+        $rule = 'tests measured the same way share one axis from zero, so bar lengths compare across tests; tests of very different size get separate axes' + $(if ($kinds.Count -gt 1) { '; times and per-minute rates never share one' } else { '' })
+        if (@($plan.items | Where-Object { $_.alone }).Count) { $rule += '; a test with a database over the time limit gets an axis of its own' }
+    }
+    $sub = 'Acumatica 2026 R2 ' + $script:MIDDOT + ' median of ' + (Get-RunsText $models) + ' per test and database ' + $script:MIDDOT + ' ' + $rule
+    $title = $name + $(if ($groups.Count -gt 1) { ' on shared scales' } else { ' on one scale' })
+    $y = Add-FamilyChartHead $out $title $score $sub $engs $models $FamilyKey $geo
+
+    $descGroups = @()
+    for ($gi = 0; $gi -lt $groups.Count; $gi++) {
+        $g = $groups[$gi]
+        $n = $g.items.Count
+        $cf = if ($g.hasCap) { $CAP_SHARE } else { 1.0 }
+        $sx = { param([double]$V) $X0 + 0.5 + ($V / [double]$g.axis.max) * $lmax * $cf }
+        # header band: which scale, its range, and why a test has an axis of its own
+        $pre = if ($groups.Count -gt 1) { 'Scale ' + ($gi + 1) + ' of ' + $groups.Count + ' ' + $script:MIDDOT + ' ' } else { '' }
+        if (-not $g.axis) {
+            $head = $pre + 'No scale for this test'
+            $body = $script:NDASH + ' ' + $(if (@($g.items[0].view.rows.Values | Where-Object { $_.capped }).Count) { 'no database finished it within the time limit' } else { 'no database has a result to draw' })
+        }
+        elseif ($n -ge 2) { $head = $pre + 'Same scale for ' + $(if ($n -eq $models.Count) { $(if ($n -eq 2) { 'both tests' } else { 'all ' + $n + ' tests' }) } else { 'these ' + $n + ' tests' }) + ': ' + $g.range; $body = '' }
+        elseif ($g.items[0].alone) {
+            # an over-the-limit time is only known to exceed the test's own finished times, never another test's
+            $capE = @($engs | Where-Object { $cr = $g.items[0].view.rows[$_]; $cr -and $cr.capped })
+            $head = $pre + 'Own scale for this test: ' + $g.range
+            $body = $script:NDASH + ' ' + (Join-EngineNames $capE) + ' did not finish it within the time limit, so its bars are not compared with other tests'
+        }
+        else { $head = $pre + 'Own scale for this test: ' + $g.range; $body = $script:NDASH + ' ' + (Get-SameScaleRatioText $g $groups) }
+        $bandTop = $y + 10
+        $hy = $bandTop + 21
+        $maxW = $RIGHT - $PAD - 24
+        $hl = New-Object System.Text.StringBuilder
+        if ($body -and ((Get-CardTextWidth $head 14 $true) + (Get-CardTextWidth (' ' + $body) 13 $false)) * $SAFE -le $maxW) {
+            [void]$hl.Append(('<text x="{0}" y="{1}" font-size="14">' -f ($PAD + 12), (Format-SvgNum $hy)) + (Get-CardSpan $head 0 $Pal.ink '600') + (Get-CardSpan (' ' + $body) 13 $Pal.ink2) + '</text>' + "`n")
+        }
+        else {
+            $first = $true
+            foreach ($l in (Get-CardWrap $head 14 $true $maxW)) { if (-not $first) { $hy += 19 }; [void]$hl.Append((Get-CardText ($PAD + 12) $hy $l 14 $Pal.ink '600')); $first = $false }
+            if ($body) { foreach ($l in (Get-CardWrap $body 13 $false $maxW)) { $hy += 18; [void]$hl.Append((Get-CardText ($PAD + 12) $hy $l 13 $Pal.ink2)) } }
+        }
+        $bandBottom = $hy + 12
+        $ticks = @()
+        if ($g.axis) {
+            # tick labels at the axis step; a coarser step that still ends on the axis end when neighbours would touch,
+            # so every gridline has its label and the end is always labelled
+            foreach ($st in (Get-SameScaleSteps ([double]$g.axis.step) ([double]$g.axis.max))) {
+                $ticks = @(Get-SameScaleTicks $g $st)
+                $tw = @($ticks | ForEach-Object { (Get-CardTextWidth $_.text 12 $false) * $SAFE })
+                $clash = $false
+                for ($k = 1; $k -lt $ticks.Count; $k++) { if (((& $sx $ticks[$k].value) - (& $sx $ticks[$k - 1].value)) -lt ($tw[$k] + $tw[$k - 1]) / 2.0 + 6) { $clash = $true; break } }
+                if (-not $clash) { break }
+            }
+            $ty = $hy + 22
+            foreach ($tk in $ticks) { [void]$hl.Append((Get-CardText (& $sx $tk.value) $ty $tk.text 12 $Pal.ink2 '' 'middle' ' style="font-variant-numeric: tabular-nums"')) }
+            $bandBottom = $ty + 9
+        }
+        [void]$out.Append(('<rect x="{0}" y="{1}" width="{2}" height="{3}" rx="6" fill="{4}"/>' -f $PAD, (Format-SvgNum $bandTop), ($RIGHT - $PAD), (Format-SvgNum ($bandBottom - $bandTop)), $Pal.band) + "`n")
+        [void]$out.Append($hl.ToString())
+        $gridX = [double[]]@()
+        if ($g.axis) { $gridX = [double[]]@($ticks | Where-Object { $_.value -gt 0 } | ForEach-Object { & $sx $_.value }) }
+        $y = $bandBottom - 10
+        for ($ii = 0; $ii -lt $n; $ii++) {
+            $it = $g.items[$ii]; $tv = $it.view
+            $lens = @{}
+            foreach ($e in @($tv.rows.Keys)) {
+                $r = $tv.rows[$e]
+                $fr = & $frac $g $it $r
+                $lens[$e] = $(if ($r.capped) { $lmax } elseif ($fr -gt 0) { [Math]::Max($MIN_BAR, $lmax * $fr) } else { 0.0 })
+            }
+            $y = Add-FamilyBlock $out $tv $y $lens $engs $geo $gridX $true
+            if ($ii -lt $n - 1) { [void]$out.Append(('<line x1="{0}" y1="{1}" x2="{2}" y2="{1}" stroke="{3}" stroke-width="1"/>' -f $PAD, (Format-SvgNum $y), $RIGHT, $Pal.hair) + "`n") }
+        }
+        $descGroups += ($head + $(if ($body) { ' ' + $body } else { '' }) + ': ' + (Join-CardWords @(@($g.items) | ForEach-Object { $_.view.model.name })) + '.')
+    }
+    $y += 26
+    $foot = 'The lowest and highest of the ' + (Get-RunsText $models) + ' and the exact tie rule are in the table below the chart.'
+    foreach ($l in (Get-CardWrap $foot 12.5 $false ($W - 2 * $PAD))) { [void]$out.Append((Get-CardText $PAD $y $l 12.5 $Pal.ink2)); $y += 17 }
+    $H = [int][Math]::Ceiling($y - 17 + $PAD)
+
+    $desc = $title + ': ' + $score + '. Median per test for ' + (Join-EngineNames $engs) + '; ' + $rule + '. ' + ($descGroups -join ' ') + ' Coloured bars mark differences a user would notice, grey bars ties and differences too small to notice. ' + ((@($views | ForEach-Object { $_.model.name + ': ' + $_.verdict + '.' })) -join ' ')
+    $id = 'family-' + ($FamilyKey.ToLowerInvariant() -replace '[^a-z0-9]+', '-') + '-same-scale'
+    return (New-CardSvg $id $W $H ($title + ' ' + $script:MDASH + ' ' + $score) $desc $out.ToString())
 }
 
 #endregion
@@ -3729,6 +4073,99 @@ function Invoke-SelfTest {
     $iS = if ($sp2) { $sp2.IndexOf('>Stock availability list, all columns<') } else { -1 }
     $ok2 = $sp2 -and $iL -ge 0 -and $iL -lt $iD -and $iD -lt $iS -and $sp2.Contains('font-weight="600" text-anchor="middle" fill="#111827" style="font-variant-numeric: tabular-nums">1' + $tx + '<') -and $sp2.Contains('>14' + $tx + '<') -and $sp2.Contains('each job with a result for both finished') -and -not (& $svgOk $sp2)
     & $check 'C13' 'speed-up chart: catalog order kept, 1x labelled past 10x, headline qualified for jobs without a speed-up' $ok2 $(if ($sp2) { 'positions ' + $iL + ' < ' + $iD + ' < ' + $iS } else { 'no chart: ' + $sp2Err })
+
+    # ---- same-scale family charts: the grouping rule (largest first; a test joins while its largest median is at least
+    #      1/30 of the group's axis end), single-test groups, per-minute rates apart from times, a missing database, a
+    #      test over the time limit everywhere, and no chart when no two tests share an axis
+    $md = $script:MIDDOT
+    $mkI = { param([string]$Key, $Max, [int]$Order) [pscustomobject]@{ key = $Key; max = $Max; order = $Order } }
+    $gTxt = { param([object[]]$Gs) (@($Gs | ForEach-Object { '[' + (@($_.items | ForEach-Object { $_.order }) -join ',') + ']' + $(if ($_.axis) { '0-' + ([double]$_.axis.max).ToString('0.###', $script:Inv) } else { 'none' }) }) -join ' ') }
+    $g1 = & $gTxt @(Get-SameScaleGroups @((& $mkI 'time' 67.8 0), (& $mkI 'time' 262.0 1), (& $mkI 'time' 26.8 2), (& $mkI 'time' 48400.0 3)))
+    & $check 'S1' 'same scale: largest first; 48.4 s alone on 0-50 s, the three reports on 0-300 ms in family order' ($g1 -eq '[3]0-50000 [0,1,2]0-300') $g1
+    $g2a = & $gTxt @(Get-SameScaleGroups @((& $mkI 'time' 72.8 0), (& $mkI 'time' 2.7 1)))
+    $g2b = & $gTxt @(Get-SameScaleGroups @((& $mkI 'time' 72.8 0), (& $mkI 'time' 2.6 1)))
+    & $check 'S2' 'same scale: the 1/30 split (2.7 ms joins 0-80 ms; 2.6 ms is under 80/30 and starts its own axis)' ($g2a -eq '[0,1]0-80' -and $g2b -eq '[0]0-80 [1]0-3') ($g2a + ' | ' + $g2b)
+    $g3 = & $gTxt @(Get-SameScaleGroups @((& $mkI 'time' 900.0 0), (& $mkI 'rate' 150.0 1), (& $mkI 'rate' 140.0 2), (& $mkI 'time' $null 3)))
+    & $check 'S3' 'same scale: per-minute rates never share an axis with times; a test without a median gets no axis' ($g3 -eq '[0]0-1000 [3]none [1,2]0-150') $g3
+    $famSs = [ordered]@{ 'Screens' = [ordered]@{ displayName = 'Everyday screens' }; 'OrderEntry' = [ordered]@{ displayName = 'Order entry (1 clerk)' }; 'ManyUsers' = [ordered]@{ displayName = 'Many simultaneous users' }; 'InvoiceRelease' = [ordered]@{ displayName = 'Invoice release to GL' }; 'Core' = [ordered]@{ displayName = 'Platform basics: bulk record work' } }
+    $mkA = {
+        param([object[]]$Tests, $Cells)
+        $vv = [ordered]@{}; $sv = @{}
+        foreach ($tt in $Tests) { $vv[$tt.code] = Get-TestVerdict $tt @($Cells[$tt.code]) $stEng @(); $sv[$tt.code] = Get-DisplaySpec $tt @($Cells[$tt.code]) }
+        [ordered]@{ engines = $stEng; nSlots = 6; tests = $Tests; cells = $Cells; verdicts = $vv; specs = $sv; runs = @(); families = $famSs }
+    }
+    # Want: texts as written in the chart (XML-escaped here); Raw: SVG fragments taken as they are (a tick label '>10 s<')
+    $hasAll = { param([string]$Svg, [string[]]$Want, [string[]]$Raw = @()) @(@($Want | Where-Object { -not $Svg -or $Svg.IndexOf((ConvertTo-XmlText $_)) -lt 0 }) + @($Raw | Where-Object { -not $Svg -or $Svg.IndexOf($_) -lt 0 })) }
+    $stF = & $mkA $stTests $stCells
+    $ssC = $null; $ssErr = ''
+    try { $ssC = New-FamilySameScaleChart $stF 'Core' } catch { $ssErr = $_.Exception.Message }
+    $bad = if ($ssC) { & $svgOk $ssC } else { 'no chart: ' + $ssErr }
+    & $check 'S4' 'same-scale chart: well-formed SVG, solid lines only, all text >= 12 px' ($ssC -and -not $bad) $(if ($bad) { $bad } else { ([string]$ssC.Length) + ' characters' })
+    # the 8-worker delete (MySQL over the time limit) keeps an axis of its own, so the 1-worker delete stands alone too
+    $miss = @(& $hasAll $ssC @('Platform basics: bulk record work on shared scales',('Scale 1 of 3 ' + $md + ' Own scale for this test: 0 to 40 s'), ('about 37' + $tx + ' longer than any other test here'), '(not counting tests over the time limit)', ('Scale 2 of 3 ' + $md + ' Own scale for this test: 0 to 15 s'), 'MySQL did not finish it within the time limit, so its bars are not compared with other tests', ('Scale 3 of 3 ' + $md + ' Same scale for these 4 tests: 0 to 1 s (= 1,000 ms)'), 'over the time limit', 'no result', 'tests of very different size get separate axes', 'a test with a database over the time limit gets an axis of its own') @('>10 s<', '>0.2 s<', '>15 s<'))
+    $iD = if ($ssC) { $ssC.IndexOf('>Delete 10,000 records') } else { -1 }
+    $iC = if ($ssC) { $ssC.IndexOf('>' + (ConvertTo-XmlText ('Scale 2 of 3 ' + $md))) } else { -1 }
+    $iL = if ($ssC) { $ssC.IndexOf('>Load 10,000 records') } else { -1 }
+    $iS = if ($ssC) { $ssC.IndexOf('>Stock availability list') } else { -1 }
+    & $check 'S5' 'same-scale chart: a test over the time limit on an axis of its own; ms and s normalised (0-1 s = 1,000 ms); blocks by group, then family order' ($ssC -and $miss.Count -eq 0 -and $iD -ge 0 -and $iD -lt $iC -and $iC -lt $iL -and $iL -lt $iS) $(if ($miss.Count) { 'missing: ' + ($miss -join ' | ') } else { 'positions ' + $iD + ' < ' + $iC + ' < ' + $iL + ' < ' + $iS })
+    # without the 8-worker delete the 1-worker delete stands alone; a test over the limit on every database has no scale
+    $tU = & $mkT 'CORE_UPDATE_1U' 'Core' 1 $false ('Change 10,000 records' + $w1) 's per 10,000-record job' 'records'
+    $capRuns = [double[]]@(16000, 16000, 16000, $script:PosInf, $script:PosInf, $script:PosInf)
+    $cG = [ordered]@{}; foreach ($k in @($stCells.Keys)) { $cG[$k] = $stCells[$k] }
+    $cG[$tU.code] = @((& $mkC $tU 'SQLServer' $capRuns), (& $mkC $tU 'MySQL' $capRuns), (& $mkC $tU 'PostgreSQL' $capRuns))
+    $ssO = $null
+    try { $ssO = New-FamilySameScaleChart (& $mkA (@($stTests | Where-Object { $_.code -ne 'CORE_DELETE_8U' }) + @($tU)) $cG) 'Core' } catch { $ssErr = $_.Exception.Message }
+    $miss = @(& $hasAll $ssO @(('Scale 1 of 3 ' + $md + ' Own scale for this test: 0 to 40 s'), ('about 37' + $tx + ' longer than any other test here'), ('Scale 2 of 3 ' + $md + ' Same scale for these 4 tests: 0 to 1 s'), ('Scale 3 of 3 ' + $md + ' No scale for this test'), 'no database finished it within the time limit'))
+    $bad = if ($ssO) { & $svgOk $ssO } else { 'no chart: ' + $ssErr }
+    & $check 'S6' 'same-scale chart: a single-test group says why (computed ratio); a test over the limit everywhere has no scale' ($ssO -and $miss.Count -eq 0 -and -not $bad) $(if ($miss.Count) { 'missing: ' + ($miss -join ' | ') } elseif ($bad) { $bad } else { 'all present' })
+    $ssM = $null
+    try { $ssM = New-FamilySameScaleChart $stF 'ManyUsers' } catch { $ssErr = $_.Exception.Message }
+    $miss = @(& $hasAll $ssM @(' on one scale', 'Same scale for all 6 tests: 0 to 300 orders per minute',('orders per minute ' + $md + ' higher is better'), 'no result', 'not ranked') @('>100<', '>300<'))
+    $bad = if ($ssM) { & $svgOk $ssM } else { 'no chart: ' + $ssErr }
+    & $check 'S7' 'same-scale chart: per-minute tests on one axis (plain tick numbers), a database missing from one test, not ranked' ($ssM -and $miss.Count -eq 0 -and -not $bad) $(if ($miss.Count) { 'missing: ' + ($miss -join ' | ') } elseif ($bad) { $bad } else { 'all present' })
+    # no chart: a family with one test; a time test next to a per-minute test (Invoice release); 2.6 ms next to 72.8 ms
+    $ti1 = & $mkT 'INV_RELEASE_TO_GL_U01' 'InvoiceRelease' 1 $false 'Release invoices to GL' 'ms per invoice' 'invoices'
+    $ti4 = & $mkT 'INV_RELEASE_TO_GL_U04' 'InvoiceRelease' 4 $true ('Release invoices to GL ' + $nd + ' 4 people working non-stop') 'invoices per minute' 'invoices'
+    $cI = [ordered]@{}
+    $cI[$ti1.code] = @((& $mkC $ti1 'SQLServer' (& $six 900)), (& $mkC $ti1 'MySQL' (& $six 1300)), (& $mkC $ti1 'PostgreSQL' (& $six 1200)))
+    $cI[$ti4.code] = @((& $mkC $ti4 'SQLServer' (& $six 60)), (& $mkC $ti4 'MySQL' (& $six 50)), (& $mkC $ti4 'PostgreSQL' (& $six 58)))
+    $mkScr = {
+        param([double]$Top)
+        $a1 = & $mkT 'SCR_OPEN_SALES_ORDER' 'Screens' 1 $false 'Open a sales order' 'ms per order opened' 'orders'
+        $a2 = & $mkT 'SCR_CUSTOMER_SEARCH' 'Screens' 1 $false 'Find a customer by part of the name' 'ms per search' 'searches'
+        $cc = [ordered]@{}
+        $cc[$a1.code] = @((& $mkC $a1 'SQLServer' (& $six 56)), (& $mkC $a1 'MySQL' (& $six 72.8)), (& $mkC $a1 'PostgreSQL' (& $six 69)))
+        $cc[$a2.code] = @((& $mkC $a2 'SQLServer' ([double[]]@(0.5, 0.5, 0.5, 0.5, 0.5, 0.5))), (& $mkC $a2 'MySQL' ([double[]]@($Top, $Top, $Top, $Top, $Top, $Top))), (& $mkC $a2 'PostgreSQL' ([double[]]@(1, 1, 1, 1, 1, 1))))
+        & $mkA @($a1, $a2) $cc
+    }
+    $noOE = New-FamilySameScaleChart $stF 'OrderEntry'
+    $noInv = New-FamilySameScaleChart (& $mkA @($ti1, $ti4) $cI) 'InvoiceRelease'
+    $noScr = New-FamilySameScaleChart (& $mkScr 2.6) 'Screens'
+    $scr = $null
+    try { $scr = New-FamilySameScaleChart (& $mkScr 2.7) 'Screens' } catch { $ssErr = $_.Exception.Message }
+    $barW = @([regex]::Matches([string]$scr, '<rect x="458\.5" y="[0-9.]+" width="([0-9.]+)" height="16"') | ForEach-Object { [double]::Parse($_.Groups[1].Value, $script:Inv) })
+    & $check 'S8' 'same-scale chart: none for one test, for a time and a per-minute test, or for 2.6 ms next to 72.8 ms' ($null -eq $noOE -and $null -eq $noInv -and $null -eq $noScr) ('order entry: ' + [bool]$noOE + '; invoice: ' + [bool]$noInv + '; 2.6 ms: ' + [bool]$noScr)
+    & $check 'S9' 'same-scale chart: 2.7 ms shares 0-80 ms with 72.8 ms, and its 0.5 ms and 1 ms bars are still 3 px long' ($scr -and $scr.Contains('Same scale for both tests: 0 to 80 ms') -and $barW.Count -eq 2 -and @($barW | Where-Object { $_ -lt 3 }).Count -eq 0 -and -not (& $svgOk $scr)) $(if ($scr) { 'short bars: ' + (($barW | ForEach-Object { $_.ToString('0.#', $script:Inv) }) -join ', ') + ' px' } else { 'no chart: ' + $ssErr })
+    # tick labels that would touch: a coarser step that still ends on the axis end; every gridline keeps its label
+    $stTxt = { param([double]$S, [double]$M) (@(Get-SameScaleSteps $S $M) | ForEach-Object { ([double]$_).ToString('0.###', $script:Inv) }) -join ',' }
+    $st1 = & $stTxt 20 80; $st2 = & $stTxt 200 1000; $st3 = & $stTxt 50 300
+    $tickLbl = { param([string]$Svg) @([regex]::Matches($Svg, '<text x="([0-9.]+)" y="[0-9.]+" font-size="12" text-anchor="middle" fill="#[0-9a-f]{6}" style="font-variant-numeric: tabular-nums">([^<]*)<') | ForEach-Object { $_.Groups[1].Value + '|' + $_.Groups[2].Value }) }
+    $unlabelled = {
+        param([string]$Svg)
+        $lx = @(& $tickLbl $Svg | ForEach-Object { ($_ -split '\|')[0] })
+        @([regex]::Matches($Svg, '<line x1="([0-9.]+)" y1="[0-9.]+" x2="\1" y2="[0-9.]+" stroke="' + $script:CardColors.hair + '"') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique | Where-Object { $lx -notcontains $_ })
+    }
+    $scrN = $null
+    try { $scrN = New-FamilySameScaleChart (& $mkScr 2.7) 'Screens' 640 } catch { $ssErr = $_.Exception.Message }
+    $lblN = @(& $tickLbl $scrN | ForEach-Object { ($_ -split '\|')[1] })
+    $noLbl = @(@(& $unlabelled $scrN) + @(& $unlabelled $scr) + @(& $unlabelled $ssC) + @(& $unlabelled $ssM))
+    & $check 'S10' 'same-scale chart: crowded tick labels take a coarser step ending on the axis end (20 > 40 > 80), no gridline without a label' ($st1 -eq '20,40,80' -and $st2 -eq '200,250,500,1000' -and $st3 -eq '50,100,150,300' -and $scrN -and $lblN.Count -ge 2 -and $lblN.Count -lt 5 -and $lblN[-1] -eq '80 ms' -and $noLbl.Count -eq 0) ($st1 + ' | ' + $st2 + ' | ' + $st3 + ' | narrow: ' + ($lblN -join ', ') + ' | unlabelled gridlines: ' + $noLbl.Count)
+    # the lead-in under the family chart: one scale, or several (and then whether the tests moved)
+    $pC = Get-FamilySameScalePlan $stF 'Core'
+    $pS = Get-FamilySameScalePlan (& $mkScr 2.7) 'Screens'
+    $li1 = Get-SameScaleLeadIn 1 $false; $li2 = Get-SameScaleLeadIn 3 $true; $li3 = Get-SameScaleLeadIn 2 $false
+    $okLi = $pC -and @($pC.groups).Count -eq 3 -and $pC.reordered -and $pS -and @($pS.groups).Count -eq 1 -and -not $pS.reordered -and $li1.StartsWith('**The same results on one scale.**') -and $li2.StartsWith('**The same results on shared scales.**') -and $li2.EndsWith('so their order differs from the chart above.') -and $li3.EndsWith('get separate axes.')
+    & $check 'S11' 'same-scale lead-in: one scale, or shared scales (saying when the tests are listed in another order)' $okLi ('core: ' + $(if ($pC) { [string]@($pC.groups).Count + ' scales, reordered ' + $pC.reordered } else { 'no plan' }) + '; screens: ' + $(if ($pS) { [string]@($pS.groups).Count + ' scale, reordered ' + $pS.reordered } else { 'no plan' }))
     Remove-Variable -Name stT, stC -Scope Script -ErrorAction SilentlyContinue
 
     $script:selfRows | Format-Table -AutoSize | Out-String -Width 220 | Write-Host
@@ -4948,7 +5385,9 @@ function Get-CampaignFacts {
 }
 
 function New-ReadmeFragments {
-    param($Data, $A, [string]$ChartPrefix)
+    # SameScale: family key -> its same-scale chart (file, number of scale groups, tests reordered), shown right under the
+    # family chart.
+    param($Data, $A, [string]$ChartPrefix, $SameScale = $null)
     $md = New-Object System.Text.StringBuilder
     $facts = Get-CampaignFacts $Data $A
     $engs = $A.engines
@@ -5045,7 +5484,17 @@ function New-ReadmeFragments {
             & $add ('**Why it matters when choosing a database:** ' + $why)
             & $add ''
         }
-        if ($info) { & $add ('![' + $fam.displayName + '](' + $ChartPrefix + $info.chart + ')'); & $add '' }
+        if ($info) {
+            & $add ('![' + $fam.displayName + '](' + $ChartPrefix + $info.chart + ')'); & $add ''
+            # the same-scale version only right under its family chart (its lead-in refers to the chart above)
+            if ($SameScale -and $SameScale.Contains($fk)) {
+                $ss = $SameScale[$fk]
+                & $add (Get-SameScaleLeadIn ([int]$ss.scales) ([bool]$ss.reordered))
+                & $add ''
+                & $add ('![' + $fam.displayName + $(if ([int]$ss.scales -gt 1) { ' on shared scales' } else { ' on one scale' }) + '](' + $ChartPrefix + $ss.file + ')')
+                & $add ''
+            }
+        }
         & $add ('| Test | ' + $hdrEngines + ' | Verdict |')
         & $add ('|---|' + $sepEngines + '|---|')
         $famTests = @($A.tests | Where-Object { $_.family -eq $fk })
@@ -5767,10 +6216,18 @@ function Invoke-Report {
     # charts
     $svgs = @{}
     $svgs['at-a-glance.svg'] = New-ScorecardChart $a
+    # each family chart, and its same-scale version where at least two tests share an axis
+    $sameScale = [ordered]@{}
     foreach ($fk in $a.families.Keys) {
         $info = $script:FamilyInfo[$fk]
         $file = if ($info) { $info.chart } else { 'family-' + $fk.ToLowerInvariant() + '.svg' }
         $svgs[$file] = New-FamilyValueChart $a $fk
+        $plan = Get-FamilySameScalePlan $a $fk
+        if ($plan) {
+            $sameFile = $file -replace '\.svg$', '-same-scale.svg'
+            $svgs[$sameFile] = New-FamilySameScaleChart $a $fk
+            $sameScale[$fk] = [pscustomobject]@{ file = $sameFile; scales = @($plan.groups).Count; reordered = [bool]$plan.reordered }
+        }
     }
     if (@($a.derived.scaling).Count) { $svgs['scaling-orders.svg'] = New-ScalingChart $a }
     if (@($a.derived.speedup1Uto8U).Count) { $svgs['speedup-core.svg'] = New-SpeedupChart $a }
@@ -5781,11 +6238,11 @@ function Invoke-Report {
     Write-Utf8File (Join-Path $Out 'analysis.json') ($json + "`n")
 
     # README fragments and HTML
-    $md = New-ReadmeFragments $data $a $ChartPrefix
+    $md = New-ReadmeFragments $data $a $ChartPrefix $sameScale
     Write-Utf8File (Join-Path $Out 'README-results.md') $md
     $inline = @{}
     foreach ($k in $svgs.Keys) { $inline[$k] = ($svgs[$k] -replace '^<\?xml[^>]*\?>\s*', '') }
-    $mdForHtml = New-ReadmeFragments $data $a 'charts/'
+    $mdForHtml = New-ReadmeFragments $data $a 'charts/' $sameScale
     $campaignName = ($data.campaignIds | Select-Object -First 1)
     if (-not $campaignName) { $campaignName = 'campaign' }
     $htmlPath = Join-Path $Out ('PerfDBBenchmark-' + $campaignName + '.html')

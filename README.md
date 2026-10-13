@@ -337,6 +337,7 @@ A difference can be real and still not matter to anyone. We mark it **not notice
 - **"different answer"** and **"N failed saves"** mean the database is not ranked on that test; correctness comes before speed.
 - **The overview chart** under Results at a glance is a scorecard: one row per test, one column per database. Each cell gives the median in the test's own unit and a small label (a "chip"). A chip has colour only where a difference is real and big enough to notice: "fastest" (or "joint fastest" when two share the top) in the database's colour for a database that is noticeably faster than another one, and "x% slower" lightly tinted, with a grey line saying against which database, for example "+19.9 s vs SQL Server" or "vs PostgreSQL only". When one gap in a test reaches 2×, every gap of that test is given as a ratio ("1.98× slower", "2.33× slower"). A "joint fastest" chip without colour marks a database in the fastest group that ties with every other database. Every other cell says "tie". Short grey notes explain ties that look like gaps: the extra time is too small to feel ("only +226 ms"), the gap is within the normal swing between runs, or that database's own runs varied widely. "not ranked" marks failed saves or a different answer; "over limit" and "ranks last" mark a database that did not finish within the time limit. The bold line at the top counts the tests where users would notice a difference.
 - **The family charts** show the real median of each database as a bar that starts at zero, on each test's own scale, with the unit and "lower is better" or "higher is better" above the bars. The verdict for each test is written on its left. A bar is in its database's colour only where that database is on one side of a difference you would notice; a grey bar means no difference you would notice ("tie": inside the test's noise margin; "not noticeable": real but too small to feel). The label after each bar gives the value, the gap to the fastest and that tag. For "per minute" tests the gap is measured on the median time per order or invoice, so it can differ a little from the ratio of the bars; the chart says so where the two differ by more than 2 percentage points. The lowest and highest runs are in the tables, not in the charts.
+- **The same-scale charts** follow four of the family charts (Everyday screens, Reports & month-end, Many simultaneous users and Platform basics). They show the same bars, words and colours, but tests measured the same way share one axis from zero, so bar lengths can be compared across tests. A test whose bars would be under 1/30 of that axis gets a separate one, so Reports & month-end and Platform basics have two scales each, listed one after the other; a grey band at the start of each group gives its range. Order entry has a single test and the two Invoice release tests use different units, so neither has a same-scale version.
 - **The scaling chart** under Many simultaneous users draws one line per database through its medians for 1, 4, 8 and 16 clerks: orders per minute at the top and the wait within which 95% of orders were saved at the bottom, each on one scale for both columns; a grey note beside a point marks a database whose own runs varied widely. The rows under the top charts give the overview chart's verdict at each number of clerks: one grey "tie" when all three tie, otherwise chips coloured only where users would notice the gap. **The speed-up chart** under Platform basics shows how many times faster a job finished with 8 workers than with 1 (1× = no gain, 8× = a perfect split), with both times in the test's unit; speed-ups are not ranked, so all of its bars have one neutral colour, and a longer bar means more gain from 8 workers, not a faster database.
 - **Colours** stand for the database, never for good or bad: SQL Server is blue, MySQL orange and PostgreSQL pink (chosen to be readable with colour blindness), and every column, bar and line is also labelled with the database name.
 - **The family index** in the at-a-glance table summarises a family in one number per database: 1.00 means fastest on every test of the family, 1.20 means typically 20% slower. Tests that cannot be compared fairly (time limit, different answer, failed saves) are left out of the index and listed under the table.
@@ -407,6 +408,10 @@ Each cell shows the family index (1.00 = fastest on every test, computed over th
 
 ![Everyday screens](docs/images/2026r2/family-screens.svg)
 
+**The same results on one scale.** Above, each test has its own scale; here tests measured the same way share one axis, so you can compare sizes across tests.
+
+![Everyday screens on one scale](docs/images/2026r2/family-screens-same-scale.svg)
+
 | Test | SQL Server | MySQL | PostgreSQL | Verdict |
 |---|---|---|---|---|
 | Open a sales order <br>*ms per order opened* | 56.4 (55.7–61.3) | 72.8 (70.8–79.1) | 69.1 (66.2–78.1) | **Not noticeable:** SQL Server was faster than MySQL (56.4 ms vs 72.8 ms per order opened), a difference nobody will notice. Open a sales order: 56.4–72.8 ms per order opened on all three; not noticeable. |
@@ -450,6 +455,10 @@ Differences here come mostly from how Acumatica works with each database on a sh
 **Why it matters when choosing a database:** Month-end and management reports ask the database for the most work per click. These tests time the database work behind each report or inquiry inside Acumatica. Report layout, rendering, export to PDF or Excel and the browser are not included.
 
 ![Reports & month-end](docs/images/2026r2/family-reports.svg)
+
+**The same results on shared scales.** Above, each test has its own scale; here tests measured the same way share one axis where their sizes allow, so you can compare sizes within each group. Tests of very different size get separate axes, and the chart lists the tests group by group, so their order differs from the chart above.
+
+![Reports & month-end on shared scales](docs/images/2026r2/family-reports-same-scale.svg)
 
 | Test | SQL Server | MySQL | PostgreSQL | Verdict |
 |---|---|---|---|---|
@@ -525,6 +534,10 @@ Differences here come mostly from how Acumatica works with each database on a sh
 Acumatica ran on about 2 processor cores on every database (its limit for a site without a licence), so where Acumatica is the bottleneck the differences between the databases are smaller than they could be ([Limits](#limits-of-this-test)).
 
 ![Many simultaneous users](docs/images/2026r2/family-many-users.svg)
+
+**The same results on one scale.** Above, each test has its own scale; here tests measured the same way share one axis, so you can compare sizes across tests.
+
+![Many simultaneous users on one scale](docs/images/2026r2/family-many-users-same-scale.svg)
 
 | Test | SQL Server | MySQL | PostgreSQL | Verdict |
 |---|---|---|---|---|
@@ -652,6 +665,10 @@ These tests write permanent accounting data (invoices, customer balances, GL bat
 These are the original 12 tests of the previous edition, fixed and re-measured; see [what changed](#4-the-original-12-tests-fixed-and-measured-again-re-baseline) and the table of old and new names there. They use a simple custom table and run no business logic, so they show the platform's raw cost of reading and writing data. Imports of real documents behave more like [Order entry](#order-entry-1-clerk-1-test) and [Invoice release](#invoice-release-to-gl).
 
 ![Platform basics: bulk record work](docs/images/2026r2/family-core.svg)
+
+**The same results on shared scales.** Above, each test has its own scale; here tests measured the same way share one axis where their sizes allow, so you can compare sizes within each group. Tests of very different size get separate axes, and the chart lists the tests group by group, so their order differs from the chart above.
+
+![Platform basics: bulk record work on shared scales](docs/images/2026r2/family-core-same-scale.svg)
 
 | Test | SQL Server | MySQL | PostgreSQL | Verdict |
 |---|---|---|---|---|

@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1056" viewBox="0 0 960 1056" role="img" aria-labelledby="family-manyusers-same-scale-title family-manyusers-same-scale-desc">
+<title id="family-manyusers-same-scale-title">Many simultaneous users on one scale — A noticeable difference in 1 of 6 tests</title>
+<desc id="family-manyusers-same-scale-desc">Many simultaneous users on one scale: A noticeable difference in 1 of 6 tests. Median per test for SQL Server, MySQL and PostgreSQL; all 6 tests share one axis from zero, so bar lengths compare across tests. Same scale for all 6 tests: 0 to 250 orders per minute: Enter sales orders – 4 clerks working non-stop, Enter sales orders – 8 clerks working non-stop, Enter sales orders – 16 clerks working non-stop, Everyone sells the best-seller – 4 clerks working non-stop, Everyone sells the best-seller – 8 clerks working non-stop and Everyone sells the best-seller – 16 clerks working non-stop. Coloured bars mark differences a user would notice, grey bars ties and differences too small to notice. Enter sales orders – 4 clerks working non-stop: Tie: no real winner. Enter sales orders – 8 clerks working non-stop: MySQL noticeably slower than PostgreSQL. Enter sales orders – 16 clerks working non-stop: Tie: no real winner. Everyone sells the best-seller – 4 clerks working non-stop: Tie: no real winner. Everyone sells the best-seller – 8 clerks working non-stop: Tie: no real winner. Everyone sells the best-seller – 16 clerks working non-stop: Tie: no real winner.</desc>
+<rect x="0.5" y="0.5" width="959" height="1055" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+<g font-family="-apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, &#39;Helvetica Neue&#39;, Helvetica, Arial, &#39;Liberation Sans&#39;, sans-serif">
+<text x="24" y="46"><tspan font-size="21" font-weight="600" fill="#111827">Many simultaneous users on one scale</tspan><tspan font-size="15" fill="#111827" dx="14">A noticeable difference in 1 of 6 tests</tspan></text>
+<text x="24" y="68" font-size="13" fill="#4b5563">Acumatica 2026 R2 · median of 6 runs per test and database · all 6 tests share one axis from zero, so bar lengths compare across tests</text>
+<rect x="24" y="87" width="14" height="14" rx="3" fill="#0072B2"/>
+<text x="44" y="98" font-size="13" font-weight="600" fill="#111827">SQL Server</text>
+<rect x="142.7" y="87" width="14" height="14" rx="3" fill="#E69F00"/>
+<text x="162.7" y="98" font-size="13" font-weight="600" fill="#111827">MySQL</text>
+<rect x="234.8" y="87" width="14" height="14" rx="3" fill="#CC79A7"/>
+<text x="254.8" y="98" font-size="13" font-weight="600" fill="#111827">PostgreSQL</text>
+<rect x="24" y="113" width="5" height="14" fill="#0072B2"/>
+<rect x="29" y="113" width="5" height="14" fill="#E69F00"/>
+<rect x="34" y="113" width="5" height="14" fill="#CC79A7"/>
+<text x="48" y="124" font-size="13"><tspan font-weight="600" fill="#111827">Coloured bar:</tspan><tspan fill="#4b5563"> this database is on one side of a difference you would notice: noticeably faster or noticeably slower than another</tspan></text>
+<text x="48" y="142" font-size="13" fill="#4b5563">database in the same test.</text>
+<rect x="24" y="153" width="15" height="14" rx="3" fill="#c9c8c0"/>
+<text x="48" y="164" font-size="13"><tspan font-weight="600" fill="#111827">Grey bar:</tspan><tspan fill="#4b5563"> no difference you would notice against the others. “tie” means inside the test’s noise margin; “not noticeable” means real</tspan></text>
+<text x="48" y="182" font-size="13" fill="#4b5563">but too small to feel (under 10%).</text>
+<line x1="24" y1="218" x2="936" y2="218" stroke="#111827" stroke-width="1.5"/>
+<rect x="24" y="230" width="912" height="52" rx="6" fill="#f6f8fa"/>
+<text x="36" y="251" font-size="14" font-weight="600" fill="#111827">Same scale for all 6 tests: 0 to 250 orders per minute</text>
+<text x="458.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">0</text>
+<text x="506.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">50</text>
+<text x="554.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">100</text>
+<text x="602.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">150</text>
+<text x="650.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">200</text>
+<text x="698.5" y="273" font-size="12" text-anchor="middle" fill="#4b5563" style="font-variant-numeric: tabular-nums">250</text>
+<text x="24" y="302" font-size="14" font-weight="600" fill="#111827">Enter sales orders –</text>
+<text x="24" y="320" font-size="14" font-weight="600" fill="#111827">4 clerks working non-stop</text>
+<text x="24" y="340" font-size="13.5" font-weight="600" fill="#4b5563">Tie: no real winner</text>
+<text x="24" y="358" font-size="13" fill="#4b5563">All within 58%, inside the 75% noise margin. Gaps</text>
+<text x="24" y="375" font-size="13" fill="#4b5563">are measured on the median time per order; the</text>
+<text x="24" y="392" font-size="13" fill="#4b5563">per-minute medians differ more because SQL</text>
+<text x="24" y="409" font-size="13" fill="#4b5563">Server’s runs varied 140–275/min.</text>
+<text x="458" y="300" font-size="12.5" fill="#4b5563">orders per minute · higher is better</text>
+<line x1="506.5" y1="307" x2="506.5" y2="373" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="554.5" y1="307" x2="554.5" y2="373" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="602.5" y1="307" x2="602.5" y2="373" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="650.5" y1="307" x2="650.5" y2="373" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="307" x2="698.5" y2="373" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="307" x2="458" y2="373" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="322.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,310 H661.3 A4,4 0 0 1 665.3,314 V322 A4,4 0 0 1 661.3,326 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Enter sales orders – 4 clerks working non-stop: median 215 (140–275), noisy orders/min (lowest–highest run in brackets)</title></path>
+<rect x="669.8" y="310.5" width="169.5" height="16" fill="#ffffff"/>
+<text x="672.8" y="322.5" font-size="13" fill="#4b5563"><tspan font-weight="600">215 orders/min</tspan><tspan fill="#4b5563"> · highest</tspan></text>
+<text x="450" y="344.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,332 H579.3 A4,4 0 0 1 583.3,336 V344 A4,4 0 0 1 579.3,348 H458.5 Z" fill="#c9c8c0"><title>MySQL, Enter sales orders – 4 clerks working non-stop: median 130 (121–154) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="587.8" y="332.5" width="224.2" height="16" fill="#ffffff"/>
+<text x="590.8" y="344.5" font-size="13" fill="#4b5563"><tspan font-weight="600">130 orders/min</tspan><tspan fill="#4b5563"> · 58% slower · tie</tspan></text>
+<text x="450" y="366.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,354 H606.1 A4,4 0 0 1 610.1,358 V366 A4,4 0 0 1 606.1,370 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Enter sales orders – 4 clerks working non-stop: median 158 (139–182) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="614.6" y="354.5" width="224.2" height="16" fill="#ffffff"/>
+<text x="617.6" y="366.5" font-size="13" fill="#4b5563"><tspan font-weight="600">158 orders/min</tspan><tspan fill="#4b5563"> · 29% slower · tie</tspan></text>
+<line x1="24" y1="434" x2="936" y2="434" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="464" font-size="14" font-weight="600" fill="#111827">Enter sales orders –</text>
+<text x="24" y="482" font-size="14" font-weight="600" fill="#111827">8 clerks working non-stop</text>
+<text x="24" y="502" font-size="13.5" font-weight="600" fill="#111827">MySQL noticeably slower than PostgreSQL</text>
+<text x="24" y="520" font-size="13" fill="#4b5563">140 orders/min vs 154 orders/min (10% slower).</text>
+<text x="24" y="537" font-size="13" fill="#4b5563">SQL Server ties with both.</text>
+<text x="458" y="462" font-size="12.5" fill="#4b5563">orders per minute · higher is better</text>
+<line x1="506.5" y1="469" x2="506.5" y2="535" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="554.5" y1="469" x2="554.5" y2="535" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="602.5" y1="469" x2="602.5" y2="535" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="650.5" y1="469" x2="650.5" y2="535" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="469" x2="698.5" y2="535" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="469" x2="458" y2="535" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="484.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,472 H596.1 A4,4 0 0 1 600.1,476 V484 A4,4 0 0 1 596.1,488 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Enter sales orders – 8 clerks working non-stop: median 147 (133–162) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="604.6" y="472.5" width="228.2" height="16" fill="#ffffff"/>
+<text x="607.6" y="484.5" font-size="13" fill="#4b5563"><tspan font-weight="600">147 orders/min</tspan><tspan fill="#4b5563"> · 4.7% slower · tie</tspan></text>
+<text x="450" y="506.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,494 H588.9 A4,4 0 0 1 592.9,498 V506 A4,4 0 0 1 588.9,510 H458.5 Z" fill="#E69F00"><title>MySQL, Enter sales orders – 8 clerks working non-stop: median 140 (125–144) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="597.4" y="494.5" width="274.7" height="16" fill="#ffffff"/>
+<text x="600.4" y="506.5" font-size="13" fill="#111827"><tspan font-weight="600">140 orders/min</tspan><tspan fill="#4b5563"> · 10% slower · noticeable</tspan></text>
+<text x="450" y="528.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,516 H602.5 A4,4 0 0 1 606.5,520 V528 A4,4 0 0 1 602.5,532 H458.5 Z" fill="#CC79A7"><title>PostgreSQL, Enter sales orders – 8 clerks working non-stop: median 154 (139–158) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="611" y="516.5" width="165.9" height="16" fill="#ffffff"/>
+<text x="614" y="528.5" font-size="13" fill="#111827"><tspan font-weight="600">154 orders/min</tspan><tspan fill="#4b5563"> · fastest</tspan></text>
+<line x1="24" y1="562" x2="936" y2="562" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="592" font-size="14" font-weight="600" fill="#111827">Enter sales orders –</text>
+<text x="24" y="610" font-size="14" font-weight="600" fill="#111827">16 clerks working non-stop</text>
+<text x="24" y="630" font-size="13.5" font-weight="600" fill="#4b5563">Tie: no real winner</text>
+<text x="24" y="648" font-size="13" fill="#4b5563">All within 11%, inside the 17% noise margin.</text>
+<text x="458" y="590" font-size="12.5" fill="#4b5563">orders per minute · higher is better</text>
+<line x1="506.5" y1="597" x2="506.5" y2="663" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="554.5" y1="597" x2="554.5" y2="663" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="602.5" y1="597" x2="602.5" y2="663" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="650.5" y1="597" x2="650.5" y2="663" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="597" x2="698.5" y2="663" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="597" x2="458" y2="663" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="612.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,600 H591.2 A4,4 0 0 1 595.2,604 V612 A4,4 0 0 1 591.2,616 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Enter sales orders – 16 clerks working non-stop: median 142 (133–189) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="599.7" y="600.5" width="228.2" height="16" fill="#ffffff"/>
+<text x="602.7" y="612.5" font-size="13" fill="#4b5563"><tspan font-weight="600">142 orders/min</tspan><tspan fill="#4b5563"> · 3.6% slower · tie</tspan></text>
+<text x="450" y="634.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,622 H582 A4,4 0 0 1 586,626 V634 A4,4 0 0 1 582,638 H458.5 Z" fill="#c9c8c0"><title>MySQL, Enter sales orders – 16 clerks working non-stop: median 133 (127–162) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="590.5" y="622.5" width="224.2" height="16" fill="#ffffff"/>
+<text x="593.5" y="634.5" font-size="13" fill="#4b5563"><tspan font-weight="600">133 orders/min</tspan><tspan fill="#4b5563"> · 11% slower · tie</tspan></text>
+<text x="450" y="656.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,644 H596.3 A4,4 0 0 1 600.3,648 V656 A4,4 0 0 1 596.3,660 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Enter sales orders – 16 clerks working non-stop: median 148 (129–170) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="604.8" y="644.5" width="169.5" height="16" fill="#ffffff"/>
+<text x="607.8" y="656.5" font-size="13" fill="#4b5563"><tspan font-weight="600">148 orders/min</tspan><tspan fill="#4b5563"> · highest</tspan></text>
+<line x1="24" y1="673" x2="936" y2="673" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="703" font-size="14" font-weight="600" fill="#111827">Everyone sells the best-seller –</text>
+<text x="24" y="721" font-size="14" font-weight="600" fill="#111827">4 clerks working non-stop</text>
+<text x="24" y="741" font-size="13.5" font-weight="600" fill="#4b5563">Tie: no real winner</text>
+<text x="24" y="759" font-size="13" fill="#4b5563">All within 13%, inside the 26% noise margin.</text>
+<text x="458" y="701" font-size="12.5" fill="#4b5563">orders per minute · higher is better</text>
+<line x1="506.5" y1="708" x2="506.5" y2="774" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="554.5" y1="708" x2="554.5" y2="774" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="602.5" y1="708" x2="602.5" y2="774" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="650.5" y1="708" x2="650.5" y2="774" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="708" x2="698.5" y2="774" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="708" x2="458" y2="774" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="723.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,711 H608.9 A4,4 0 0 1 612.9,715 V723 A4,4 0 0 1 608.9,727 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Everyone sells the best-seller – 4 clerks working non-stop: median 161 (140–166) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="617.4" y="711.5" width="169.5" height="16" fill="#ffffff"/>
+<text x="620.4" y="723.5" font-size="13" fill="#4b5563"><tspan font-weight="600">161 orders/min</tspan><tspan fill="#4b5563"> · highest</tspan></text>
+<text x="450" y="745.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,733 H590.6 A4,4 0 0 1 594.6,737 V745 A4,4 0 0 1 590.6,749 H458.5 Z" fill="#c9c8c0"><title>MySQL, Everyone sells the best-seller – 4 clerks working non-stop: median 142 (124–177) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="599.1" y="733.5" width="224.3" height="16" fill="#ffffff"/>
+<text x="602.1" y="745.5" font-size="13" fill="#4b5563"><tspan font-weight="600">142 orders/min</tspan><tspan fill="#4b5563"> · 13% slower · tie</tspan></text>
+<text x="450" y="767.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,755 H603.9 A4,4 0 0 1 607.9,759 V767 A4,4 0 0 1 603.9,771 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Everyone sells the best-seller – 4 clerks working non-stop: median 156 (131–229) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="612.4" y="755.5" width="228.1" height="16" fill="#ffffff"/>
+<text x="615.4" y="767.5" font-size="13" fill="#4b5563"><tspan font-weight="600">156 orders/min</tspan><tspan fill="#4b5563"> · 3.4% slower · tie</tspan></text>
+<line x1="24" y1="784" x2="936" y2="784" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="814" font-size="14" font-weight="600" fill="#111827">Everyone sells the best-seller –</text>
+<text x="24" y="832" font-size="14" font-weight="600" fill="#111827">8 clerks working non-stop</text>
+<text x="24" y="852" font-size="13.5" font-weight="600" fill="#4b5563">Tie: no real winner</text>
+<text x="24" y="870" font-size="13" fill="#4b5563">All within 27%, inside the 43% noise margin.</text>
+<text x="458" y="812" font-size="12.5" fill="#4b5563">orders per minute · higher is better</text>
+<line x1="506.5" y1="819" x2="506.5" y2="885" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="554.5" y1="819" x2="554.5" y2="885" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="602.5" y1="819" x2="602.5" y2="885" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="650.5" y1="819" x2="650.5" y2="885" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="819" x2="698.5" y2="885" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="819" x2="458" y2="885" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="834.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,822 H609.8 A4,4 0 0 1 613.8,826 V834 A4,4 0 0 1 609.8,838 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Everyone sells the best-seller – 8 clerks working non-stop: median 162 (137–213), noisy orders/min (lowest–highest run in brackets)</title></path>
+<rect x="618.3" y="822.5" width="169.5" height="16" fill="#ffffff"/>
+<text x="621.3" y="834.5" font-size="13" fill="#4b5563"><tspan font-weight="600">162 orders/min</tspan><tspan fill="#4b5563"> · highest</tspan></text>
+<text x="450" y="856.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,844 H576.6 A4,4 0 0 1 580.6,848 V856 A4,4 0 0 1 576.6,860 H458.5 Z" fill="#c9c8c0"><title>MySQL, Everyone sells the best-seller – 8 clerks working non-stop: median 127 (121–141) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="585.1" y="844.5" width="224.2" height="16" fill="#ffffff"/>
+<text x="588.1" y="856.5" font-size="13" fill="#4b5563"><tspan font-weight="600">127 orders/min</tspan><tspan fill="#4b5563"> · 27% slower · tie</tspan></text>
+<text x="450" y="878.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,866 H600.3 A4,4 0 0 1 604.3,870 V878 A4,4 0 0 1 600.3,882 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Everyone sells the best-seller – 8 clerks working non-stop: median 152 (134–185) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="608.8" y="866.5" width="228.1" height="16" fill="#ffffff"/>
+<text x="611.8" y="878.5" font-size="13" fill="#4b5563"><tspan font-weight="600">152 orders/min</tspan><tspan fill="#4b5563"> · 6.5% slower · tie</tspan></text>
+<line x1="24" y1="895" x2="936" y2="895" stroke="#e5e7eb" stroke-width="1"/>
+<text x="24" y="925" font-size="14" font-weight="600" fill="#111827">Everyone sells the best-seller –</text>
+<text x="24" y="943" font-size="14" font-weight="600" fill="#111827">16 clerks working non-stop</text>
+<text x="24" y="963" font-size="13.5" font-weight="600" fill="#4b5563">Tie: no real winner</text>
+<text x="24" y="981" font-size="13" fill="#4b5563">All within 13%, inside the 21% noise margin.</text>
+<text x="458" y="923" font-size="12.5" fill="#4b5563">orders per minute · higher is better</text>
+<line x1="506.5" y1="930" x2="506.5" y2="996" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="554.5" y1="930" x2="554.5" y2="996" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="602.5" y1="930" x2="602.5" y2="996" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="650.5" y1="930" x2="650.5" y2="996" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="698.5" y1="930" x2="698.5" y2="996" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="458" y1="930" x2="458" y2="996" stroke="#9ca3af" stroke-width="1"/>
+<text x="450" y="945.5" font-size="13" text-anchor="end" fill="#111827">SQL Server</text>
+<path d="M458.5,933 H586.6 A4,4 0 0 1 590.6,937 V945 A4,4 0 0 1 586.6,949 H458.5 Z" fill="#c9c8c0"><title>SQL Server, Everyone sells the best-seller – 16 clerks working non-stop: median 138 (135–151) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="595.1" y="933.5" width="224.2" height="16" fill="#ffffff"/>
+<text x="598.1" y="945.5" font-size="13" fill="#4b5563"><tspan font-weight="600">138 orders/min</tspan><tspan fill="#4b5563"> · 13% slower · tie</tspan></text>
+<text x="450" y="967.5" font-size="13" text-anchor="end" fill="#111827">MySQL</text>
+<path d="M458.5,955 H595.5 A4,4 0 0 1 599.5,959 V967 A4,4 0 0 1 595.5,971 H458.5 Z" fill="#c9c8c0"><title>MySQL, Everyone sells the best-seller – 16 clerks working non-stop: median 147 (123–166) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="604" y="955.5" width="228.2" height="16" fill="#ffffff"/>
+<text x="607" y="967.5" font-size="13" fill="#4b5563"><tspan font-weight="600">147 orders/min</tspan><tspan fill="#4b5563"> · 5.7% slower · tie</tspan></text>
+<text x="450" y="989.5" font-size="13" text-anchor="end" fill="#111827">PostgreSQL</text>
+<path d="M458.5,977 H603.6 A4,4 0 0 1 607.6,981 V989 A4,4 0 0 1 603.6,993 H458.5 Z" fill="#c9c8c0"><title>PostgreSQL, Everyone sells the best-seller – 16 clerks working non-stop: median 155 (133–190) orders/min (lowest–highest run in brackets)</title></path>
+<rect x="612.1" y="977.5" width="169.5" height="16" fill="#ffffff"/>
+<text x="615.1" y="989.5" font-size="13" fill="#4b5563"><tspan font-weight="600">155 orders/min</tspan><tspan fill="#4b5563"> · highest</tspan></text>
+<text x="24" y="1032" font-size="12.5" fill="#4b5563">The lowest and highest of the 6 runs and the exact tie rule are in the table below the chart.</text>
+</g>
+</svg>
